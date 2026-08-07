@@ -1,0 +1,201 @@
+<div class="py-10">
+    <div class="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[1fr_1.4fr] lg:px-8">
+        <div class="space-y-6">
+            @unless ($canCreatePresentations)
+                <div class="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em]">Prerequisitos</p>
+                    <p class="mt-2 text-sm">
+                        Antes de crear presentaciones debes tener al menos un producto y una unidad activa en esta empresa.
+                    </p>
+                </div>
+            @endunless
+
+            <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Formulario</p>
+                        <h3 class="mt-2 text-2xl font-black text-stone-900">
+                            {{ $editingPresentationId ? 'Editar presentacion' : 'Nueva presentacion' }}
+                        </h3>
+                    </div>
+
+                    @if ($editingPresentationId)
+                        <button wire:click="resetPresentationForm" class="text-sm font-medium text-stone-500">
+                            Cancelar
+                        </button>
+                    @endif
+                </div>
+
+                <form wire:submit="savePresentation" class="mt-6 space-y-5">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="presentation-product" class="text-sm font-medium text-stone-700">Producto</label>
+                            <select wire:model="productId" id="presentation-product" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                                <option value="">Selecciona</option>
+                                @foreach ($products as $product)
+                                    <option value="{{ $product->id }}">{{ $product->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('productId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="presentation-unit" class="text-sm font-medium text-stone-700">Unidad de presentacion</label>
+                            <select wire:model="unitId" id="presentation-unit" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                                <option value="">Selecciona</option>
+                                @foreach ($units as $unit)
+                                    <option value="{{ $unit->id }}">{{ $unit->name }} ({{ $unit->code }})</option>
+                                @endforeach
+                            </select>
+                            @error('unitId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="presentation-name" class="text-sm font-medium text-stone-700">Nombre</label>
+                            <input wire:model="name" id="presentation-name" type="text" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                            @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="presentation-barcode" class="text-sm font-medium text-stone-700">Codigo de barras</label>
+                            <input wire:model="barcode" id="presentation-barcode" type="text" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                            @error('barcode') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                            <label for="presentation-factor" class="text-sm font-medium text-stone-700">Factor de conversion</label>
+                            <input wire:model.live="conversionFactor" id="presentation-factor" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                            @error('conversionFactor') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="presentation-price-1" class="text-sm font-medium text-stone-700">Precio 1</label>
+                            <input wire:model="price1" id="presentation-price-1" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                            @error('price1') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="presentation-price-2" class="text-sm font-medium text-stone-700">Precio 2</label>
+                            <input wire:model="price2" id="presentation-price-2" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                            @error('price2') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label for="presentation-price-3" class="text-sm font-medium text-stone-700">Precio 3</label>
+                            <input wire:model="price3" id="presentation-price-3" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500" @disabled(! $canCreatePresentations)>
+                            @error('price3') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl border border-stone-200 bg-stone-50 p-4">
+                        <div class="grid gap-4 sm:grid-cols-[0.8fr_1.2fr] sm:items-end">
+                            <div>
+                                <label for="sample-quantity" class="text-sm font-medium text-stone-700">Cantidad de ejemplo</label>
+                                <input wire:model.live="samplePresentationQuantity" id="sample-quantity" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            </div>
+                            <div class="text-sm text-stone-600">
+                                <p class="font-semibold text-stone-900">Preview de conversion</p>
+                                <p class="mt-1">
+                                    {{ $samplePresentationQuantity ?: '0' }} presentacion(es) equivalen a
+                                    <span class="font-semibold text-amber-700">{{ $conversionPreview ?? '0' }}</span>
+                                    unidad(es) base.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="inline-flex rounded-full bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60" @disabled(! $canCreatePresentations)>
+                        {{ $editingPresentationId ? 'Actualizar presentacion' : 'Guardar presentacion' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Listado</p>
+                    <h3 class="mt-2 text-2xl font-black text-stone-900">Presentaciones registradas</h3>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+                    <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por presentacion, producto o codigo" class="w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500">
+
+                    <label class="flex items-center gap-2 text-sm text-stone-600">
+                        <input wire:model.live="showArchived" type="checkbox" class="rounded border-stone-300 text-amber-600 shadow-sm focus:ring-amber-500">
+                        Ver archivadas
+                    </label>
+                </div>
+            </div>
+
+            <div class="mt-6 overflow-x-auto">
+                <table class="min-w-full divide-y divide-stone-200 text-sm">
+                    <thead>
+                        <tr class="text-left text-stone-500">
+                            <th class="pb-3 font-medium">Presentacion</th>
+                            <th class="pb-3 font-medium">Producto</th>
+                            <th class="pb-3 font-medium">Conversion</th>
+                            <th class="pb-3 font-medium">Precios</th>
+                            <th class="pb-3 font-medium">Estado</th>
+                            <th class="pb-3 font-medium text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-100">
+                        @forelse ($presentations as $presentation)
+                            <tr wire:key="presentation-{{ $presentation->id }}">
+                                <td class="py-4 align-top">
+                                    <p class="font-semibold text-stone-900">{{ $presentation->name }}</p>
+                                    <p class="mt-1 text-xs text-stone-500">{{ $presentation->barcode ?: 'Sin codigo de barras' }}</p>
+                                </td>
+                                <td class="py-4 align-top text-stone-600">
+                                    <p>{{ $presentation->product->name }}</p>
+                                    <p>{{ $presentation->unit->name }} ({{ $presentation->unit->code }})</p>
+                                </td>
+                                <td class="py-4 align-top text-stone-600">
+                                    <p>1 presentacion = {{ rtrim(rtrim((string) $presentation->conversion_factor, '0'), '.') }} {{ $presentation->product->baseUnit->code }}</p>
+                                </td>
+                                <td class="py-4 align-top text-stone-600">
+                                    <p>P1: {{ \App\Support\Money::format((float) $presentation->price_1) }}</p>
+                                    <p>P2: {{ $presentation->price_2 !== null ? \App\Support\Money::format((float) $presentation->price_2) : 'No aplica' }}</p>
+                                    <p>P3: {{ $presentation->price_3 !== null ? \App\Support\Money::format((float) $presentation->price_3) : 'No aplica' }}</p>
+                                </td>
+                                <td class="py-4 align-top">
+                                    <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $presentation->status === 'active' ? 'bg-emerald-100 text-emerald-700' : ($presentation->status === 'inactive' ? 'bg-stone-200 text-stone-700' : 'bg-amber-100 text-amber-700') }}">
+                                        {{ $presentation->status }}
+                                    </span>
+                                </td>
+                                <td class="py-4 align-top text-right">
+                                    <div class="flex justify-end gap-2">
+                                        @if ($presentation->deleted_at)
+                                            <button wire:click="restorePresentation({{ $presentation->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                                Restaurar
+                                            </button>
+                                        @else
+                                            <button wire:click="editPresentation({{ $presentation->id }})" class="rounded-full border border-stone-300 px-3 py-1 font-medium text-stone-700">
+                                                Editar
+                                            </button>
+                                            <button wire:click="togglePresentationStatus({{ $presentation->id }})" class="rounded-full border border-amber-300 px-3 py-1 font-medium text-amber-700">
+                                                {{ $presentation->status === 'active' ? 'Desactivar' : 'Activar' }}
+                                            </button>
+                                            <button wire:click="archivePresentation({{ $presentation->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
+                                                Archivar
+                                            </button>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="py-6 text-center text-stone-500">Aun no hay presentaciones registradas para esta empresa.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

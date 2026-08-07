@@ -1,0 +1,3611 @@
+# Registro de Cambios IA
+
+## 2026-08-06 - Clientes: nombre real en vez de "Cliente #N", busqueda que funciona con Ñ, y habilitar credito a un cliente existente
+
+- Objetivo: en el POS, un cliente ya creado ("Ñato") aparecia en la busqueda como "Cliente #20" en vez de su nombre; buscar por "Ñ" no lo encontraba; y en `/credit` no habia forma de encontrarlo para habilitarle una cuenta de credito por primera vez.
+- Archivos modificados:
+  - `app/Models/Person.php` — accessor `full_name`
+  - `app/Livewire/Sales/PosPage.php` — `resolveOrCreateCustomer()` reescrito
+  - `resources/views/livewire/sales/pos-page.blade.php` — fix de mayusculas en `posCustomerSearch()`
+  - `app/Actions/Customers/EnableCustomerCredit.php` (nuevo)
+  - `app/Livewire/Credit/CreditAccountsPage.php` — buscador + modal "Agregar cliente a credito"
+  - `resources/views/livewire/credit/credit-accounts-page.blade.php` — boton, modal, simplifica 2 bloques de nombre duplicados
+  - `tests/Unit/PersonFullNameTest.php` (nuevo), `tests/Feature/EnableCustomerCreditTest.php` (nuevo), `tests/Feature/PosPageTest.php`, `tests/Feature/CreditAccountsPageTest.php`
+  - `docs/registro-cambios-ia.md`, `docs/modelo-datos.md`, `docs/decisiones-tecnicas.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - `Person::full_name` (`trim(first_name.' '.last_name)`) es ahora la unica fuente de verdad para el nombre — `PosPage.php`/`pos-page.blade.php` ya llamaban a este accessor desde antes, pero nunca existio; Eloquent devolvia `null` silenciosamente y el respaldo `'Cliente #'.$id` se disparaba siempre. Se simplificaron tambien los 2 bloques de `credit-accounts-page.blade.php` que armaban el nombre a mano para usar el mismo accessor.
+  - `resolveOrCreateCustomer()` ya no guarda el texto escrito como `document_number` cuando no son puros digitos (un apodo se guarda solo como `first_name`; `document_number` queda `null`). La busqueda de personas existentes sigue la misma regla, para no crear un cliente duplicado cada vez que se repite el mismo apodo.
+  - El buscador "Agregar cliente a credito" se agrego dentro de `/credit` (no una pagina de "Clientes" nueva), porque `CreditAccountsPage::accounts()` solo consulta `credit_accounts` — un cliente sin cuenta (cualquiera creado por alta rapida del POS) era invisible ahi.
+  - Bug real encontrado y corregido en el camino: el `<script>` que registra la funcion Alpine del nuevo buscador se coloco primero **antes** del `<div>` raiz del componente — eso hizo que Livewire inyectara `wire:id`/`wire:snapshot` sobre el `<script>` en vez de sobre el div real, rompiendo silenciosamente todos los `wire:click` de la pagina (sin ningun error en consola). Se movio el `<script>` a **despues** del `</div>` de cierre del componente, mismo patron seguro ya usado en `pos-page.blade.php`.
+- Pruebas:
+  - `tests/Unit/PersonFullNameTest.php` (3 casos): nombre completo, solo nombre, ambos vacios.
+  - `tests/Feature/PosPageTest.php` (+2 casos): un apodo no numerico crea una persona con `document_number = null`; escribir el mismo apodo en una segunda venta reutiliza el mismo cliente.
+  - `tests/Feature/EnableCustomerCreditTest.php` (3 casos): habilita credito a un cliente sin cuenta; rechaza doble habilitacion; rechaza cliente de otra empresa.
+  - `tests/Feature/CreditAccountsPageTest.php` (+2 casos): el buscador solo lista clientes sin cuenta; despues de habilitar, el cliente aparece en la tabla principal.
+  - `php artisan test --filter='Pos|Credit|Person|Customer|Sales'`: 17 fallos preexistentes (misma linea base ya documentada en sesiones anteriores — 302 vs 403 por suscripcion `status=pending`, textos de blade desactualizados en asserts viejos, `LoyaltySalesTest`, `SupplierPayablesSummaryTest`, `NavigationVisibilityTest`, `FrozenSalesPageTest`), ninguno relacionado con este cambio.
+  - Verificacion manual en Chromium real (Playwright): confirmado sobre el registro real de "Ñato" (via tinker) que `full_name` ya resuelve "Ñato" correctamente; creando un cliente nuevo con apodo "Ñoño Test"/"Ñoño Premium" en POS y buscandolo despues por "ño" (minuscula, parcial) aparece correctamente con su nombre; en `/credit`, "Agregar cliente a credito" encuentra ese mismo cliente, se le habilita un cupo, y pasa a aparecer en la tabla principal de Cartera (conteo de "Cuentas activas" subio de 4 a 5).
+- Resultado:
+  - Los clientes ya muestran su nombre real en vez de "Cliente #N", la busqueda funciona sin importar mayusculas/Ñ, y cualquier cliente existente puede recibir credito por primera vez desde `/credit`.
+
+## 2026-08-06 - Ventas: "Modificar" una venta confirmada (recarga el carrito, anula la original al confirmar la nueva)
+
+- Objetivo: en `Ventas`, una venta confirmada solo tenia "Devolver" y "Anular" — no habia forma de corregir un error de captura (un producto que falto o se empaco de mas) sin perder la venta completa. Se pidio un boton "Modificar" que recargue los mismos productos/cantidades/precio en el POS para que el cajero los ajuste y cierre una venta nueva, quedando la original anulada.
+- Archivos modificados:
+  - `app/Actions/Sales/ModifySale.php` (nuevo) — orquesta `CancelSale` + `CreatePosSale` en una sola transaccion
+  - `database/migrations/2026_08_06_130000_add_replaces_sale_id_to_sales_table.php` (nuevo)
+  - `app/Models/Sale.php` — `replaces_sale_id` en `fillable`, relaciones `replacesSale()`/`replacedBySale()`
+  - `app/Livewire/Sales/PosPage.php` — `modifyingSaleId`, `loadSaleForModification()`, `mapSaleItemsForCart()` (extraido de `loadDraftSaleForEditing()`), tercera rama en `saveSale()`
+  - `app/Livewire/Sales/SalesPage.php` — `modifySaleUrl()`, eager-load de `replacesSale`/`replacedBySale`
+  - `resources/views/livewire/sales/sales-page.blade.php` — boton "Modificar" + insignias de trazabilidad
+  - `tests/Feature/SalesModificationTest.php` (nuevo), `tests/Feature/PosPageTest.php`, `tests/Feature/SalesPageTest.php`
+  - `docs/registro-cambios-ia.md`, `docs/modelo-datos.md`, `docs/decisiones-tecnicas.md`, `docs/flujo-pos.md`, `docs/estados-del-sistema.md`
+- Migraciones:
+  - `add_replaces_sale_id_to_sales_table`: agrega `sales.replaces_sale_id` (autorreferencia nullable, `nullOnDelete`, mismo patron que `frozen_sales.converted_sale_id`) + indice `(company_id, replaces_sale_id)`.
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - `ModifySale::handle()` anula la venta original **antes** de crear la nueva (no al reves), porque `PostSaleToInventory` y `CompanyOperationalLimitGuard` (stock y `max_monthly_sales`) evaluan contra el estado vigente — crear primero podia rechazar una correccion legitima por "stock insuficiente" mientras el stock de la venta vieja seguia atrapado.
+  - Ambas Actions ya abren su propio `DB::transaction()`; envolverlas en una transaccion externa en `ModifySale` basta para atomicidad total (Laravel promueve la anidada a `SAVEPOINT`, en Postgres y en SQLite).
+  - "Modificar" solo exige `sales.create` (no se creo un permiso `sales.modify`, ni se exige tambien `sales.cancel`) porque `cashier`/`seller` no tienen `sales.cancel` en `PermissionCatalog` y el pedido original queria que el propio cajero pudiera hacer esta correccion.
+  - Restringido a `sale_type = pos`: `PosPage::saveSale()` ya hardcodea `sale_type = pos`, el POS no puede crear ventas de credito; modificar una venta de credito quedo fuera de alcance.
+  - `ModifySale` re-verifica `status === confirmed` con `lockForUpdate()` al inicio, porque `CancelSale` es idempotente si la venta ya esta `cancelled` — sin este guard, un doble submit de "Modificar" crearia una segunda venta de reemplazo.
+- Pruebas:
+  - `tests/Feature/SalesModificationTest.php` (5 casos): camino feliz con `replaces_sale_id` correcto; rollback total si la venta nueva falla (la original sigue `confirmed`, no queda anulada sin reemplazo); regresion del orden anular-antes-de-crear (stock agotado por la venta original, modificar pidiendo la misma cantidad debe funcionar); rechazo de ventas a credito; rechazo de doble modificacion sobre la misma venta.
+  - `tests/Feature/PosPageTest.php` (+3 casos): carga y confirma una modificacion end-to-end vía Livewire; rechaza cargar una venta draft o de credito para modificar.
+  - `tests/Feature/SalesPageTest.php` (+1 caso): el boton "Modificar" solo aparece para ventas confirmadas de tipo POS, no para draft.
+  - `php artisan test --filter='Sales|Pos|Cash|Credit|Inventory'`: 20 fallos preexistentes (documentados en sesiones anteriores: suscripcion `status=pending` con 302 en vez de 403, textos de blade desactualizados en los asserts de `SalesPageTest`/`PosPageTest`, `LoyaltySalesTest`, `SupplierPayablesSummaryTest`, `NavigationVisibilityTest`), ninguno relacionado con este cambio — confirmado comparando contra la linea base antes de tocar codigo.
+- Resultado:
+  - Una venta POS confirmada ahora puede "Modificar"se desde `Ventas`: recarga el carrito en el POS, y al confirmar la venta corregida, la original queda anulada automaticamente y enlazada por `replaces_sale_id`.
+
+## 2026-08-06 - POS: formatear el separador de miles mientras se escribe el valor de pago
+
+- Objetivo: en el modal "Cobrar Venta" del POS, el campo de valor de cada forma de pago solo mostraba el punto de miles al perder el foco (`onBlur`) — mientras el cajero escribia (ej. "6000") veia el numero crudo sin separador, sin la misma ayuda visual que ya tiene "Total a cobrar".
+- Archivos modificados:
+  - `resources/views/livewire/sales/pos-page.blade.php` — Alpine `paymentAmount()`: nuevo `onInput()` que reformatea en cada tecla, `onFocus()` ya no desformatea (innecesario ahora que `onInput` recalcula desde el valor formateado en cada evento)
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Se agrego `onInput` en vez de reemplazar el input por uno numerico nativo (`type="number"`) porque los inputs numericos nativos del navegador no soportan separadores de miles ni se pueden formatear en vivo. El campo sigue siendo `wire:ignore` (Alpine controla el DOM directamente); la sincronizacion a Livewire se mantiene solo en `onBlur`, sin cambios en esa parte, para no disparar un request por cada tecla.
+  - El reposicionamiento de cursor cuenta cuantos digitos habia antes de la posicion del cursor en el valor crudo, reformatea, y ubica el cursor despues de esa misma cantidad de digitos en el string formateado — asi insertar un digito en medio del numero (no solo al final) no salta el cursor a un lugar incorrecto.
+- Pruebas:
+  - Verificacion manual en Chromium real (Playwright): escribiendo "6000" digito por digito el campo mostro "6" → "60" → "600" → "6.000"; insertando un digito en medio de un valor ya formateado ("6.000" con cursor tras el "6", se escribe "9") el resultado fue "69.000" con el cursor correctamente ubicado tras "69".
+  - Sin cambios en PHP, no se corrio la suite de Pest para este cambio (puramente Alpine.js/Blade).
+- Resultado:
+  - El valor de cada forma de pago en "Cobrar Venta" ahora muestra el punto de miles/millon en vivo mientras se escribe, igual que "Total a cobrar".
+
+## 2026-08-06 - Caja: numerar sesiones por empresa en vez de usar el id global
+
+- Objetivo: `Caja > Historial reciente de caja` mostraba "Sesion #{{ id }}", usando la PK autoincremental de `cash_sessions`, compartida entre todas las empresas del sistema. Una empresa que abria su primera caja podia ver "Sesion #11" porque otras 10 filas ya existian en la tabla para otras empresas, dando la impresion enganosa de tener 10 sesiones previas.
+- Archivos modificados:
+  - `database/migrations/2026_08_06_120000_add_company_sequence_to_cash_sessions_table.php` (nuevo)
+  - `app/Models/CashSession.php` — `company_sequence` en `fillable` y `casts`
+  - `app/Actions/Cash/OpenCashSession.php` — calcula `company_sequence` como `max(company_sequence) + 1` por empresa, con `lockForUpdate()`
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php` — muestra `$session->company_sequence` en vez de `$session->id`
+  - `tests/Feature/CashAndPaymentsTest.php` — nuevo caso `test_company_sequence_is_independent_per_company`
+  - `docs/registro-cambios-ia.md`
+  - `docs/modelo-datos.md`
+- Migraciones:
+  - `add_company_sequence_to_cash_sessions_table`: agrega `company_sequence` (unsigned integer, nullable), hace backfill ordenando por `company_id, id` para asignar 1, 2, 3... por empresa a las sesiones ya existentes, y agrega restriccion unica `(company_id, company_sequence)`. Sigue el mismo patron ya usado en `add_internal_document_fields_to_sales_table` para `document_sequence`.
+- Decisiones:
+  - Se replico el patron ya existente en `sales.document_sequence` (calculado dentro de la transaccion con `lockForUpdate()`) en vez de inventar un mecanismo nuevo. A diferencia de `SaleDocumentNumberGenerator`, aqui no hace falta un numero de documento formateado con prefijo/padding (no es un comprobante fiscal ni se imprime), asi que se dejo como un entero simple calculado directamente en `OpenCashSession::handle()`, sin crear un servicio generador nuevo.
+- Pruebas:
+  - `tests/Feature/CashAndPaymentsTest.php` (nuevo caso): abre y cierra una sesion, abre una segunda para la misma empresa (`company_sequence` 1 y 2), luego abre la primera sesion de una segunda empresa y confirma que empieza en 1 aunque su `id` global sea mayor que las de la primera empresa.
+  - `php artisan test tests/Feature/CashAndPaymentsTest.php tests/Feature/CashSessionsPageTest.php`: los 2 fallos que aparecen (mensaje de validacion de pagos distinto al esperado por el test, y `route is forbidden` devolviendo 302 en vez de 403 por suscripcion `status=pending`) ya eran preexistentes, sin relacion con este cambio.
+- Resultado:
+  - "Sesion #N" ahora refleja cuantas sesiones de caja ha abierto esa empresa especificamente, empezando siempre en 1 para una empresa nueva.
+
+## 2026-08-06 - Roles: ocultar del formulario los permisos de modulos que el plan no incluye
+
+- Objetivo: `Admin > Roles` mostraba siempre el checklist completo de permisos agrupados por `module_code` (Caja, Credito, Inventario, Fidelizacion, Compras, etc.) al crear/editar un rol personalizado, sin importar si el plan de la empresa incluia esos modulos. Una empresa en Basic (que solo trae `products, pos, cash, reports`) veia igual las secciones de Credito, Inventario, Fidelizacion, Promociones y Compras, sin sentido porque no puede usarlas.
+- Archivos modificados:
+  - `app/Livewire/Admin/RolesPage.php` — nueva constante `PLAN_GATED_MODULE_CODES` y `permissionGroups()` filtrado por `CompanyPlanResolver::hasModule()`
+  - `tests/Feature/RolesPagePermissionGatingTest.php` (nuevo)
+  - `docs/registro-cambios-ia.md`
+  - `docs/roles-y-permisos.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mapeo `PLAN_GATED_MODULE_CODES` traduce cada `module_code` de la tabla `permissions` a su modulo de `PlanCatalog` correspondiente: la mayoria coincide 1 a 1 (`products`, `inventory`, `purchases`, `cash`, `credit`, `loyalty`, `promotions`, `reports`), salvo `sales` (permisos de venta) que se gatea contra el modulo de plan `pos`, porque `PlanCatalog` no tiene un modulo llamado literalmente `sales`. Los `module_code` sin entrada en el mapeo (`masters`, `suppliers`, `payables`, `settings`, `users`, `roles`, `subscriptions`) son capacidades administrativas/nucleo y siempre se muestran, sin importar el plan.
+  - Confirmado con el usuario: si un rol ya tenia asignado un permiso de un modulo que luego el plan deja de incluir (downgrade), el permiso **se deja como esta en base de datos**, solo se oculta del formulario. No se toco `editRole()` ni `saveRole()` — ya funcionaban asi de forma natural (`editRole()` carga los permisos actuales del rol independientemente de `permissionGroups()`, y `saveRole()` valida contra la tabla `permissions` completa, no contra la lista filtrada), asi que solo filtrar la lista que arma el checklist visible fue suficiente.
+  - La vista (`roles-page.blade.php`) no necesito ningun cambio: como `$permissionGroups` ya llega filtrado desde PHP, el `@foreach` existente automaticamente deja de renderizar los grupos ocultos.
+- Pruebas:
+  - `tests/Feature/RolesPagePermissionGatingTest.php` (3 casos, 24 assertions): plan Basic oculta `credit`/`loyalty`/`promotions`/`inventory`/`purchases` pero conserva `products`/`cash`/`sales`/`reports` y todos los grupos administrativos; plan Premium muestra todos los grupos; un rol con un permiso de un modulo luego des-incluido en el plan lo conserva tras editar y volver a guardar.
+  - `php artisan test tests/Feature/PermissionAuthorizationTest.php tests/Feature/RolesPageTest.php tests/Feature/RolesPagePermissionGatingTest.php`: los 3 fallos que aparecen (`route is forbidden` devolviendo 302 en vez de 403/200, y el test de limite de usuarios) ya eran preexistentes, documentados en sesiones anteriores (suscripcion `status=pending`), sin relacion con este cambio.
+  - Verificacion manual en Chromium real (Playwright): con `demo.basic` el checklist de `/admin/roles` solo muestra Caja, Masters, Payables, Productos, Reportes, Roles, Ventas, Configuracion, Subscriptions, Suppliers, Users; con `demo.premium` aparecen ademas Credito, Inventario, Fidelizacion, Promociones, Compras.
+- Resultado:
+  - El formulario de creacion/edicion de roles ya no ofrece permisos de modulos que la empresa no puede usar segun su plan.
+
+## 2026-08-06 - Normalizar el ancho de contenedor en las 8 pantallas de Admin
+
+- Objetivo: la barra de tabs de `<x-admin-nav />` (Reportes, Suscripcion, Bundles, Cupones, Overrides, Estructura, Configuracion, Auditoria, Roles) se veia en una sola fila en la mayoria de pantallas de Admin, pero se partia en 2 filas especificamente en Configuracion, dando la sensacion de que los botones "se movian" al navegar entre tabs.
+- Archivos modificados:
+  - `resources/views/livewire/admin/settings-page.blade.php`
+  - `resources/views/livewire/admin/company-structure-page.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Causa real: `settings-page.blade.php` envolvia todo en `max-w-4xl` (896px) mientras las otras 7 pantallas de Admin ya usaban `max-w-7xl` (1280px) — la misma barra de navegacion, con el mismo contenido, se ve forzada a partir en 2 filas cuando su contenedor es mas angosto. Se normalizo a `max-w-7xl` para que las 9 pestañas queden siempre en la misma posicion sin importar en cual pantalla de Admin estes.
+  - Para que el formulario de Configuracion no quedara con campos de texto excesivamente anchos al ensanchar el contenedor, se le agrego `max-w-3xl` a la tarjeta blanca interna (no al wrapper completo), asi la barra de navegacion ocupa el mismo ancho que en las demas pantallas pero el formulario se queda en un ancho de lectura comodo.
+  - De paso se normalizo `company-structure-page.blade.php`, que tenia `space-y-6` de la mayoria (traia `space-y-5`).
+- Pruebas:
+  - Verificacion manual en Chromium real: posicion en pixeles de los botones "Reportes" y "Roles" medida en las 8 pantallas de Admin — identica en las 8 (la unica diferencia de 2px es el propio boton activo en negrita dentro de `admin/roles`, no un problema de layout).
+  - `php artisan test --filter='SettingsPageTest|CompanyStructurePageTest'`: los 4 fallos que aparecen ya eran preexistentes (documentados en sesiones anteriores), sin relacion con este cambio de solo CSS.
+- Resultado:
+  - La barra de navegacion de Admin ya se ve identica, en la misma posicion, en las 8 pantallas.
+
+## 2026-08-06 - Toasts abajo a la derecha con estilo distinto por tipo
+
+- Objetivo: el `toast` global salia arriba a la derecha, encima del boton "Cerrar sesion" (se veian encimados), y los 4 tipos (`success`, `error`, `warning`, `info`) solo se distinguian por el color de un puntito de 2.5px — visualmente casi identicos.
+- Archivos modificados:
+  - `resources/views/components/toast-stack.blade.php`
+  - `resources/js/app.js`
+  - `tailwind.config.js`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Posicion: `bottom-4 right-4` (`sm:bottom-6 sm:right-6`) en vez de `top-4 right-4`; el apilado pasa a `flex-col-reverse` para que el toast mas nuevo aparezca pegado a la esquina y los anteriores se acomoden hacia arriba.
+  - Cada tipo ya tiene borde izquierdo de 4px, fondo tintado (`bg-{color}-50/95`) e icono propio en circulo solido (check para success, X para error, triangulo de alerta para warning, "i" para info) en vez del punto generico de 2.5px sobre fondo blanco identico para los 4 tipos.
+  - Bug encontrado y corregido en el camino: los colores nuevos no se veian (fondo transparente, borde gris) porque `tailwind.config.js` no incluia `resources/js/**/*.js` en `content` — las clases de Tailwind que solo existen como texto dentro de `toastStack()` en `app.js` nunca se compilaban a CSS real. Se agrego esa ruta al `content` del config.
+- Pruebas:
+  - Verificacion manual en Chromium real: toast de error disparado desde el POS (carrito vacio) ya no se superpone con el header, con fondo rosa, borde izquierdo rosa e icono X solido confirmados via `getComputedStyle` (antes del fix de Tailwind: fondo transparente y borde gris; despues: colores reales aplicados).
+- Resultado:
+  - Las notificaciones ya no interfieren visualmente con la barra superior, y de un vistazo se distingue si algo fue exitoso, un error, una advertencia o solo informativo.
+
+## 2026-08-06 - Reportes: ocultar indicadores por plan y agregar graficas filtrables
+
+- Objetivo: `Reportes` mostraba siempre Cartera, Cartera vencida, Docs vencidos, Aging de cartera, Puntos vigentes y Promociones sin importar si el plan de la empresa incluia esos modulos (Basic no trae credito/fidelizacion/promociones y las veia igual, todo en $0). Ademas todo era numeros y listas, sin graficas.
+- Archivos modificados:
+  - `app/Services/Reports/OperationalReportService.php` — flags de gating en `summaryCards()`, nuevo `salesTrend()`
+  - `app/Livewire/Reports/OperationalReportsPage.php` — `creditEnabled()`, `loyaltyEnabled()`, `promotionsEnabled()`, `profitabilityEnabled()`
+  - `resources/views/livewire/reports/operational-reports-page.blade.php` — `@if` de gating, grid de tarjetas fluida, 4 graficas nuevas
+  - `resources/views/components/charts/bar-chart.blade.php` (nuevo)
+  - `resources/views/components/charts/line-chart.blade.php` (nuevo)
+  - `tests/Feature/OperationalReportsGatingTest.php` (nuevo)
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Gating: Cartera/Cartera vencida/Docs vencidos/Aging de cartera requieren modulo `credit`; Puntos vigentes requiere `loyalty`; Promociones (tarjeta + actividad reciente) requiere `promotions`; Margen bruto ahora requiere ademas la feature `reports.profitability` (antes solo dependia del permiso `reports.view_costs`). El servicio ya no ejecuta las consultas de un modulo apagado, no solo las oculta.
+  - Cargue la skill `dataviz` antes de construir las graficas. Un intento de paleta categorica propia (tonos amber/sky/emerald del proyecto) fallo el validador (`scripts/validate_palette.js`, separacion CVD insuficiente); se uso en su lugar la paleta de referencia de la skill (ya validada), que convive bien con el resto de la UI porque el texto siempre usa tinta neutra, nunca el color de la serie.
+  - Graficas como SVG inline generado por Blade (sin libreria JS): heredan gratis el comportamiento "sin recargar pagina" porque los filtros de fecha/sucursal ya eran `wire:model.live`, y Livewire re-renderiza el SVG en cada actualizacion AJAX igual que el resto de la pagina.
+  - Nueva consulta `salesTrend()` agrupa por `date(coalesce(sold_at, created_at))` en vez de `::date` (cast especifico de Postgres) porque el test suite corre sobre SQLite en memoria; `date()` es portable entre ambos motores.
+- Bugs encontrados y corregidos en el camino (ninguno de los dos se veia con datos vacios, solo aparecieron probando con datos reales en navegador):
+  - Los totales que ya vienen formateados por `Money::format()` (ej. `"153.028"`, punto como separador de miles) se le pasaban a los componentes de grafica, que hacian `(float)` directo — mismo bug de interpretar el punto como decimal que ya se habia corregido en Productos esta sesion. Se agrego normalizacion (`Money::normalizeInput()`) en ambos componentes antes de graficar.
+  - El SVG de las graficas se salia de su contenedor en el grafico de "Medios de pago": `getComputedStyle` revelo que el navegador ignoraba `height: 100%` (clases `h-full w-full`) y calculaba el alto a partir del aspect-ratio intrinseco del `viewBox`, ignorando `preserveAspectRatio="none"`. En los otros 3 graficos el alto resultante quedaba por casualidad por debajo del contenedor y no se notaba; en este se pasaba y tapaba la lista de abajo. Se corrigio fijando `height` como atributo SVG explicito (`height="{{ $height }}"`) en vez de depender de CSS porcentual.
+- Pruebas:
+  - `tests/Feature/OperationalReportsGatingTest.php` (3 casos): plan `basic` oculta credito/fidelizacion/promociones/margen; plan `premium` los muestra; `salesTrend()` agrupa correctamente por dia y respeta el rango de fechas filtrado.
+  - Verificacion manual en Chromium real: comparacion visual `demo.basic` vs `demo.premium`, hover con tooltip mostrando el valor real, cambio de filtro de fecha sin evento `load` del navegador (confirmado por conteo), validador de paleta corrido sobre los hex exactos usados.
+- Resultado:
+  - Una empresa en Basic ya no ve indicadores de modulos que no tiene contratados. Todas las empresas ven una tendencia de ventas por dia, y sucursales/medios de pago/cartera vencida (cuando aplica) tienen su version grafica ademas de la lista de siempre, todo actualizandose sin recargar la pagina.
+
+## 2026-08-05 - Quitar barras de navegacion de un solo boton en 7 modulos
+
+- Objetivo: varios modulos (Caja, Catalogo/Productos, Credito, Inventario, Fidelizacion, Promociones, Reportes) mostraban una barra de navegacion tipo pestañas con un unico boton, siempre activo, sin nada mas a donde navegar — ocupaba espacio sin dar ninguna funcion real.
+- Archivos modificados:
+  - Eliminados: `resources/views/components/{cash,catalog,credit,inventory,loyalty,promotions,reports}-nav.blade.php` (7 archivos, cada uno tenia un unico `<a>` de navegacion)
+  - 16 vistas que incluian `<x-*-nav />`: `livewire/cash/cash-sessions-page.blade.php`, `livewire/masters/{brands,units,categories}-page.blade.php`, `livewire/products/{attributes,product-presentations,product-variants,product-imports,products}-page.blade.php`, `livewire/promotions/promotions-page.blade.php`, `livewire/loyalty/loyalty-accounts-page.blade.php`, `livewire/credit/{customer-imports,credit-accounts}-page.blade.php`, `livewire/inventory/{inventory-adjustment,inventory-adjustment-imports}-page.blade.php`, `livewire/reports/operational-reports-page.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Se verifico con `grep` que cada uno de los 7 componentes tenia exactamente una sola llamada a `route()` (un solo destino posible) antes de eliminarlos, y que no se usaban en ninguna otra vista ademas de las 16 listadas.
+  - Se dejaron intactos `admin-nav` (9 destinos), `purchases-nav` (5 destinos) y `sales-nav` (2 destinos), que si tienen navegacion real entre varias pantallas.
+- Pruebas:
+  - Verificacion manual en Chromium real: las 16 paginas afectadas cargan con status 200 sin errores.
+  - Se corrio la suite de los modulos afectados; los 9 fallos que aparecen ya eran preexistentes (documentados en sesiones anteriores) o son errores de validacion de negocio en `Actions/Sales/*` no relacionados con esta vista.
+- Resultado:
+  - Caja, Catalogo/Productos, Credito, Inventario, Fidelizacion, Promociones y Reportes ya no muestran una barra de "navegacion" que no navega a ningun lado.
+
+## 2026-08-05 - Vista compacta de Caja para empresas de una sola sucursal/caja
+
+- Objetivo: el plan Basic solo permite 1 sucursal y 1 caja (`max_branches`, `max_cash_registers` = 1), asi que mostrar selectores de Sucursal/Caja en el formulario de apertura, en los filtros y repetidos en cada tarjeta del historial era espacio desperdiciado sin ninguna decision real que tomar.
+- Archivos modificados:
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Cuando la empresa tiene una sola sucursal y una sola caja activa, el formulario "Nueva sesion" reemplaza los dos `<select>` por una linea de texto ("Sucursal Principal · Caja Principal"); si existe mas de una sucursal o caja (Pro/Premium con estructura ampliada), se mantienen los selectores tal cual estaban.
+  - Mismo criterio aplicado a los filtros del historial (se ocultan los selects de sucursal/caja) y a cada tarjeta de sesion (no repite sucursal/caja si siempre es la misma).
+  - Las 5 tarjetas de estadisticas se compactaron (menos padding, numeros mas pequeños) y "Cajas filtradas" se oculta cuando solo existe una caja posible, porque el numero siempre seria 1.
+  - Bug encontrado y corregido en el camino: la sintaxis corta `@php($var = a || b)` de Blade rompio la compilacion en este archivo (`ParseError: unexpected token "class"` en la linea siguiente) combinada con el compilador extendido de Livewire; se cambio a la forma de bloque `@php ... @endphp`, que es la forma segura para asignaciones con operadores logicos.
+- Pruebas:
+  - Verificacion manual en Chromium real logueado como `demo.basic` (una sola sucursal/caja): confirmado que los selectores desaparecen, el formulario sigue abriendo sesion correctamente, y las tarjetas de historial se ven mas compactas.
+  - `php artisan test --filter='CashSessions|CashAndPayments'`: mismo resultado que antes del cambio (2 fallos preexistentes sin relacion, documentados en sesiones anteriores; el test que abre y cierra sesion de caja sigue en verde).
+- Resultado:
+  - El modulo de Caja ya no muestra selectores ni repite sucursal/caja cuando la empresa solo tiene una de cada una, dejando la pantalla mas compacta sin perder funcionalidad cuando la empresa si tiene mas de una.
+
+## 2026-08-05 - Restablecer contraseña de usuario desde Plataforma > Usuarios
+
+- Objetivo: el superadmin pidio poder "ver" las contraseñas de los usuarios con un icono de ojo. Las contraseñas se guardan con `bcrypt` (hash de un solo sentido) y es criptograficamente imposible recuperarlas; en vez de eso se construyo la alternativa real: restablecerlas.
+- Archivos modificados:
+  - `app/Livewire/Platform/UsersPage.php`
+  - `resources/views/livewire/platform/users-page.blade.php`
+  - `tests/Feature/PlatformUsersPageTest.php` (nuevo)
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Boton "Restablecer contraseña" por usuario en `Plataforma > Usuarios`, con un modal de dos pasos: (1) genera una contraseña aleatoria de 12 caracteres (`Str::password(12, symbols: false)`, sin simbolos para que sea facil de comunicar por WhatsApp/telefono), editable a mano, con icono de ojo para mostrar/ocultar antes de guardar (eso si es legitimo: es un campo nuevo que el propio superadmin esta escribiendo, no un hash existente); (2) tras confirmar, muestra la contraseña en texto plano una sola vez con boton de copiar, y advierte que no se va a volver a mostrar.
+  - Sin auditoria por ahora, mismo criterio que la edicion de planes: es una accion de plataforma sin empresa dueña y `AuditLogger` exige `Company` no nulo.
+- Pruebas:
+  - `tests/Feature/PlatformUsersPageTest.php` (3 casos): el superadmin restablece la contraseña y el usuario puede autenticarse con la nueva; se exige minimo 8 caracteres; un usuario no-superadmin no puede acceder a la pantalla.
+- Resultado:
+  - Verificado en Chromium real de punta a punta: generar, revelar, guardar y **login real exitoso** con la contraseña nueva.
+
+## 2026-08-05 - Correccion de margen incorrecto en formulario de productos
+
+- Objetivo: corregir que el porcentaje de margen mostrado en vivo al crear/editar un producto (costo y precios) mostrara valores absurdos (ej. "1199900.0% margen") en vez del margen real.
+- Archivos modificados:
+  - `resources/js/app.js`
+  - `resources/views/livewire/products/products-page.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Causa raiz identificada y confirmada con Playwright (tecleo real, no solo lectura de codigo): el formateador global de dinero (`app.js`) reformatea el input en vivo insertando "." como separador de miles (ej. "20000" -> "20.000"), pero el calculo de margen en el formulario de productos (Alpine.js) leia ese texto ya formateado con `parseFloat($event.target.value)` directo. `parseFloat("20.000")` en JS da `20` (interpreta el punto como separador decimal), no `20000`, produciendo margenes absurdos.
+  - Se agrego `moneyValue()` en el `x-data` del formulario, que limpia el texto a solo digitos antes de convertir a numero, y se uso en los 4 campos (`cost`, `price1`, `price2`, `price3`) en lugar de `parseFloat` directo.
+  - De paso se corrigio que el formateador global de `app.js` no preservaba la posicion del cursor al reescribir el valor en cada tecla (`input.value = formattedValue` sin `setSelectionRange`), lo que bajo tecleo muy rapido podia desordenar los digitos. Se agrego calculo de digitos-antes-del-cursor para reposicionar el cursor correctamente tras reformatear; beneficia a todos los campos de dinero de la aplicacion, no solo productos.
+  - El valor guardado en base de datos (`margin_1/2/3` via `ProductsPage::marginFrom()`) nunca estuvo mal calculado: ese metodo PHP ya usaba `(float)` sobre el valor normalizado por `NormalizeMoneyInput` (que si limpia los puntos correctamente en el servidor). El bug era exclusivamente de la vista previa en vivo (Alpine/JS), no de lo persistido.
+- Pruebas:
+  - Verificacion manual en Chromium real (Playwright) con tecleo simulado realista (clic, pausa, escritura): costo "20000" y precio "24000" ahora muestran "20.0% margen" correctamente, en vez del valor absurdo original.
+- Resultado:
+  - El margen mostrado en vivo al crear o editar un producto ya refleja el calculo real, sin importar cuantos digitos tenga el costo o el precio.
+
+## 2026-08-05 - Mensaje preciso de requisitos para POS y ventas congeladas
+
+- Objetivo: corregir que una empresa recien creada mostrara "Debes tener al menos una sucursal, una bodega y un producto activo" en el POS, sugiriendo que faltaba sucursal/bodega cuando en realidad `CreateCompany` ya las crea automaticamente; el unico requisito real pendiente es el producto (manual, a cargo del cliente).
+- Archivos modificados:
+  - `app/Livewire/Sales/PosPage.php`
+  - `app/Livewire/Sales/FrozenSalesPage.php`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `resources/views/livewire/sales/frozen-sales-page.blade.php`
+  - `tests/Feature/SalesRequirementsMessageTest.php` (nuevo)
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Verificado en base de datos que `CreateCompany` ya crea sucursal, bodega y caja principal automaticamente para toda empresa nueva; no habia nada que arreglar en el aprovisionamiento.
+  - `canCreateSales()`/`canCreateFrozenSales()` combinaban 3 condiciones (sucursal, bodega, producto) en un solo booleano y mostraban siempre el mismo mensaje generico listando las 3, sin importar cual faltara realmente. Se agrego `salesRequirementsMessage()`/`frozenSalesRequirementsMessage()` que arma el mensaje solo con lo que efectivamente falta.
+- Pruebas:
+  - `tests/Feature/SalesRequirementsMessageTest.php` (2 casos): una empresa recien creada (sucursal y bodega ya provisionadas, sin productos) solo reporta "producto activo" en POS y en ventas congeladas, no sucursal ni bodega.
+- Resultado:
+  - Un cliente nuevo ve exactamente que le falta (agregar un producto), sin sugerir un problema de configuracion de sucursal/bodega que no existe.
+
+## 2026-08-04 - Edicion completa de planes (modulos, features y limites) desde Plataforma
+
+- Objetivo: permitir que un `platform_super_admin` edite que modulos, features y limites tiene cada plan desde `Plataforma > Planes` con clics, en vez de depender de valores hardcodeados en `app/Support/Plans/PlanCatalog.php`; y resolver que el bootstrapper del catalogo revertia esas ediciones en trafico normal.
+- Archivos modificados:
+  - `app/Services/Plans/PlanCatalogBootstrapper.php`
+  - `app/Support/Plans/PlanLimitCatalog.php` (nuevo)
+  - `app/Actions/Plans/UpdatePlan.php` (nuevo)
+  - `app/Livewire/Platform/PlansPage.php`
+  - `resources/views/livewire/platform/plans-page.blade.php`
+  - `app/Http/Middleware/NormalizeMoneyInput.php`
+  - `resources/js/app.js`
+  - `tests/Feature/PlanCatalogBootstrapperTest.php` (nuevo)
+  - `tests/Feature/PlansPageTest.php` (nuevo)
+  - `docs/matriz-planes-modulos.md`, `docs/modelo-datos.md`, `docs/decisiones-tecnicas.md`, `docs/roadmap.md`, `docs/checklist-maestro.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna (no se agregaron columnas; se reutilizan `plan_modules`, `plan_features` y `plan_limits` ya existentes).
+- Decisiones:
+  - Cambiar `PlanCatalogBootstrapper::ensureDefaults()` de `upsert(..., $updateColumns)` a `insertOrIgnore(...)` para `plans`, `plan_modules`, `plan_features` y `plan_limits`. Verificado en el codigo fuente de Laravel que `upsert($values, $uniqueBy, [])` no es "insertar o ignorar" (hace un `insert()` plano que rompe con duplicate-key); el metodo correcto es `insertOrIgnore()`. `PlanCatalog.php` pasa a ser solo el seed inicial; la base de datos manda una vez que existe una fila.
+  - Nueva Action `UpdatePlan::handle()` hace `sync()` completo de modulos y features contra el universo total (siempre deja una fila explicita `enabled: true/false`, nunca ambiguedad de fila ausente) y `updateOrCreate` por cada limite de `PlanLimitCatalog`.
+  - Al desmarcar un modulo en la UI, sus features tambien se desmarcan automaticamente para evitar el estado inconsistente "feature activa sin su modulo".
+  - Implementar esta edicion como el primer "drawer" (panel lateral) del proyecto en vez del modal chico centrado, siguiendo la regla de `AGENTS.md` ("modal para formularios pequeños y drawer para medianos o grandes"): el formulario ya no cabe comodo en `max-w-md`.
+  - Bug encontrado y corregido en el camino: el formateador global de dinero (JS en `app.js` + `NormalizeMoneyInput`) detecta campos de dinero por substring en el nombre (`amount, price, ..., limit, cash, ...`); los nuevos campos `editLimits.max_products`, `editLimits.max_cash_registers`, etc. son contadores enteros pero calzaban por accidente, y en una prueba en navegador real llegaron a corromper el valor guardado (dos numeros concatenados). Se agrego `editlimits` a la lista de exclusion en ambos lugares.
+  - Esta edicion queda sin auditoria por ahora: `AuditLogger` exige un `Company` no nulo y editar un plan es una accion de plataforma sin empresa dueña; se anota como deuda pendiente en `decisiones-tecnicas.md`.
+- Pruebas:
+  - `tests/Feature/PlanCatalogBootstrapperTest.php` (3 casos): seed en base vacia, no revierte ediciones manuales en una segunda corrida, sigue sembrando filas faltantes sin tocar las ya editadas.
+  - `tests/Feature/PlansPageTest.php` (3 casos): edicion completa persiste en BD, desmarcar modulo limpia features en el estado del componente, `CompanyPlanResolver` refleja el cambio para una empresa en ese plan.
+  - Verificacion manual en Chromium real (Playwright): abrir drawer, desmarcar modulo con features, cambiar limite, guardar, recargar y confirmar persistencia; confirmado que el campo de limite ya no se corrompe tras el fix del formateador de dinero.
+- Resultado:
+  - `Plataforma > Planes` permite gobernar modulos, features y limites por plan sin tocar codigo, y las ediciones sobreviven a la creacion de empresas y cambios de suscripcion de cualquier cliente.
+
+## 2026-08-04 - Limpieza de Usuarios y correccion de overlay de modales en 8 pantallas
+
+- Objetivo: quitar la posibilidad de promover a superadmin a un usuario de cliente desde `Plataforma > Usuarios`, y corregir un bug real donde el fondo oscuro de los modales no cubria la parte superior de la pantalla.
+- Archivos modificados:
+  - `app/Livewire/Platform/UsersPage.php`
+  - `resources/views/livewire/platform/users-page.blade.php`
+  - `resources/views/livewire/platform/plans-page.blade.php`
+  - `resources/views/livewire/platform/subscriptions-page.blade.php`
+  - `resources/views/livewire/platform/platform-coupons-page.blade.php`
+  - `resources/views/livewire/purchases/suppliers-page.blade.php`
+  - `resources/views/livewire/purchases/purchases-page.blade.php`
+  - `resources/views/livewire/products/products-page.blade.php`
+  - `resources/views/livewire/admin/company-structure-page.blade.php`
+  - `resources/views/livewire/credit/credit-accounts-page.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Eliminar por completo el boton "Hacer admin", el metodo `toggleAdmin()` y la columna "Accion" de `Plataforma > Usuarios`; esa promocion queda reservada a un comando de consola o acceso directo a base de datos.
+  - Causa raiz del bug de overlay: la utilidad `space-y-*` de Tailwind aplica `margin-top` a todos los hijos de un contenedor excepto el primero; el modal (`fixed inset-0`) vivia como hijo no-primero de ese contenedor, asi que quedaba empujado hacia abajo y no cubria la franja superior de la pantalla. Afectaba 8 pantallas, no solo Planes.
+  - Primer intento de arreglo (sacar el modal fuera del `space-y-*`) rompio la regla de Livewire de que un componente debe tener un unico elemento raiz: los modales dejaban de abrirse del todo (estado se actualizaba en servidor pero el HTML nunca volvia). Se detecto probando en navegador real antes de reportar como terminado. Arreglo correcto: un `<div>` raiz unico, con `space-y-*` solo en un div interno que envuelve el contenido normal, y los modales como hermanos de ese div interno (mismo patron que ya usaba `pos-page.blade.php` en este proyecto, que sirvio de precedente).
+- Pruebas:
+  - Verificacion manual en Chromium real (Playwright) en las 8 pantallas afectadas: overlay cubre el 100% del viewport y los modales abren y guardan correctamente en cada una.
+- Resultado:
+  - Ningun usuario de cliente puede ser promovido a superadmin desde la UI.
+  - Los modales de Planes, Suscripciones, Cupones (Plataforma), Proveedores, Compras, Productos, Estructura de empresa y Cuentas de credito cubren correctamente toda la pantalla.
+
+## 2026-08-04 - Vencimiento y renovacion automatica de suscripciones
+
+- Objetivo: corregir que `Plataforma > Suscripciones` mostraba una suscripcion vencida como "activa", y agregar renovacion automatica opcional por empresa mas la posibilidad de activar un nuevo plan manualmente sobre una suscripcion vencida.
+- Archivos modificados:
+  - `database/migrations/2026_08_04_000000_add_auto_renew_to_companies_table.php` (nuevo)
+  - `app/Models/Company.php`
+  - `app/Models/Subscription.php`
+  - `app/Actions/Subscriptions/ChangeCompanySubscription.php`
+  - `app/Actions/Subscriptions/ProcessDueSubscriptions.php` (nuevo)
+  - `app/Console/Commands/ProcessDueSubscriptionsCommand.php` (nuevo)
+  - `routes/console.php`
+  - `app/Livewire/Platform/SubscriptionsPage.php`
+  - `resources/views/livewire/platform/subscriptions-page.blade.php`
+  - `tests/Feature/ProcessDueSubscriptionsTest.php` (nuevo)
+  - `tests/Feature/PlatformSubscriptionsPageTest.php` (nuevo)
+  - `docs/estados-del-sistema.md`, `docs/modelo-datos.md`, `docs/decisiones-tecnicas.md`, `docs/roadmap.md`, `docs/checklist-maestro.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - `add_auto_renew_to_companies_table`: agrega `companies.auto_renew` (boolean, default false).
+- Decisiones:
+  - Corregir la contradiccion entre `docs/estados-del-sistema.md` (describia estados `past_due`, `suspended`, `cancelled`, `expired` que nunca se implementaron) y el codigo real (`pending`, `trialing`, `active`, `ended`, sin enum).
+  - "Vencida" es un estado derivado (no una columna): se calcula comparando `ends_at` con `now()` via `Subscription::isPastDue()` en la UI, y ya se resolvia correctamente en `CompanyPlanResolver` via `Subscription::scopeActiveAt()`.
+  - Comando programado diario `subscriptions:process-due`: cierra suscripciones vencidas (`EndCompanySubscription`) y, si `companies.auto_renew` esta activo, crea la siguiente automaticamente con `ChangeCompanySubscription` (extendido con un `ends_at` opcional, antes siempre quedaba `null`).
+- Pruebas:
+  - `tests/Feature/ProcessDueSubscriptionsTest.php` (3 casos): renovacion automatica, solo cierre sin auto-renovacion, ignora suscripciones sin fecha de vencimiento.
+  - `tests/Feature/PlatformSubscriptionsPageTest.php` (4 casos): badge "vencida", toggle de auto-renovacion, acceso restringido a platform admin, activacion manual de nuevo plan.
+- Resultado:
+  - Una suscripcion vencida ya se muestra como "vencida" de inmediato en la UI, sin esperar al job diario.
+  - Las empresas con auto-renovacion activa se renuevan solas; las demas quedan claramente marcadas para activacion manual.
+
+## 2026-06-24 - Integracion OpenFoodFacts, correcciones de bugs y estandarizacion visual
+
+- Objetivo: integrar consulta de productos por codigo de barras contra la API publica de OpenFoodFacts, corregir bugs criticos de navegacion y calculo de credito, y estandarizar el espaciado visual en todos los modulos.
+- Archivos modificados:
+  - `app/Services/Products/OpenFoodFactsService.php` (nuevo)
+  - `app/Livewire/Products/ProductsPage.php`
+  - `app/Livewire/Credit/CreditAccountsPage.php`
+  - `app/Livewire/Admin/SettingsPage.php`
+  - `resources/views/livewire/products/products-page.blade.php`
+  - `resources/views/livewire/credit/credit-accounts-page.blade.php`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `resources/views/livewire/inventory/inventory-adjustment-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/admin/*.blade.php` (8 archivos)
+  - `resources/views/livewire/sales/frozen-sales-page.blade.php`
+  - `resources/views/printing/sales/ticket.blade.php`
+  - `config/services.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/decisiones-tecnicas.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Integrar `OpenFoodFactsService::findName()` usando API v3 de OpenFoodFacts con campos `product_name`, `product_name_es` y `quantity`. Preferir nombre en español; concatenar cantidad cuando exista (`Miel de Abejas – 350 g`).
+  - Disparar la consulta al presionar Enter en el campo de codigo de barras (`wire:keydown.enter.prevent="lookupBarcode"`), no en blur, para compatibilidad con lectores de barras fisicos.
+  - Generar `code` automatico para categorias creadas rapido (`saveQuickCategory`) usando slug en mayusculas + contador de unicidad por empresa, evitando la violacion NOT NULL que bloqueaba la creacion.
+  - Corregir calculo de `available_credit` en edicion de cupo: usar `credit_limit - balance_due` directo en lugar de sumar/restar la diferencia sobre el valor previo.
+  - Corregir ruta de Inventario en navegacion lateral: apuntaba a `inventory.imports` en lugar de `inventory.index`; tambien corregir la condicion `visible` que requeria modulo de importaciones en lugar del modulo de inventario.
+  - Agregar formato `thermal_58mm` como opcion valida en `printing.ticket_format` con CSS dedicado en el ticket.
+  - Ocultar campo "Referencia fiscal" en formulario de producto; mover codigo de barras antes del nombre; ocultar "Stock minimo" y "Controla inventario" cuando la empresa no tiene modulo de inventario en su plan.
+  - Estandarizar espaciado vertical en todos los modulos: cambiar `py-10` a `pb-10` en el div raiz de cada pagina Livewire para eliminar el padding-top redundante sobre el `py-6` del layout.
+  - Estandarizar `sales-page.blade.php`: `max-w-5xl` a `max-w-7xl`, `space-y-5` a `space-y-6`, tarjeta principal `rounded-2xl p-5` a `rounded-3xl p-6`, heading con patron amber label.
+  - Fijar ancho del boton de estado en tabla de productos (`w-20`) para evitar reflow de columnas al alternar activo/inactivo.
+- Pruebas:
+  - Verificacion manual: escaneo de barras en formulario de producto, creacion de categoria rapida, alternancia de estado de producto, navegacion a inventario, edicion de cupo de cliente.
+- Resultado:
+  - El formulario de producto autocompleta nombre desde OpenFoodFacts al escanear, con notificacion si no se encuentra.
+  - La creacion rapida de categoria ya no lanza error NOT NULL.
+  - El cupo disponible en credito se recalcula correctamente al editar el limite.
+  - La navegacion lateral de Inventario lleva al modulo correcto y es visible para usuarios con el modulo de inventario habilitado.
+  - Todos los modulos tienen el mismo espaciado desde el header hasta el primer elemento de contenido.
+
+## 2026-06-21 - Ajuste POS basico con buscador por texto y ocultamiento de campos por plan
+
+- Objetivo: adaptar el POS `basic` al flujo real de mostrador usando un solo campo de busqueda de producto y ocultando inputs operativos reservados para planes superiores.
+- Archivos modificados:
+  - `app/Livewire/Sales/PosPage.php`
+  - `docs/flujo-pos.md`
+  - `docs/matriz-planes-modulos.md`
+  - `docs/registro-cambios-ia.md`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Reemplazar la seleccion visible de producto por `input text` con soporte para codigo de barras, SKU y nombre.
+  - Hacer que `Enter` en el buscador agregue coincidencia exacta por codigo o la primera sugerencia disponible.
+  - Ocultar en plan `basic` los campos manuales de sucursal, bodega, caja, cliente y fecha de venta.
+  - Mantener esos datos resueltos por defecto desde el contexto operativo de la empresa para no romper el backend actual.
+  - Dejar documentada la matriz de inputs visibles y ocultos por plan dentro de los `.md`.
+- Pruebas:
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - El POS basico ya se comporta mas como caja real y menos como formulario administrativo.
+  - La captura de producto ya funciona mejor con lector de codigo de barras y con busqueda manual por nombre.
+  - La documentacion ya refleja que algunos campos quedan ocultos o reservados segun el plan.
+
+## 2026-06-21 - Ajuste visual POS tipo terminal con barra de acciones
+
+- Objetivo: acercar el POS visualmente a una terminal de facturacion rapida, con barra superior de acciones, auditoria visible y banda inferior de captura/resumen.
+- Archivos modificados:
+  - `app/Livewire/Sales/PosPage.php`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `tests/Feature/PosPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Reorganizar la vista en tres zonas: cabecera operativa, cuerpo de lineas y banda inferior de captura.
+  - Mostrar indicadores adaptados al modelo actual: auditoria temporal, cajero, terminal, fecha, items, total item, subtotal, precio activo, cambio, descuentos e impuestos.
+  - Integrar el boton `Congelar` solo cuando el plan tenga `pos.frozen_sales` y el usuario tenga permiso `sales.freeze`.
+  - Reusar el backend existente de ventas congeladas con etiqueta automatica basada en la auditoria temporal.
+- Pruebas:
+  - `php artisan test --filter=PosPageTest --stop-on-failure`
+- Resultado:
+  - El POS ahora se siente mas cercano a una terminal comercial tradicional.
+  - La captura por teclado y lector queda en la banda inferior, donde el operario espera trabajar.
+  - El flujo de congelar venta queda integrado visualmente sin habilitarlo artificialmente en planes que no lo soportan.
+
+## 2026-06-18 - Fase 6 edicion y confirmacion de borradores de venta desde POS
+
+- Objetivo: endurecer el ciclo de vida del documento POS permitiendo editar solo ventas en borrador y confirmarlas despues desde el mismo formulario.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/UpdateDraftPosSale.php`
+  - `app/Actions/Sales/UpdateDraftSale.php`
+  - `app/Livewire/Sales/PosPage.php`
+  - `app/Livewire/Sales/SalesPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `tests/Feature/PosPageTest.php`
+  - `tests/Feature/SalesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener la regla de que solo los `draft` son editables; los documentos confirmados siguen saliendo por flujo de devolucion o anulacion, no por reescritura.
+  - Reusar el mismo POS como superficie de edicion para no abrir una segunda pantalla documental.
+  - Conservar `document_number` y `document_sequence` del borrador al editarlo o confirmarlo, porque el documento interno ya existe desde su creacion.
+  - Separar `UpdateDraftSale` y `UpdateDraftPosSale` del flujo de alta para no mezclar reglas de creacion con reglas de reescritura de borradores.
+- Pruebas:
+  - `php artisan test --filter=PosPageTest`
+  - `php artisan test --filter=SalesPageTest`
+  - `php artisan test --filter=SalesCreationTest`
+- Resultado:
+  - El listado de ventas ya expone `Editar borrador` para documentos en estado `draft`.
+  - El POS ya puede cargar un borrador existente, modificar lineas o contexto comercial y luego confirmarlo con posting y cobro inmediato cuando aplica.
+  - Los documentos confirmados quedan mejor protegidos frente a cambios posteriores.
+
+## 2026-06-18 - Fase 6 numeracion documental interna para ventas POS
+
+- Objetivo: dejar operativa la facturacion normal interna del POS sin depender todavia de integracion de facturacion electronica.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Livewire/Credit/CreditAccountsPage.php`
+  - `app/Livewire/Sales/SalesPage.php`
+  - `app/Models/Sale.php`
+  - `app/Services/Sales/SaleDocumentNumberGenerator.php`
+  - `database/migrations/2026_06_18_101500_add_internal_document_fields_to_sales_table.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/credit/credit-accounts-page.blade.php`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `resources/views/printing/sales/ticket.blade.php`
+  - `tests/Feature/CreditAccountsPageTest.php`
+  - `tests/Feature/PosPageTest.php`
+  - `tests/Feature/SaleTicketViewTest.php`
+  - `tests/Feature/SalesCreationTest.php`
+  - `tests/Feature/SalesPageTest.php`
+- Migraciones:
+  - `2026_06_18_101500_add_internal_document_fields_to_sales_table.php`
+- Decisiones:
+  - Generar una secuencia interna por empresa en formato `VTA-000001`, independiente del `id` tecnico.
+  - Asignar el documento en la misma transaccion de creacion de la venta usando `lockForUpdate` sobre la secuencia maxima actual.
+  - Backfillear ventas existentes en la migracion para que listado, ticket y cartera queden consistentes desde el primer despliegue.
+  - Exponer tanto el documento comercial como el identificador interno `Venta #id` en UI para soporte operativo y trazabilidad.
+- Pruebas:
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=SalesPageTest`
+  - `php artisan test --filter=SaleTicketViewTest`
+  - `php artisan test --filter=PosPageTest`
+  - `php artisan test --filter=CreditAccountsPageTest`
+- Resultado:
+  - El POS ya emite ventas con numero documental interno consecutivo por empresa.
+  - El ticket, el listado de ventas y la cartera a credito ya muestran y buscan por ese documento.
+  - La integracion de facturacion electronica puede retomarse despues sobre una base documental interna ya estable.
+
+## 2026-06-18 - Fase 6 parametrizacion de numeracion interna desde Settings
+
+- Objetivo: evitar que la numeracion interna del POS quede fija en codigo, permitiendo prefijo y consecutivo inicial por empresa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Admin/SettingsPage.php`
+  - `app/Services/Sales/SaleDocumentNumberGenerator.php`
+  - `app/Support/Settings/CompanySettingCatalog.php`
+  - `database/migrations/2026_06_18_101500_add_internal_document_fields_to_sales_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PosPageTest.php`
+  - `tests/Feature/SalesCreationTest.php`
+  - `tests/Feature/SettingsPageTest.php`
+- Migraciones:
+  - Ninguna nueva; se ajusto la migracion vigente de numeracion para usar el formato base `VTA-` en el backfill.
+- Decisiones:
+  - Reutilizar el grupo `pos` en lugar de abrir otro grupo de configuracion, porque la facturacion interna actual pertenece al flujo comercial POS.
+  - Exponer `sale_document_prefix` y `sale_document_starting_sequence` como parametros tipados persistibles desde `Settings`.
+  - Resolver el siguiente consecutivo como `max(historial, consecutivo_inicial - 1) + 1`, para permitir arranque configurable sin retroceder secuencias ya emitidas.
+  - Permitir cambio de prefijo a futuro, manteniendo el correlativo tecnico `document_sequence` continuo por empresa.
+- Pruebas:
+  - `php artisan test --filter=SettingsPageTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - La empresa ya puede definir su prefijo interno comercial sin tocar codigo.
+  - El arranque del consecutivo puede ajustarse para nuevas empresas o migraciones controladas.
+  - La numeracion historica no se revierte aunque la configuracion cambie despues.
+
+## 2026-06-18 - Fase 8 importacion CSV de clientes y base de facturacion electronica
+
+- Objetivo: cerrar otro tramo fuerte de avance backend habilitando migracion de clientes y una base real de configuracion para facturacion electronica.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Customers/ImportCustomersFromCsv.php`
+  - `app/Actions/Settings/UpdateCompanySettings.php`
+  - `app/Livewire/Admin/SettingsPage.php`
+  - `app/Livewire/Credit/CustomerImportsPage.php`
+  - `app/Support/Settings/CompanySettingCatalog.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/credit-nav.blade.php`
+  - `resources/views/livewire/credit/customer-imports-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CustomerImportsPageTest.php`
+  - `tests/Feature/SettingsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Colgar la importacion de clientes del modulo `Credito` usando `credit.manage`, porque hoy es el flujo que ya administra cuentas formalizadas por cliente.
+  - Mantener importacion parcial por fila y `create-only`, con alta opcional de cuenta de credito y de fidelizacion segun columnas del archivo.
+  - Exponer `electronic_billing` como nuevo grupo de configuracion tipada, visible solo cuando el plan tenga el modulo habilitado.
+  - Bloquear guardado de settings de facturacion electronica cuando el plan no tenga el modulo, incluso si el payload se fuerza manualmente.
+- Pruebas:
+  - `php artisan test --filter=CustomerImportsPageTest`
+  - `php artisan test --filter=SettingsPageTest`
+- Resultado:
+  - El proyecto ya puede migrar clientes por CSV desde backoffice.
+  - La empresa `premium` ya puede guardar configuracion base de facturacion electronica desde Settings.
+  - La base queda lista para conectar luego emision real y enforcement de `max_electronic_documents`.
+
+## 2026-06-18 - Fase 8 primera importacion CSV de proveedores
+
+- Objetivo: completar la ruta de migracion maestra del modulo de compras cargando proveedores por CSV.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Suppliers/ImportSuppliersFromCsv.php`
+  - `app/Livewire/Purchases/SupplierImportsPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/purchases-nav.blade.php`
+  - `resources/views/livewire/purchases/supplier-imports-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/SupplierImportsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener un importador `create-only` para no mezclar altas con actualizaciones masivas en esta primera entrega.
+  - Detectar duplicados por documento y por correo dentro de la empresa antes de crear el proveedor.
+  - Reutilizar `CreateSupplier` para preservar la misma semantica entre UI manual e importacion.
+  - Usar `suppliers.manage` como permiso y `imports.excel` como gate comercial.
+- Pruebas:
+  - `php artisan test --filter=SupplierImportsPageTest`
+- Resultado:
+  - El usuario ya puede migrar el maestro de proveedores por CSV.
+  - El sistema conserva errores por fila y deja auditoria adicional del lote importado.
+
+## 2026-06-18 - Fase 8 primera importacion CSV de compras
+
+- Objetivo: extender el bloque de importaciones a un flujo contable y operativo real, cargando lineas de compra sobre un unico documento.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/ImportPurchaseFromCsv.php`
+  - `app/Livewire/Purchases/PurchaseImportsPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/purchases-nav.blade.php`
+  - `resources/views/livewire/purchases/purchase-imports-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/PurchaseImportsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener la misma estrategia de `single-document import`, dejando encabezado comercial y financiero en la UI y las lineas en el archivo.
+  - Reutilizar `CreatePurchase` para no duplicar reglas de calculo, posting a inventario ni movimientos de cuentas por pagar.
+  - Resolver lineas por `product_sku` con soporte opcional para presentacion, variante e impuesto.
+  - Aplicar el mismo gate comercial de `imports.excel` y permiso `purchases.create`.
+- Pruebas:
+  - `php artisan test --filter=PurchaseImportsPageTest`
+- Resultado:
+  - El usuario ya puede cargar compras por CSV sin perder trazabilidad contable ni operativa.
+  - El sistema conserva errores por fila y deja auditoria adicional del lote importado.
+
+## 2026-06-18 - Fase 8 primera importacion CSV de ajustes de inventario
+
+- Objetivo: abrir una segunda importacion util del dominio, enfocada en migracion o carga masiva de saldos mediante ajustes de inventario.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Inventory/ImportInventoryAdjustmentFromCsv.php`
+  - `app/Livewire/Inventory/InventoryAdjustmentImportsPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/inventory-nav.blade.php`
+  - `resources/views/livewire/inventory/inventory-adjustment-imports-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/InventoryAdjustmentImportsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Definir sucursal, bodega, tipo y motivo del ajuste en la UI para que el CSV no tenga que modelar documentos ni encabezados repetidos.
+  - Tratar el archivo como lote de lineas, creando un unico ajuste real cuando al menos una fila valida sobrevive.
+  - Reutilizar `CreateInventoryAdjustment` para no duplicar reglas de kardex, costing ni auditoria del documento base.
+  - Mantener la misma feature comercial `imports.excel` como gate de acceso a esta importacion.
+- Pruebas:
+  - `php artisan test --filter=InventoryAdjustmentImportsPageTest`
+- Resultado:
+  - El usuario ya puede cargar lineas masivas de ajuste por CSV desde una pantalla de inventario.
+  - El sistema conserva errores por fila y deja un resumen adicional de importacion en auditoria.
+
+## 2026-06-18 - Fase 8 primera importacion estructurada de productos por CSV
+
+- Objetivo: abrir el primer flujo de importaciones del sistema sin introducir dependencias externas todavia, priorizando catalogo de productos por empresa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Products/ImportProductsFromCsv.php`
+  - `app/Livewire/Products/ProductImportsPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/catalog-nav.blade.php`
+  - `resources/views/livewire/products/product-imports-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/ProductImportsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Empezar por `CSV` en lugar de Excel nativo para cerrar primero el flujo funcional y las reglas de negocio sin dependencia de terceros.
+  - Implementar la importacion en modo `create-only` y `partial success`, para no mezclar altas con actualizaciones masivas en esta primera entrega.
+  - Exigir referencias existentes de categoria, unidad y marca opcional, evitando que un archivo mal construido cree maestras en cascada.
+  - Hacer cumplir tanto permiso `products.create` como el acceso efectivo del plan sobre `imports` e `imports.excel`.
+- Pruebas:
+  - `php artisan test --filter=ProductImportsPageTest`
+- Resultado:
+  - El modulo de productos ya puede importar catalogo por CSV desde UI.
+  - Cada lote deja trazabilidad resumida en auditoria y reporta filas invalidas sin perder las filas validas.
+
+## 2026-06-18 - Fase 2 enforcement operativo de `max_products` y `max_monthly_sales`
+
+- Objetivo: cerrar otro bloque de enforcement cuantitativo del plan sobre flujos de negocio ya operativos: alta de productos y confirmacion de ventas.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Livewire/Products/ProductsPage.php`
+  - `app/Services/Plans/CompanyOperationalLimitGuard.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/ProductsCatalogTest.php`
+  - `tests/Feature/SalesCreationTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Centralizar los limites operativos en `CompanyOperationalLimitGuard` para evitar reglas dispersas entre Livewire y acciones transaccionales.
+  - Hacer cumplir `max_products` solo sobre productos no archivados, para que el archivado siga liberando cupo real.
+  - Hacer cumplir `max_monthly_sales` solo sobre ventas `confirmed`, dejando que los borradores no consuman cupo comercial mensual.
+  - Dejar `max_electronic_documents` preparado en el guard pero sin integracion final hasta tener un flujo real de emision electronica.
+- Pruebas:
+  - `php artisan test --filter=ProductsCatalogTest`
+  - `php artisan test --filter=SalesCreationTest`
+- Resultado:
+  - La empresa ya recibe bloqueo controlado al intentar crear productos por encima del cupo del plan.
+  - La confirmacion de ventas ya se detiene cuando se alcanza el tope mensual permitido por el plan.
+  - El proyecto queda listo para reutilizar el mismo guard en futuras entradas operativas o integraciones externas.
+
+## 2026-06-18 - Fase 2 overrides por empresa desde UI
+
+- Objetivo: exponer una primera capa operativa para aplicar overrides manuales por empresa sobre modulos, features y limites sin tocar base de datos directamente.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Plans/ApplyCompanyFeatureOverride.php`
+  - `app/Actions/Plans/ApplyCompanyLimitOverride.php`
+  - `app/Actions/Plans/ApplyCompanyModuleOverride.php`
+  - `app/Livewire/Admin/PlanOverridesPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/plan-overrides-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/AuditLoggingTest.php`
+  - `tests/Feature/CompanyPlanResolverTest.php`
+  - `tests/Feature/PlanOverridesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Crear una pantalla `Overrides` separada de `Suscripcion` para no mezclar lifecycle comercial con reglas de excepcion tenant.
+  - Modelar modulo, feature y limite como formularios separados con vigencia `starts_at/ends_at`.
+  - Reutilizar el resolvedor real para validar en pruebas que los overrides aplican precedencia efectiva sobre el plan base.
+- Pruebas:
+  - `php artisan test --filter=PlanOverridesPageTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - La empresa ya puede aplicar y editar overrides de modulos, features y limites desde backoffice.
+  - Los cambios dejan auditoria dedicada por tipo de override.
+- Pendientes:
+  - Archivado o desactivacion asistida de overrides.
+  - Reglas comerciales mas avanzadas alrededor de billing y excepciones temporales.
+
+## 2026-06-18 - Fase 2 lifecycle inicial de suscripciones directas
+
+- Objetivo: completar la primera operacion real del ciclo de vida de suscripciones permitiendo fecha efectiva, cierre manual y renovacion desde backoffice.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Subscriptions/EndCompanySubscription.php`
+  - `app/Actions/Subscriptions/RenewCompanySubscription.php`
+  - `app/Livewire/Admin/SubscriptionPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/admin/subscription-page.blade.php`
+  - `tests/Feature/AuditLoggingTest.php`
+  - `tests/Feature/CompanyPlanResolverTest.php`
+  - `tests/Feature/SubscriptionPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener el cambio de plan directo en `ChangeCompanySubscription`, pero separar lifecycle puntual en acciones dedicadas `EndCompanySubscription` y `RenewCompanySubscription`.
+  - Permitir fecha efectiva al crear/cambiar la suscripcion directa para no amarrar todo al `now()`.
+  - Resolver la renovacion como nueva suscripcion directa sobre el mismo plan, preservando historial en lugar de reabrir filas viejas.
+- Pruebas:
+  - `php artisan test --filter=SubscriptionPageTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - La empresa ya puede finalizar y renovar suscripciones directas desde UI.
+  - El historial de suscripciones queda mas util para operaciones y auditoria.
+- Pendientes:
+  - Overrides por empresa.
+  - Reglas financieras/comerciales mas completas de billing.
+
+## 2026-06-18 - Fase 2 alta y edicion inicial de bundles
+
+- Objetivo: pasar la pantalla de bundles desde solo lectura a una primera operacion real de alta y edicion para la empresa activa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Subscriptions/CreateSubscriptionBundle.php`
+  - `app/Actions/Subscriptions/UpdateSubscriptionBundle.php`
+  - `app/Livewire/Admin/BundlesPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/admin/bundles-page.blade.php`
+  - `tests/Feature/AuditLoggingTest.php`
+  - `tests/Feature/BundlesPageTest.php`
+  - `tests/Feature/CompanyPlanResolverTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener la semantica de la pantalla acotada a la empresa activa: crear o editar el bundle al que esa empresa pertenece, sin abrir todavia gestion multiempresa completa.
+  - Crear `CreateSubscriptionBundle` y `UpdateSubscriptionBundle` para encapsular bundle, suscripcion base y membership en una sola operacion consistente.
+  - Reutilizar auditoria por snapshot para registrar metadata del bundle mas el plan y membership asociados.
+- Pruebas:
+  - `php artisan test --filter=BundlesPageTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - El usuario ya puede crear y editar bundles desde backoffice para la empresa activa.
+  - Los cambios dejan auditoria como `subscription_bundle.created` y `subscription_bundle.updated`.
+- Pendientes:
+  - Gestion multiempresa dentro de un mismo bundle.
+  - Lifecycle de suscripciones y overrides por empresa.
+
+## 2026-06-18 - Fase 2 alta y edicion inicial de cupones
+
+- Objetivo: pasar la pantalla de cupones desde solo lectura a una primera operacion real de alta y edicion manual con trazabilidad.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Coupons/CreateCoupon.php`
+  - `app/Actions/Coupons/UpdateCoupon.php`
+  - `app/Livewire/Admin/CouponsPage.php`
+  - `app/Services/Audit/AuditLogger.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/admin/coupons-page.blade.php`
+  - `tests/Feature/CouponsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener la misma pantalla `Cupones` como punto unico de lectura y mutacion inicial para no duplicar interfaces.
+  - Agregar `AuditLogger::logSnapshot()` para registrar cambios donde el alcance comercial incluye relaciones (`plan_ids`, `bundle_ids`) y no solo atributos planos.
+  - Permitir cupones globales sin planes o bundles asociados, usando selecciones vacias como alcance abierto.
+- Pruebas:
+  - `php artisan test --filter=CouponsPageTest`
+  - `php artisan test --filter=BundlesPageTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - El usuario ya puede crear y editar cupones desde backoffice.
+  - Los cambios dejan auditoria como `coupon.created` y `coupon.updated`, incluyendo alcance por planes y bundles.
+- Pendientes:
+  - Incorporar archivado o desactivacion mas guiada de cupones.
+  - Continuar con mutaciones controladas de bundles o consola platform mas amplia.
+
+## 2026-06-18 - Fase 2 UI inicial de cupones en modo lectura
+
+- Objetivo: completar la visibilidad operativa del dominio SaaS exponiendo cupones, alcance comercial y redenciones recientes sin abrir aun flujos de edicion.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Admin/CouponsPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/coupons-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CouponsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener esta primera pantalla como solo lectura para reducir riesgo y dar soporte operativo inmediato.
+  - Mostrar alcance por `plans` y `bundles` junto con limites y ultimas redenciones visibles para la empresa actual.
+  - Reutilizar `settings.manage` mientras sigue pendiente una consola platform dedicada.
+- Pruebas:
+  - `php artisan test --filter=CouponsPageTest`
+  - `php artisan test --filter=BundlesPageTest`
+  - `php artisan test --filter=SubscriptionPageTest`
+- Resultado:
+  - La navegacion administrativa ya expone `Cupones`.
+  - El usuario ya puede inspeccionar reglas, vigencias, limites y uso reciente de cupones desde backoffice.
+- Pendientes:
+  - Abrir alta/edicion de cupones.
+  - Continuar con mutaciones controladas de bundles o consola platform mas amplia.
+
+## 2026-06-16 - Fase 2 UI inicial de bundles en modo lectura
+
+- Objetivo: completar la lectura operativa del dominio SaaS mostrando los bundles asociados a la empresa activa sin abrir todavia flujos de edicion.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Admin/BundlesPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/bundles-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/BundlesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener esta primera iteracion como pantalla de solo lectura para cerrar rapido visibilidad del dominio sin introducir mutaciones delicadas de bundle.
+  - Reutilizar `settings.manage` como permiso de entrada mientras aun no existe una consola platform separada.
+  - Mostrar owner, plan asignado, descuento, cupo y empresas vinculadas dentro de cada membership para explicar mejor el origen del plan efectivo.
+- Pruebas:
+  - `php artisan test --filter=BundlesPageTest`
+  - `php artisan test --filter=SubscriptionPageTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+- Resultado:
+  - La navegacion administrativa ya expone `Bundles` junto a `Suscripcion`.
+  - El usuario ya puede inspeccionar bundles reales asociados a la empresa sin consultar la base de datos manualmente.
+- Pendientes:
+  - Abrir alta/edicion de bundles.
+  - Continuar con cupones y consola platform mas amplia.
+
+## 2026-06-16 - Fase 2 UI inicial de suscripcion por empresa
+
+- Objetivo: exponer la primera capa administrativa para inspeccionar el plan efectivo de la empresa y permitir cambios manuales de suscripcion directa sobre el backend SaaS ya construido.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Subscriptions/ChangeCompanySubscription.php`
+  - `app/Livewire/Admin/SubscriptionPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/subscription-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CompanyPlanResolverTest.php`
+  - `tests/Feature/CompanyProvisioningTest.php`
+  - `tests/Feature/SubscriptionPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Abrir la primera UI desde el backoffice tenant usando `settings.manage`, en lugar de esperar una consola platform completa.
+  - Crear una accion dedicada `ChangeCompanySubscription` para cerrar suscripciones directas vigentes, abrir la nueva y registrar auditoria consistente.
+  - Mostrar en la misma pantalla el snapshot efectivo, el historial directo y las asignaciones por bundle para diagnosticar precedence real de acceso.
+- Pruebas:
+  - `php artisan test --filter=SubscriptionPageTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+  - `php artisan test --filter=CompanyProvisioningTest`
+- Resultado:
+  - La empresa ya puede cambiar manualmente su plan directo desde UI sin tocar base de datos a mano.
+  - La navegacion administrativa ya expone `Suscripcion` junto a configuracion, estructura, auditoria y roles.
+  - Cada cambio directo deja trazabilidad en `audit_logs` como `subscription.ended` y `subscription.created`.
+- Pendientes:
+  - Abrir gestion operativa de bundles y cupones.
+  - Llevar el catalogo de planes y overrides a una consola platform mas amplia cuando toque el siguiente corte.
+
+## 2026-06-16 - Fase 2 enforcement inicial de `max_branches`, `max_warehouses` y `max_cash_registers`
+
+- Objetivo: formalizar el alta operativa de sucursales, bodegas y cajas desde UI administrativa y bloquear nuevos registros cuando el plan alcance sus cupos estructurales.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Company/CreateBranch.php`
+  - `app/Actions/Company/CreateCashRegister.php`
+  - `app/Actions/Company/CreateWarehouse.php`
+  - `app/Livewire/Admin/CompanyStructurePage.php`
+  - `app/Services/Plans/CompanyStructureLimitGuard.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/company-structure-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CompanyProvisioningTest.php`
+  - `tests/Feature/CompanyStructurePageTest.php`
+  - `tests/Feature/SettingsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - No dejar las altas estructurales como inserts dispersos; se crean acciones dedicadas para sucursal, bodega y caja con validacion, normalizacion de codigo y auditoria propia.
+  - Resolver los cupos desde un guard unico `CompanyStructureLimitGuard` para centralizar `max_branches`, `max_warehouses` y `max_cash_registers`.
+  - Exponer una pantalla administrativa unica `admin/structure` protegida por `settings.manage`, en lugar de repartir formularios sueltos por modulo.
+- Pruebas:
+  - `php artisan test --filter=CompanyStructurePageTest`
+  - `php artisan test --filter=SettingsPageTest`
+  - `php artisan test --filter=CompanyProvisioningTest`
+- Resultado:
+  - La empresa ya puede crear sucursales, bodegas y cajas desde backoffice con codigos normalizados y trazabilidad en auditoria.
+  - Un tenant con plan `basic` recibe bloqueo controlado al intentar superar sus cupos estructurales.
+  - La navegacion administrativa ya expone una entrada `Estructura` coherente con el backoffice existente.
+- Pendientes:
+  - Reutilizar estas acciones en futuras pantallas operativas de inventario, caja y configuracion avanzada para evitar duplicar reglas.
+  - Seguir con la UI platform/admin de planes, bundles, suscripciones y cupones.
+
+## 2026-06-16 - Reportes operativos, exportacion y auditoria avanzada inicial
+
+- Objetivo: abrir un primer modulo formal de reportes y cerrar el siguiente corte de explotacion con exportacion CSV y mejoras de auditoria.
+- Archivos modificados:
+  - `README.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `app/Actions/Audit/ListAuditLogs.php`
+  - `app/Http/Controllers/Admin/ExportAuditLogsController.php`
+  - `app/Http/Controllers/Reports/ExportOperationalReportController.php`
+  - `app/Livewire/Admin/AuditLogsPage.php`
+  - `app/Livewire/Reports/OperationalReportsPage.php`
+  - `app/Services/Reports/OperationalReportService.php`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/components/reports-nav.blade.php`
+  - `resources/views/livewire/admin/audit-logs-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/reports/operational-reports-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/AuditLogsPageTest.php`
+  - `tests/Feature/OperationalReportsPageTest.php`
+- Migraciones: ninguna.
+- Decisiones:
+  - Crear un modulo `Reportes` unico y operativo antes de abrir familias mas especializadas de tableros.
+  - Reutilizar un servicio unico `OperationalReportService` para alimentar tanto la UI como las exportaciones CSV y evitar reglas duplicadas.
+  - Mantener la exportacion en CSV sobre datasets concretos (`productos`, `sucursales`, `audit_logs`) en lugar de construir un exportador generico prematuro.
+- Pruebas:
+  - `php artisan test --filter=OperationalReportsPageTest`
+  - `php artisan test --filter=AuditLogsPageTest`
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - El backoffice ya expone una pantalla `Reportes` con resumen ejecutivo, top productos, desempeno por sucursal y actividad promocional.
+  - Reportes y auditoria ya pueden exportar CSV.
+  - Auditoria ya soporta filtro por IP y busqueda general sobre accion, entidad y actor.
+- Pendientes:
+  - Incorporar reportes mas especializados por periodo, comparativos y analitica financiera avanzada.
+  - Incorporar importaciones estructuradas y flujos batch.
+
+## 2026-06-16 - Preview comercial POS y refinamiento operativo de promociones
+
+- Objetivo: cubrir el siguiente corte comercial mostrando un preview real de totales en POS y mejorando la operacion diaria sobre promociones y ajustes de fidelizacion.
+- Archivos modificados:
+  - `README.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `app/Livewire/Promotions/PromotionsPage.php`
+  - `app/Livewire/Sales/PosPage.php`
+  - `app/Services/Sales/SalePreviewService.php`
+  - `resources/views/livewire/promotions/promotions-page.blade.php`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `tests/Feature/PosPageTest.php`
+  - `tests/Feature/PromotionsPageTest.php`
+  - `app/Actions/Loyalty/AdjustLoyaltyPoints.php`
+  - `app/Livewire/Loyalty/LoyaltyAccountsPage.php`
+  - `resources/views/livewire/loyalty/loyalty-accounts-page.blade.php`
+- Migraciones: ninguna.
+- Decisiones:
+  - Crear `SalePreviewService` para reutilizar el motor real de promociones y la logica de redencion en un calculo provisional, sin persistencia.
+  - Mantener el preview tolerante a lineas incompletas para no bloquear la captura operativa mientras el documento se arma.
+  - Refinar promociones con filtros por vigencia derivada y duplicado rapido de reglas comerciales.
+  - Endurecer ajustes manuales de fidelizacion exigiendo motivo explicito y nota descriptiva en descuentos manuales de puntos.
+- Pruebas:
+  - `php artisan test --filter=PosPageTest`
+  - `php artisan test --filter=PromotionsPageTest`
+  - `php artisan test --filter=LoyaltyAccountsPageTest`
+- Resultado:
+  - POS ya muestra subtotal, descuentos, impuestos, total final, promociones aplicadas, redencion proyectada y saldo pendiente de cobro antes de confirmar.
+  - Promociones ya puede filtrar por vigencia efectiva y duplicar reglas existentes para acelerar operaciones comerciales.
+  - Fidelizacion ya exige mejor trazabilidad para ajustes manuales sensibles.
+- Pendientes:
+  - Si se necesita, convertir el preview provisional en simulador formal con reservas comerciales o escenarios comparativos.
+
+## 2026-06-16 - Ajustes manuales de fidelizacion
+
+- Objetivo: completar la operacion base del modulo de fidelizacion permitiendo sumar o descontar puntos manualmente desde UI sin pasar por una venta.
+- Archivos modificados:
+  - `README.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `app/Actions/Loyalty/AdjustLoyaltyPoints.php`
+  - `app/Enums/LoyaltyMovementType.php`
+  - `app/Livewire/Loyalty/LoyaltyAccountsPage.php`
+  - `app/Services/Loyalty/LoyaltyLedger.php`
+  - `resources/views/livewire/loyalty/loyalty-accounts-page.blade.php`
+  - `tests/Feature/LoyaltyAccountsPageTest.php`
+- Migraciones: ninguna.
+- Decisiones:
+  - Registrar ajustes manuales como movimientos explicitos `manual_credit` y `manual_debit` para no mezclar estos eventos con acumulaciones o redenciones de ventas.
+  - Mantener los ajustes manuales dentro del mismo ledger de fidelizacion para preservar trazabilidad completa de saldo.
+  - Requerir que la empresa tenga fidelizacion habilitada antes de permitir ajustes manuales.
+- Pruebas:
+  - `php artisan test --filter=LoyaltyAccountsPageTest`
+  - `php artisan test --filter=LoyaltySalesTest`
+- Resultado:
+  - La pantalla de fidelizacion ya permite abrir un formulario inline por cuenta y aplicar ajustes manuales con nota.
+  - El ledger ya diferencia ajustes a favor y en contra, mostrando direccion, equivalente monetario y observaciones.
+- Pendientes:
+  - Si el negocio lo requiere, agregar aprobacion dual o motivos predefinidos para ajustes manuales sensibles.
+
+## 2026-06-16 - Refinamiento UI de promociones y redencion POS
+
+- Objetivo: completar el siguiente corte comercial agregando edicion/archivado de promociones y redencion directa de puntos desde la UI POS.
+- Archivos modificados:
+  - `README.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `app/Actions/Promotions/UpdatePromotion.php`
+  - `app/Livewire/Promotions/PromotionsPage.php`
+  - `app/Livewire/Sales/PosPage.php`
+  - `resources/views/livewire/promotions/promotions-page.blade.php`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `tests/Feature/PosPageTest.php`
+  - `tests/Feature/PromotionsPageTest.php`
+- Migraciones: ninguna.
+- Decisiones:
+  - Extraer `UpdatePromotion` como accion dedicada para mantener la logica comercial de promociones fuera del componente Livewire.
+  - Resolver el archivado como cambio de `status` con auditoria propia, sin borrar la regla historica.
+  - Habilitar redencion de puntos en POS solo sobre ventas confirmadas para no introducir descuentos de fidelizacion en borradores no consumidos.
+- Pruebas:
+  - `php artisan test --filter=PromotionsPageTest`
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - Promociones ya puede editar y archivar reglas creadas desde backoffice.
+  - POS ya puede aplicar `loyalty_points_to_redeem` sobre ventas confirmadas con cliente fidelizado y saldo disponible.
+  - El ultimo documento visible en POS ya expone la redencion aplicada cuando existe.
+- Pendientes:
+  - Incorporar ajuste manual de puntos desde UI de fidelizacion si el proceso comercial lo necesita.
+  - Incorporar reglas promocionales mas avanzadas y controles adicionales sobre vigencia/prioridad.
+
+## 2026-06-16 - Fase 7 UI operativa de promociones y fidelizacion
+
+- Objetivo: abrir la primera capa operativa de backoffice para administrar promociones comerciales y consultar/operar cuentas de fidelizacion sobre el backend ya disponible.
+- Archivos modificados:
+  - `README.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `app/Livewire/Loyalty/LoyaltyAccountsPage.php`
+  - `app/Livewire/Promotions/PromotionsPage.php`
+  - `resources/views/components/loyalty-nav.blade.php`
+  - `resources/views/components/promotions-nav.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/loyalty/loyalty-accounts-page.blade.php`
+  - `resources/views/livewire/promotions/promotions-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/LoyaltyAccountsPageTest.php`
+  - `tests/Feature/PromotionsPageTest.php`
+- Migraciones: ninguna.
+- Decisiones:
+  - Exponer `promotions.manage` y `loyalty.manage` como rutas y entradas de navegacion dedicadas dentro del backoffice principal.
+  - Mantener la UI de promociones centrada en alta y consulta de reglas `product_discount` y `combo_price`, reutilizando el motor backend ya existente.
+  - Mantener la UI de fidelizacion enfocada en consulta de cuentas, lectura de ledger y ejecucion manual de expiracion, sin introducir aun alta manual de puntos ni redencion directa desde esta pantalla.
+- Pruebas:
+  - `php artisan test --filter=PromotionsPageTest`
+  - `php artisan test --filter=LoyaltyAccountsPageTest`
+  - `php artisan test --filter=PromotionsAndCombosTest`
+  - `php artisan test --filter=LoyaltySalesTest`
+- Resultado:
+  - El backoffice ya permite crear promociones por producto y combos a precio fijo con filtros, alcance por producto/categoria/variante y resumen visual de reglas creadas.
+  - El backoffice ya permite consultar cuentas de fidelizacion, revisar movimientos recientes y ejecutar expiracion manual usando `loyalty.points_expiration_days`.
+  - La navegacion principal ya expone accesos dedicados a `Promociones` y `Fidelizacion` segun permisos de la empresa activa.
+- Pendientes:
+  - Incorporar edicion y archivado de promociones desde UI.
+  - Incorporar redencion directa y ajustes manuales de puntos desde UI, si el flujo comercial lo exige.
+
+## 2026-06-15 - Fase 0 de arranque
+
+- Objetivo: asegurar directorio, diagnosticar Docker sin acciones destructivas y crear documentacion base del SaaS.
+- Archivos modificados:
+  - `AGENTS.md`
+  - `CLAUDE.md`
+  - `.env.example`
+  - `docs/README.md`
+  - `docs/arquitectura-saas.md`
+  - `docs/modelo-datos.md`
+  - `docs/matriz-planes-modulos.md`
+  - `docs/roles-y-permisos.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/flujo-pos.md`
+  - `docs/reglas-inventario.md`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/roadmap.md`
+  - `docs/docker-local.md`
+  - `docs/deploy-railway.md`
+- Migraciones: ninguna.
+- Decisiones:
+  - Crear raiz exclusiva `retail_saas`.
+  - No bootstrapear Laravel antes de validar diseno.
+  - Reservar nombres y puertos propios para evitar colisiones.
+- Pruebas:
+  - Inspeccion del directorio.
+  - `docker ps` y `docker ps -a` sin cambios.
+  - Revision de redes y volumenes.
+  - Inspeccion de puertos escuchando.
+- Documentos actualizados: todos los listados arriba.
+- Pendientes:
+  - Generar el proyecto Laravel y Compose propio.
+  - Traducir el modelo conceptual a migraciones de Fase 1 y Fase 2.
+
+## 2026-06-15 - Fase 1 base tecnica
+
+- Objetivo: bootstrapear Laravel, crear Docker Compose propio y modelar el nucleo tenant inicial.
+- Archivos modificados:
+  - `composer.json`
+  - `README.md`
+  - `.env`
+  - `.env.example`
+  - `.dockerignore`
+  - `bootstrap/app.php`
+  - `config/database.php`
+  - `routes/web.php`
+  - `resources/css/app.css`
+  - `resources/js/app.js`
+  - `resources/js/bootstrap.js`
+  - `resources/views/welcome.blade.php`
+  - `app/Providers/AppServiceProvider.php`
+  - `app/Models/User.php`
+  - `app/Enums/RecordStatus.php`
+  - `app/Models/Company.php`
+  - `app/Models/Branch.php`
+  - `app/Models/Warehouse.php`
+  - `app/Models/CashRegister.php`
+  - `app/Actions/Companies/CreateCompany.php`
+  - `app/Services/Tenancy/CurrentCompany.php`
+  - `app/Http/Middleware/EnsureCompanyContext.php`
+  - `database/factories/UserFactory.php`
+  - `database/factories/CompanyFactory.php`
+  - `database/migrations/0001_01_01_000000_create_users_table.php`
+  - `database/migrations/2026_06_15_120000_create_companies_table.php`
+  - `database/migrations/2026_06_15_120100_create_company_user_table.php`
+  - `database/migrations/2026_06_15_120200_create_branches_table.php`
+  - `database/migrations/2026_06_15_120300_create_warehouses_table.php`
+  - `database/migrations/2026_06_15_120400_create_cash_registers_table.php`
+  - `docker-compose.yml`
+  - `docker/app/Dockerfile`
+  - `docker/nginx/default.conf`
+  - `tests/Feature/LandingPageTest.php`
+  - `tests/Feature/CompanyProvisioningTest.php`
+  - `AGENTS.md`
+  - `docs/docker-local.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ajuste de `users` para `username`, `status` y `last_login_at`.
+  - Nuevas tablas `companies`, `company_user`, `branches`, `warehouses`, `cash_registers`.
+- Decisiones:
+  - Crear accion explicita `CreateCompany` para provisionar estructura principal sin observers ocultos.
+  - Mantener `CurrentCompany` en sesion.
+  - Ejecutar Vite en contenedor Node 24.
+- Pruebas:
+  - Pendiente ejecutar `php artisan test`.
+- Documentos actualizados:
+  - `AGENTS.md`
+  - `docs/docker-local.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+- Pendientes:
+  - Autenticacion por `username`.
+  - Selector de empresa activa en UI.
+  - Instalacion de Livewire y componentes CRUD del primer modulo.
+
+## 2026-06-15 - Fase 1 autenticacion y contexto tenant
+
+- Objetivo: completar la base operativa de acceso con Breeze + Livewire, login por `username` y seleccion obligatoria de empresa activa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Http/Middleware/EnsureCompanyContext.php`
+  - `app/Livewire/Company/SelectCompanyPage.php`
+  - `app/Livewire/Forms/LoginForm.php`
+  - `app/Services/Tenancy/CurrentCompany.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/docker-local.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `docs/roles-y-permisos.md`
+  - `resources/views/components/page-title.blade.php`
+  - `resources/views/dashboard.blade.php`
+  - `resources/views/livewire/company/select-company-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/pages/auth/login.blade.php`
+  - `resources/views/livewire/pages/auth/register.blade.php`
+  - `resources/views/livewire/profile/update-profile-information-form.blade.php`
+  - `resources/views/welcome.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/Auth/AuthenticationTest.php`
+  - `tests/Feature/Auth/RegistrationTest.php`
+  - `tests/Feature/CompanySelectionTest.php`
+  - `tests/Feature/LandingPageTest.php`
+  - `tests/Feature/ProfileTest.php`
+  - `tests/TestCase.php`
+- Dependencias instaladas:
+  - `laravel/breeze`
+  - `livewire/livewire`
+  - `livewire/volt`
+- Migraciones:
+  - Ninguna nueva en esta fase.
+- Decisiones:
+  - Reutilizar Breeze + Livewire como base del backoffice autenticado.
+  - Mantener `email` en el usuario para recuperacion y verificacion, pero operar el login con `username`.
+  - Forzar empresa activa antes del dashboard y autoseleccionar cuando el usuario solo tenga una empresa vinculada.
+- Pruebas:
+  - `php artisan test`
+  - Resultado: `31 passed`.
+- Validaciones operativas:
+  - Se detecto que el Node 18 del host no sirve para Vite 8.
+  - Se documento el uso del servicio `vite` con Node 24 para compilar assets.
+- Pendientes:
+  - Ejecutar el primer CRUD funcional del modulo de catalogos.
+  - Introducir autorizacion por permisos y roles empresariales.
+
+## 2026-06-15 - Mitigacion de vulnerabilidades frontend
+
+- Objetivo: revisar el `npm audit` y corregir la vulnerabilidad critica sin romper compatibilidad operativa del proyecto.
+- Archivos modificados:
+  - `package.json`
+  - `package-lock.json`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+- Hallazgos:
+  - `npm audit` reporto vulnerabilidad critica en `shell-quote`.
+  - La ruta de dependencia era `concurrently -> shell-quote`.
+  - `concurrently` 10 ya incorpora `shell-quote` parchado, pero exige Node `>=22`.
+- Decisiones:
+  - Mantener `concurrently` 9.x para no romper el flujo `composer dev`.
+  - Forzar `shell-quote` `1.8.4` mediante `overrides` de npm.
+- Pruebas:
+  - Pendiente revalidar `npm audit`, build frontend y suite PHP tras regenerar lockfile.
+- Pendientes:
+  - Continuar con el primer CRUD del modulo de catalogos una vez quede limpio el frente de dependencias.
+
+## 2026-06-15 - Fase 4 inicial de maestras
+
+- Objetivo: abrir el primer modulo operativo con CRUD tenant-scoped para categorias, marcas y unidades.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Masters/CategoriesPage.php`
+  - `app/Livewire/Masters/BrandsPage.php`
+  - `app/Livewire/Masters/UnitsPage.php`
+  - `app/Models/Brand.php`
+  - `app/Models/Category.php`
+  - `app/Models/Company.php`
+  - `app/Models/Unit.php`
+  - `database/migrations/2026_06_15_130000_create_categories_table.php`
+  - `database/migrations/2026_06_15_130100_create_brands_table.php`
+  - `database/migrations/2026_06_15_130200_create_units_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/masters-nav.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/masters/categories-page.blade.php`
+  - `resources/views/livewire/masters/brands-page.blade.php`
+  - `resources/views/livewire/masters/units-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/MastersCatalogsTest.php`
+- Migraciones:
+  - Nuevas tablas `categories`, `brands`, `units`.
+- Decisiones:
+  - Crear rutas separadas `masters/categories`, `masters/brands` y `masters/units`.
+  - Limitar todas las consultas y mutaciones a la empresa activa.
+  - Usar archivado logico para categorias y marcas; en unidades el archivado se resuelve por estado.
+- Pruebas:
+  - `php artisan test`
+  - Resultado: `35 passed`.
+- Pendientes:
+  - Continuar con `products` y sus relaciones a `category`, `brand` y `unit`.
+  - Introducir permisos tecnicos efectivos sobre el modulo `masters`.
+
+## 2026-06-15 - Fase 4 producto base
+
+- Objetivo: implementar el catalogo base de productos enlazado a maestras y listo para ser consumido por compras, inventario y POS.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Products/ProductsPage.php`
+  - `app/Models/Brand.php`
+  - `app/Models/Category.php`
+  - `app/Models/Company.php`
+  - `app/Models/Product.php`
+  - `app/Models/Unit.php`
+  - `database/migrations/2026_06_15_140000_create_products_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/catalog-nav.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/masters/brands-page.blade.php`
+  - `resources/views/livewire/masters/categories-page.blade.php`
+  - `resources/views/livewire/masters/units-page.blade.php`
+  - `resources/views/livewire/products/products-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/ProductsCatalogTest.php`
+- Migraciones:
+  - Nueva tabla `products`.
+- Decisiones:
+  - Crear modulo `products` separado de `masters`, pero compartir una navegacion comun de catalogos.
+  - Exigir `category` y `base_unit` de la empresa activa para registrar un producto.
+  - Mantener `brand` opcional.
+  - Persistir margenes calculados a partir de costo y precios.
+  - Dejar `tax_id` como referencia nullable mientras no exista catalogo fiscal dedicado.
+- Pruebas:
+  - `php artisan test`
+  - Resultado: `38 passed`.
+- Pendientes:
+  - Implementar `product_presentations`.
+  - Implementar `attributes`, `attribute_values` y `product_variants`.
+  - Introducir permisos efectivos `products.*`.
+
+## 2026-06-15 - Fase 4 presentaciones de producto
+
+- Objetivo: implementar presentaciones vendibles con factor de conversion exacto a unidad base y CRUD tenant-scoped.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Products/ProductPresentationsPage.php`
+  - `app/Models/Company.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductPresentation.php`
+  - `app/Models/Unit.php`
+  - `app/Services/Products/ProductPresentationConverter.php`
+  - `database/migrations/2026_06_15_150000_create_product_presentations_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/catalog-nav.blade.php`
+  - `resources/views/livewire/products/product-presentations-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/ProductPresentationsCatalogTest.php`
+  - `tests/Unit/ProductPresentationConverterTest.php`
+- Migraciones:
+  - Nueva tabla `product_presentations`.
+- Decisiones:
+  - Compartir la navegacion de catalogos entre maestras, productos y presentaciones.
+  - Limitar la creacion de presentaciones a productos y unidades activas de la empresa actual.
+  - Usar `bcmath` en un servicio dedicado para conversion de cantidades.
+  - Mantener archivado logico en presentaciones para preservar historico operativo.
+- Pruebas:
+  - `php artisan test`
+  - Resultado: `44 passed`.
+- Pendientes:
+  - Implementar `attributes`, `attribute_values` y `product_variants`.
+  - Empezar a consumir `product_presentations` desde compras e inventario.
+  - Introducir permisos efectivos `products.*`.
+
+## 2026-06-15 - Notificaciones globales con toast
+
+- Objetivo: reemplazar mensajes estaticos por un sistema de notificaciones consistente, animado y reutilizable.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Company/SelectCompanyPage.php`
+  - `app/Livewire/Concerns/InteractsWithToast.php`
+  - `app/Livewire/Masters/BrandsPage.php`
+  - `app/Livewire/Masters/CategoriesPage.php`
+  - `app/Livewire/Masters/UnitsPage.php`
+  - `app/Livewire/Products/ProductPresentationsPage.php`
+  - `app/Livewire/Products/ProductsPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `resources/js/app.js`
+  - `resources/views/components/toast-stack.blade.php`
+  - `resources/views/layouts/app.blade.php`
+  - `resources/views/livewire/masters/brands-page.blade.php`
+  - `resources/views/livewire/masters/categories-page.blade.php`
+  - `resources/views/livewire/masters/units-page.blade.php`
+  - `resources/views/livewire/products/product-presentations-page.blade.php`
+  - `resources/views/livewire/products/products-page.blade.php`
+  - `resources/views/livewire/profile/update-password-form.blade.php`
+  - `resources/views/livewire/profile/update-profile-information-form.blade.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Montar un `toast` global en el layout autenticado para acciones Livewire y redirects.
+  - Centralizar la duracion por defecto en `window.retailSaas.toastDuration`.
+  - Mantener compatibilidad con `session('status')` mientras se migra el resto del flujo.
+- Pruebas:
+  - `php artisan test`
+  - `docker compose run --rm --entrypoint /bin/sh vite -lc "npm run build"`
+- Resultado:
+  - `toast` en esquina superior derecha con animacion de entrada y salida.
+  - Autocierre por defecto a los 5 segundos.
+  - Mismo patron reutilizable para crear, editar, desactivar, archivar, restaurar y acciones posteriores.
+- Pendientes:
+  - Extender el uso del `toast` a modulos futuros sin reintroducir mensajes inline.
+
+## 2026-06-15 - Fase 4 atributos y variantes
+
+- Objetivo: completar el catalogo extendido con atributos, valores y variantes por producto listos para compras, inventario y POS.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Products/AttributesPage.php`
+  - `app/Livewire/Products/ProductVariantsPage.php`
+  - `app/Models/Attribute.php`
+  - `app/Models/AttributeValue.php`
+  - `app/Models/Company.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductVariant.php`
+  - `database/migrations/2026_06_15_160000_create_attributes_table.php`
+  - `database/migrations/2026_06_15_160100_create_attribute_values_table.php`
+  - `database/migrations/2026_06_15_160200_create_product_variants_table.php`
+  - `database/migrations/2026_06_15_160300_create_variant_attribute_values_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `docs/roles-y-permisos.md`
+  - `resources/views/components/catalog-nav.blade.php`
+  - `resources/views/livewire/products/attributes-page.blade.php`
+  - `resources/views/livewire/products/product-variants-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/AttributesCatalogTest.php`
+  - `tests/Feature/ProductVariantsCatalogTest.php`
+- Migraciones:
+  - Nuevas tablas `attributes`, `attribute_values`, `product_variants`, `variant_attribute_values`.
+- Decisiones:
+  - Manejar atributos, valores y variantes con `status` en lugar de `soft delete`.
+  - Limitar variantes a productos activos y valores activos de atributos activos de la empresa actual.
+  - Validar en aplicacion que solo exista un valor por atributo en cada variante y que no se repita una combinacion para el mismo producto.
+- Pruebas:
+  - `php artisan test`
+  - Resultado: `49 passed`, `174 assertions`.
+- Pendientes:
+  - Conectar `product_presentations` y `product_variants` al flujo de compras e inventario.
+  - Introducir permisos efectivos `products.*`.
+
+## 2026-06-15 - Fase 3 permisos y autorizacion base
+
+- Objetivo: materializar permisos tecnicos y plantillas iniciales, y conectar middleware y policies al catalogo autenticado.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Companies/CreateCompany.php`
+  - `app/Http/Middleware/EnsureCompanyPermission.php`
+  - `app/Livewire/Masters/BrandsPage.php`
+  - `app/Livewire/Masters/CategoriesPage.php`
+  - `app/Livewire/Masters/UnitsPage.php`
+  - `app/Livewire/Products/AttributesPage.php`
+  - `app/Livewire/Products/ProductPresentationsPage.php`
+  - `app/Livewire/Products/ProductVariantsPage.php`
+  - `app/Livewire/Products/ProductsPage.php`
+  - `app/Models/Company.php`
+  - `app/Models/CompanyRole.php`
+  - `app/Models/Permission.php`
+  - `app/Models/RoleTemplate.php`
+  - `app/Models/User.php`
+  - `app/Policies/AttributePolicy.php`
+  - `app/Policies/BrandPolicy.php`
+  - `app/Policies/CategoryPolicy.php`
+  - `app/Policies/ProductPolicy.php`
+  - `app/Policies/ProductPresentationPolicy.php`
+  - `app/Policies/ProductVariantPolicy.php`
+  - `app/Policies/UnitPolicy.php`
+  - `app/Policies/Concerns/InteractsWithCompanyPermissions.php`
+  - `app/Providers/AppServiceProvider.php`
+  - `app/Providers/AuthServiceProvider.php`
+  - `app/Services/Authorization/AuthorizationCatalogBootstrapper.php`
+  - `app/Services/Authorization/CurrentCompanyPermissionResolver.php`
+  - `app/Support/Authorization/PermissionCatalog.php`
+  - `bootstrap/app.php`
+  - `bootstrap/providers.php`
+  - `database/migrations/2026_06_15_170000_create_authorization_tables.php`
+  - `database/migrations/2026_06_15_170100_add_role_references_to_company_user_table.php`
+  - `database/seeders/AuthorizationCatalogSeeder.php`
+  - `database/seeders/DatabaseSeeder.php`
+  - `docs/arquitectura-saas.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `docs/roles-y-permisos.md`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CompanyProvisioningTest.php`
+  - `tests/Feature/PermissionAuthorizationTest.php`
+- Migraciones:
+  - Nuevas tablas `permissions`, `role_templates`, `role_template_permissions`, `company_roles`, `company_role_permissions`.
+  - Nuevas columnas `role_template_id` y `company_role_id` en `company_user`.
+- Decisiones:
+  - Separar permisos de `masters.*` y `products.*` desde la base tecnica del catalogo.
+  - Resolver permisos contra la empresa activa mediante middleware de ruta y policies por recurso.
+  - Mantener `company_role` como etiqueta semantica y compatibilidad, pero usar referencias reales para autorizacion efectiva.
+  - Asignar automaticamente la plantilla `owner` al crear la primera empresa.
+- Pruebas:
+  - `php artisan test`
+  - `php artisan route:list | grep -E 'masters|products'`
+- Resultado:
+  - Las rutas del catalogo ya no dependen solo de autenticacion y empresa activa.
+  - Las acciones Livewire del catalogo validan permiso por policy antes de crear, editar, archivar o restaurar.
+  - El menu principal oculta o redirige el acceso a catalogos segun el permiso disponible.
+  - La suite quedo en `51 passed`, `177 assertions`.
+- Pendientes:
+  - Crear UI de administracion para `company_roles` y asignacion de usuarios.
+  - Conectar `product_presentations` y `product_variants` al modulo de compras e inventario.
+
+## 2026-06-15 - Fase 3 configuracion tipada por empresa
+
+- Objetivo: cerrar un paso backend acotado para persistir y resolver configuraciones por empresa sin depender aun de UI administrativa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Models/Company.php`
+  - `app/Models/CompanySetting.php`
+  - `app/Services/Settings/CompanySettings.php`
+  - `app/Support/Settings/CompanySettingCatalog.php`
+  - `database/migrations/2026_06_15_180000_create_company_settings_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CompanySettingsTest.php`
+- Migraciones:
+  - Nueva tabla `company_settings`.
+- Decisiones:
+  - Centralizar las claves soportadas y sus defaults en un catalogo unico.
+  - Exponer lectura por grupo y escritura tipada a traves de un servicio de backend.
+  - No abrir UI aun; primero dejar contrato estable para consumo por modulos posteriores.
+- Pruebas:
+  - `php artisan test`
+  - `php artisan migrate --pretend`
+- Resultado:
+  - `company_settings` ya soporta `string`, `integer`, `decimal`, `boolean` y `json`.
+  - El servicio devuelve defaults del catalogo cuando la empresa aun no ha persistido un valor.
+  - La suite quedo en `56 passed`, `190 assertions`.
+- Observaciones:
+  - `php artisan migrate --pretend` no pudo validarse en esta sesion porque PostgreSQL local no estaba disponible en `127.0.0.1:5434`.
+- Pendientes:
+  - Empezar a consumir `company_settings` desde POS, caja e inventario.
+  - Crear UI administrativa para editar configuraciones por empresa.
+
+## 2026-06-15 - Fase 5 compras base backend
+
+- Objetivo: abrir el backend transaccional inicial de compras sin UI, reutilizando productos, presentaciones y variantes ya existentes.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/CreatePurchase.php`
+  - `app/Enums/PurchaseStatus.php`
+  - `app/Models/Branch.php`
+  - `app/Models/Company.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductPresentation.php`
+  - `app/Models/ProductVariant.php`
+  - `app/Models/Purchase.php`
+  - `app/Models/PurchaseItem.php`
+  - `app/Models/Warehouse.php`
+  - `app/Services/Purchases/PurchaseCalculator.php`
+  - `database/migrations/2026_06_15_190000_create_purchases_table.php`
+  - `database/migrations/2026_06_15_190100_create_purchase_items_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchaseCreationTest.php`
+- Migraciones:
+  - Nuevas tablas `purchases` y `purchase_items`.
+- Decisiones:
+  - Persistir `base_quantity` desde el momento de la compra para dejar preparado el consumo posterior por kardex.
+  - Permitir `supplier_id` nullable y agregar `supplier_name` temporal mientras no exista aun el dominio formal de proveedores.
+  - Mantener este corte sin UI ni movimientos de inventario para no mezclar compras con kardex en una sola fase.
+- Pruebas:
+  - `php artisan test`
+  - `php artisan test --filter=PurchaseCreationTest`
+- Resultado:
+  - El backend ya puede crear compras con una o varias lineas.
+  - Las lineas soportan `product_presentation_id` y `product_variant_id`.
+  - Los totales y la `base_quantity` se calculan automaticamente.
+  - La suite quedo en `58 passed`, `198 assertions`.
+- Pendientes:
+  - Conectar compras a UI o flujo de aplicacion.
+  - Generar `inventory_movements`, `inventory_balances` y costo promedio a partir de compras confirmadas.
+  - Materializar el dominio de proveedores.
+
+## 2026-06-15 - Fase 5 estructura base de inventario
+
+- Objetivo: dejar listo el soporte estructural de kardex y saldos por bodega sin mezclar aun la logica de posting y costo promedio.
+- Archivos modificados:
+  - `README.md`
+  - `app/Enums/InventoryMovementType.php`
+  - `app/Models/Company.php`
+  - `app/Models/InventoryBalance.php`
+  - `app/Models/InventoryMovement.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductVariant.php`
+  - `app/Models/Warehouse.php`
+  - `database/migrations/2026_06_15_200000_create_inventory_movements_table.php`
+  - `database/migrations/2026_06_15_200100_create_inventory_balances_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/InventoryStructuresTest.php`
+- Migraciones:
+  - Nuevas tablas `inventory_movements` y `inventory_balances`.
+- Decisiones:
+  - Mantener `inventory_movements` con referencia generica por `reference_type` y `reference_id` para que compras, ventas y ajustes puedan reutilizar la misma estructura.
+  - Crear `inventory_balances` como tabla real con unicidad reforzada tambien para el caso sin variante.
+  - No implementar aun posting automatico ni promedio ponderado para no mezclar estructura con logica operativa.
+- Pruebas:
+  - `php artisan test --filter=InventoryStructuresTest`
+  - `php artisan test`
+- Resultado:
+  - El proyecto ya puede persistir movimientos y saldos de inventario con relaciones a empresa, bodega, producto y variante.
+  - La unicidad del saldo sin variante quedo protegida a nivel de base de datos.
+  - La suite quedo en `60 passed`, `204 assertions`.
+- Pendientes:
+  - Postear compras confirmadas hacia kardex y saldos.
+  - Calcular costo promedio por producto, bodega y variante.
+  - Conectar luego ventas, ajustes y traslados a la misma estructura.
+
+## 2026-06-15 - Fase 5 posting de compras a inventario
+
+- Objetivo: completar el primer flujo operativo de inventario haciendo que compras confirmadas actualicen kardex, saldos y costo promedio base.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/CreatePurchase.php`
+  - `app/Models/Purchase.php`
+  - `app/Services/Inventory/PostPurchaseToInventory.php`
+  - `database/migrations/2026_06_15_200200_add_posted_to_inventory_at_to_purchases_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchaseCreationTest.php`
+- Migraciones:
+  - Nueva columna `posted_to_inventory_at` en `purchases`.
+- Decisiones:
+  - Postear automaticamente compras en estado `confirmed`, `partially_paid` o `paid`.
+  - Mantener el proceso idempotente usando `posted_to_inventory_at` como marca de aplicado.
+  - Calcular el costo de kardex por unidad base a partir de `line_subtotal / base_quantity`.
+- Pruebas:
+  - `php artisan test --filter=PurchaseCreationTest`
+  - `php artisan test`
+- Resultado:
+  - Las compras confirmadas ya generan movimientos `purchase_in`.
+  - Los saldos por bodega se actualizan automaticamente.
+  - El costo promedio inicial se calcula por promedio ponderado.
+  - La suite quedo en `62 passed`, `214 assertions`.
+- Pendientes:
+  - Extender posting a devoluciones de compra.
+  - Conectar ventas, ajustes y traslados a la misma estructura.
+  - Crear UI o flujo de aplicacion para compras.
+
+## 2026-06-15 - Fase 5 devoluciones de compra a inventario
+
+- Objetivo: cerrar el segundo flujo operativo de inventario permitiendo revertir compras ya posteadas sin romper costo promedio ni permitir stock negativo.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/ReturnPurchase.php`
+  - `app/Models/Purchase.php`
+  - `app/Services/Inventory/ReturnPurchaseFromInventory.php`
+  - `database/migrations/2026_06_15_200300_add_returned_from_inventory_at_to_purchases_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchaseCreationTest.php`
+- Migraciones:
+  - Nueva columna `returned_from_inventory_at` en `purchases`.
+- Decisiones:
+  - Crear una accion `ReturnPurchase` separada del alta de compra.
+  - Marcar la devolucion de forma idempotente con `returned_from_inventory_at`.
+  - Valorar la salida `purchase_return_out` al costo promedio vigente del saldo y reiniciar `average_cost` a cero cuando el saldo queda en cero.
+  - Rechazar la devolucion si el stock actual ya no alcanza para revertir la compra.
+- Pruebas:
+  - `php artisan test --filter=PurchaseCreationTest`
+  - `php artisan test`
+- Resultado:
+  - Las compras ya pueden revertirse con trazabilidad completa en `inventory_movements`.
+  - El saldo por bodega disminuye correctamente sin permitir cantidades negativas.
+  - La suite quedo en `65 passed`, `227 assertions`.
+- Observaciones:
+  - `php artisan migrate --pretend` no pudo validarse en esta sesion porque PostgreSQL local no estaba disponible en `127.0.0.1:5434`.
+- Pendientes:
+  - Conectar ventas, ajustes y traslados a la misma estructura.
+  - Crear UI o flujo de aplicacion para compras y devoluciones.
+  - Materializar cuentas por pagar y proveedores.
+
+## 2026-06-15 - Fase 5 ajustes manuales de inventario
+
+- Objetivo: agregar un segundo origen operativo distinto de compras para alimentar el kardex con entradas y salidas manuales controladas.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Inventory/CreateInventoryAdjustment.php`
+  - `app/Enums/InventoryAdjustmentType.php`
+  - `app/Models/Branch.php`
+  - `app/Models/Company.php`
+  - `app/Models/InventoryAdjustment.php`
+  - `app/Models/InventoryAdjustmentItem.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductVariant.php`
+  - `app/Models/Warehouse.php`
+  - `app/Services/Inventory/PostInventoryAdjustmentToInventory.php`
+  - `database/migrations/2026_06_15_200400_create_inventory_adjustments_table.php`
+  - `database/migrations/2026_06_15_200500_create_inventory_adjustment_items_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/InventoryAdjustmentsTest.php`
+- Migraciones:
+  - Nuevas tablas `inventory_adjustments` e `inventory_adjustment_items`.
+- Decisiones:
+  - Crear un documento propio para ajustes manuales, separado de compras.
+  - Postear automaticamente el ajuste al kardex usando `posted_to_inventory_at` como marca idempotente.
+  - Exigir `unit_cost` positivo en ajustes de entrada.
+  - Valorar la salida por ajuste al costo promedio vigente y bloquear stock negativo.
+- Pruebas:
+  - `php artisan test --filter=InventoryAdjustmentsTest`
+  - `php artisan test --filter=InventoryStructuresTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta `adjustment_in` y `adjustment_out` con trazabilidad completa en `inventory_movements`.
+  - Las entradas por ajuste recalculan `average_cost` por promedio ponderado.
+  - Las salidas por ajuste respetan el saldo disponible y no permiten cantidades negativas.
+  - La suite quedo en `70 passed`, `242 assertions`.
+- Pendientes:
+  - Conectar ventas y traslados a la misma estructura.
+  - Crear UI o flujo de aplicacion para compras, devoluciones y ajustes.
+  - Materializar cuentas por pagar y proveedores.
+
+## 2026-06-15 - Fase 5 traslados entre bodegas
+
+- Objetivo: completar otro origen operativo del kardex permitiendo mover stock entre bodegas sin alterar el valor total de inventario de la empresa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Inventory/CreateInventoryTransfer.php`
+  - `app/Models/Company.php`
+  - `app/Models/InventoryTransfer.php`
+  - `app/Models/InventoryTransferItem.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductVariant.php`
+  - `app/Models/Warehouse.php`
+  - `app/Services/Inventory/PostInventoryTransferToInventory.php`
+  - `database/migrations/2026_06_15_200600_create_inventory_transfers_table.php`
+  - `database/migrations/2026_06_15_200700_create_inventory_transfer_items_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/InventoryTransfersTest.php`
+- Migraciones:
+  - Nuevas tablas `inventory_transfers` e `inventory_transfer_items`.
+- Decisiones:
+  - Crear un documento propio para traslados internos, separado de compras y ajustes.
+  - Exigir bodegas origen y destino distintas.
+  - Postear automaticamente el traslado usando `posted_to_inventory_at` como marca idempotente.
+  - Valorar el `transfer_out` y el `transfer_in` con el costo promedio vigente de la bodega origen.
+  - Rechazar el traslado si no hay stock suficiente en la bodega origen.
+- Pruebas:
+  - `php artisan test --filter=InventoryTransfersTest`
+  - `php artisan test --filter=InventoryAdjustmentsTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta `transfer_out` y `transfer_in` con trazabilidad completa en `inventory_movements`.
+  - La bodega origen descuenta stock sin perder su costo promedio mientras conserve saldo.
+  - La bodega destino recalcula `average_cost` usando el costo transportado desde origen.
+  - La suite quedo en `75 passed`, `256 assertions`.
+- Pendientes:
+  - Conectar ventas a la misma estructura.
+  - Crear UI o flujo de aplicacion para compras, devoluciones, ajustes y traslados.
+  - Materializar cuentas por pagar y proveedores.
+
+## 2026-06-15 - Fase 5 ventas base con salida de inventario
+
+- Objetivo: abrir el backend base de ventas reutilizando catalogo, presentaciones, variantes y kardex ya construido, sin mezclar aun pagos ni caja.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Enums/SaleStatus.php`
+  - `app/Models/Branch.php`
+  - `app/Models/CashRegister.php`
+  - `app/Models/Company.php`
+  - `app/Models/Product.php`
+  - `app/Models/ProductPresentation.php`
+  - `app/Models/ProductVariant.php`
+  - `app/Models/Sale.php`
+  - `app/Models/SaleItem.php`
+  - `app/Models/User.php`
+  - `app/Models/Warehouse.php`
+  - `app/Services/Inventory/PostSaleToInventory.php`
+  - `app/Services/Sales/SaleCalculator.php`
+  - `database/migrations/2026_06_15_200800_create_sales_table.php`
+  - `database/migrations/2026_06_15_200900_create_sale_items_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/SalesCreationTest.php`
+- Migraciones:
+  - Nuevas tablas `sales` y `sale_items`.
+- Decisiones:
+  - Mantener `cash_register_id` y `user_id` como referencias opcionales en esta primera base.
+  - Postear automaticamente la venta confirmada a inventario con `posted_to_inventory_at` como marca idempotente.
+  - Guardar `description_snapshot` al crear la linea y `cost_snapshot` al confirmar la salida de stock.
+  - Rechazar la venta confirmada si no existe stock suficiente para completar la salida.
+- Pruebas:
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=InventoryTransfersTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta ventas `draft` y `confirmed` con lineas, descuentos, impuestos y total general.
+  - Las ventas confirmadas ya generan `sale_out` en `inventory_movements`.
+  - Cada linea confirmada guarda `cost_snapshot` usando el costo promedio vigente del saldo.
+  - La suite quedo en `80 passed`, `277 assertions`.
+- Pendientes:
+  - Implementar ventas congeladas, pagos mixtos y apertura/cierre de caja.
+  - Implementar anulaciones y devoluciones de venta.
+  - Crear UI o flujo de aplicacion para compras, devoluciones, ajustes, traslados y ventas.
+
+## 2026-06-15 - Fase 6 ventas congeladas backend
+
+- Objetivo: agregar soporte backend para guardar carritos temporales del POS sin impacto en inventario y luego convertirlos en ventas reales.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CancelFrozenSale.php`
+  - `app/Actions/Sales/ConvertFrozenSaleToSale.php`
+  - `app/Actions/Sales/CreateFrozenSale.php`
+  - `app/Enums/FrozenSaleStatus.php`
+  - `app/Models/Branch.php`
+  - `app/Models/CashRegister.php`
+  - `app/Models/Company.php`
+  - `app/Models/FrozenSale.php`
+  - `app/Models/Sale.php`
+  - `app/Models/User.php`
+  - `app/Models/Warehouse.php`
+  - `database/migrations/2026_06_15_201000_create_frozen_sales_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/FrozenSalesTest.php`
+- Migraciones:
+  - Nueva tabla `frozen_sales`.
+- Decisiones:
+  - Guardar el carrito en `payload_snapshot` sin tocar inventario.
+  - Usar `pos.frozen_sales_enabled` y `pos.frozen_sales_expiration_minutes` desde `company_settings`.
+  - Permitir conversion explicita a `sales` y enlazarla con `converted_sale_id`.
+  - Permitir cancelacion y marcar expiracion al intentar convertir una venta vencida.
+- Pruebas:
+  - `php artisan test --filter=FrozenSalesTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta `frozen_sales` con estados `open`, `expired`, `converted` y `cancelled`.
+  - Las ventas congeladas no generan movimientos de inventario hasta convertirse en venta real.
+  - La conversion reutiliza el snapshot guardado y dispara el flujo normal de `sales`.
+  - La suite quedo en `85 passed`, `293 assertions`.
+- Pendientes:
+  - Implementar pagos mixtos y apertura/cierre de caja.
+  - Implementar anulaciones y devoluciones de venta.
+  - Crear UI o flujo de aplicacion para compras, devoluciones, ajustes, traslados y ventas.
+
+## 2026-06-15 - Fase 6 caja y pagos mixtos backend
+
+- Objetivo: abrir el backend de caja y cobro sobre ventas confirmadas, incluyendo apertura/cierre de caja y registro de pagos mixtos.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Cash/CloseCashSession.php`
+  - `app/Actions/Cash/OpenCashSession.php`
+  - `app/Actions/Sales/RegisterSalePayments.php`
+  - `app/Enums/CashSessionStatus.php`
+  - `app/Enums/PaymentStatus.php`
+  - `app/Models/Branch.php`
+  - `app/Models/CashRegister.php`
+  - `app/Models/CashSession.php`
+  - `app/Models/Company.php`
+  - `app/Models/Payment.php`
+  - `app/Models/Sale.php`
+  - `app/Models/User.php`
+  - `database/migrations/2026_06_15_201100_create_cash_sessions_table.php`
+  - `database/migrations/2026_06_15_201200_create_payments_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CashAndPaymentsTest.php`
+- Migraciones:
+  - Nuevas tablas `cash_sessions` y `payments`.
+- Decisiones:
+  - Mantener `payment_method_code` como string tecnico en esta fase.
+  - Permitir una sola sesion abierta por caja.
+  - Exigir coincidencia exacta entre suma de pagos y total de la venta.
+  - Calcular el efectivo esperado al cierre desde `opening_amount` mas pagos `cash`.
+  - Validar diferencias de cierre segun `cash.allow_close_with_difference`.
+- Pruebas:
+  - `php artisan test --filter=CashAndPaymentsTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta apertura y cierre de caja con diferencias controladas.
+  - Las ventas confirmadas ya pueden registrar uno o varios pagos.
+  - Los pagos pueden enlazarse a una sesion abierta de caja para trazabilidad operativa.
+  - La suite quedo en `91 passed`, `309 assertions`.
+- Pendientes:
+  - Crear UI o flujo de aplicacion para compras, devoluciones, ajustes, traslados, ventas, caja y pagos.
+  - Materializar un catalogo formal de metodos de pago si se decide endurecer ese dominio.
+
+## 2026-06-15 - Fase 6 anulaciones y devoluciones de venta backend
+
+- Objetivo: cerrar el ciclo operativo base de ventas permitiendo devoluciones parciales o totales y anulaciones con consistencia entre inventario y pagos.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CancelSale.php`
+  - `app/Actions/Sales/ReturnSale.php`
+  - `app/Models/Sale.php`
+  - `app/Models/SaleItem.php`
+  - `app/Services/Inventory/ReturnSaleToInventory.php`
+  - `database/migrations/2026_06_15_201300_add_return_tracking_to_sales_and_sale_items.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/SalesReturnsAndCancellationTest.php`
+- Migraciones:
+  - Nuevas columnas `cancelled_at` y `returned_at` en `sales`.
+  - Nuevas columnas `returned_quantity` y `returned_base_quantity` en `sale_items`.
+- Decisiones:
+  - Registrar devoluciones por linea usando cantidades acumuladas para soportar devoluciones parciales seguras.
+  - Reingresar inventario con `sale_return_in` valorizado al `cost_snapshot` original de la linea.
+  - Permitir anular ventas `draft` directamente y ventas `confirmed` mediante reposicion del saldo pendiente mas reverso de pagos `confirmed`.
+  - Bloquear la anulacion de ventas ya parcialmente devueltas para no mezclar dos flujos compensatorios sobre la misma operacion.
+- Pruebas:
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+  - `php artisan test --filter=CashAndPaymentsTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta devoluciones parciales y totales de venta con trazabilidad completa en `inventory_movements`.
+  - Las anulaciones de ventas confirmadas restituyen inventario pendiente y revierten pagos confirmados a `reversed`.
+  - La suite quedo en `96 passed`, `327 assertions`.
+- Pendientes:
+  - Crear UI o flujo de aplicacion para ventas, devoluciones, anulaciones, caja y pagos.
+  - Materializar un catalogo formal de metodos de pago si se decide endurecer ese dominio.
+
+## 2026-06-15 - Fase 7 credito y abonos backend
+
+- Objetivo: abrir el dominio base de clientes y cartera, integrando ventas a credito y abonos sobre la estructura existente de ventas, pagos y caja.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Credit/RegisterCreditPayment.php`
+  - `app/Actions/Customers/CreateCustomer.php`
+  - `app/Actions/Sales/CancelSale.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Actions/Sales/RegisterSalePayments.php`
+  - `app/Actions/Sales/ReturnSale.php`
+  - `app/Enums/CreditAccountStatus.php`
+  - `app/Enums/CreditMovementType.php`
+  - `app/Models/Company.php`
+  - `app/Models/CreditAccount.php`
+  - `app/Models/CreditMovement.php`
+  - `app/Models/Customer.php`
+  - `app/Models/Payment.php`
+  - `app/Models/Person.php`
+  - `app/Models/Sale.php`
+  - `app/Services/Credit/CreditLedger.php`
+  - `database/migrations/2026_06_15_201400_create_people_table.php`
+  - `database/migrations/2026_06_15_201500_create_customers_table.php`
+  - `database/migrations/2026_06_15_201600_create_credit_accounts_table.php`
+  - `database/migrations/2026_06_15_201700_create_credit_movements_table.php`
+  - `database/migrations/2026_06_15_201800_add_credit_fields_to_sales_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CreditSalesAndPaymentsTest.php`
+- Migraciones:
+  - Nuevas tablas `people`, `customers`, `credit_accounts`, `credit_movements`.
+  - Nuevas columnas `credit_account_id` y `credit_due_at` en `sales`.
+- Decisiones:
+  - Crear un ledger de credito separado por cuenta y enlazado a cada venta a credito.
+  - Generar el cargo de cartera al confirmar una venta `sale_type = credit`.
+  - Registrar abonos con una accion dedicada y reutilizar `payments` para trazabilidad de caja.
+  - Bloquear anulaciones o devoluciones de ventas a credito cuando ya existan abonos confirmados.
+- Pruebas:
+  - `php artisan test --filter=CreditSalesAndPaymentsTest`
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+  - `php artisan test --filter=CashAndPaymentsTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta clientes, cuentas de credito y movimientos de cartera por empresa.
+  - Las ventas a credito confirmadas ya descuentan stock y generan cargo financiero en la cuenta del cliente.
+  - Los abonos ya reducen saldo de venta y saldo total de la cuenta, con trazabilidad en `payments` y `credit_movements`.
+  - La suite quedo en `102 passed`, `347 assertions`.
+- Pendientes:
+  - Crear UI o flujo de aplicacion para clientes, ventas a credito y abonos.
+  - Implementar vencimientos avanzados, bloqueo por mora y conciliaciones posteriores.
+  - Implementar puntos y fidelizacion sobre la base actual de clientes y ventas.
+
+## 2026-06-15 - Fase 7 fidelizacion backend
+
+- Objetivo: abrir el dominio base de fidelizacion con cuentas de puntos por cliente y ledger automatico ligado a ventas, devoluciones y anulaciones.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Customers/CreateCustomer.php`
+  - `app/Actions/Sales/CancelSale.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Actions/Sales/ReturnSale.php`
+  - `app/Enums/LoyaltyAccountStatus.php`
+  - `app/Enums/LoyaltyMovementType.php`
+  - `app/Models/Company.php`
+  - `app/Models/Customer.php`
+  - `app/Models/LoyaltyAccount.php`
+  - `app/Models/LoyaltyMovement.php`
+  - `app/Models/Sale.php`
+  - `app/Services/Loyalty/LoyaltyLedger.php`
+  - `database/migrations/2026_06_15_201900_create_loyalty_accounts_table.php`
+  - `database/migrations/2026_06_15_202000_create_loyalty_movements_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/reglas-inventario.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/LoyaltySalesTest.php`
+- Migraciones:
+  - Nuevas tablas `loyalty_accounts` y `loyalty_movements`.
+- Decisiones:
+  - Crear un ledger de fidelizacion separado por cliente y empresa.
+  - Acumular puntos automaticamente al confirmar una venta con cliente fidelizado.
+  - Revertir puntos proporcionalmente en devoluciones y totalmente en anulaciones.
+  - Mantener este corte sin redencion ni expiracion automatica de puntos.
+- Pruebas:
+  - `php artisan test --filter=LoyaltySalesTest`
+  - `php artisan test --filter=CreditSalesAndPaymentsTest`
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta cuentas de fidelizacion por cliente y movimientos de puntos por empresa.
+  - Las ventas confirmadas ya pueden generar puntos cuando la empresa y el cliente tienen fidelizacion habilitada.
+  - Las devoluciones y anulaciones ya revierten esos puntos sin alterar kardex ni pagos.
+  - La suite quedo en `107 passed`, `357 assertions`.
+- Pendientes:
+  - Crear UI o flujo de aplicacion para clientes y fidelizacion.
+  - Implementar redencion de puntos y expiracion automatica.
+  - Implementar promociones y combos sobre la base actual de ventas y fidelizacion.
+
+## 2026-06-15 - Fase 7 promociones y combos backend
+
+- Objetivo: cerrar el bloque comercial base de promociones aplicadas sobre ventas confirmadas, reutilizando catalogo, ventas y configuracion por empresa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Promotions/CreatePromotion.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Enums/PromotionDiscountType.php`
+  - `app/Enums/PromotionStatus.php`
+  - `app/Enums/PromotionTargetType.php`
+  - `app/Enums/PromotionType.php`
+  - `app/Models/Company.php`
+  - `app/Models/Promotion.php`
+  - `app/Models/PromotionComboItem.php`
+  - `app/Models/PromotionTarget.php`
+  - `app/Models/SaleItem.php`
+  - `app/Services/Promotions/PromotionEngine.php`
+  - `app/Services/Sales/SaleCalculator.php`
+  - `app/Support/Authorization/PermissionCatalog.php`
+  - `database/migrations/2026_06_15_202100_create_promotions_table.php`
+  - `database/migrations/2026_06_15_202200_create_promotion_targets_table.php`
+  - `database/migrations/2026_06_15_202300_create_promotion_combo_items_table.php`
+  - `database/migrations/2026_06_15_202400_add_promotion_snapshot_to_sale_items_table.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/estados-del-sistema.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `docs/roles-y-permisos.md`
+  - `tests/Feature/PromotionsAndCombosTest.php`
+- Migraciones:
+  - Nuevas tablas `promotions`, `promotion_targets` y `promotion_combo_items`.
+  - Nueva columna `promotion_snapshot` en `sale_items`.
+- Decisiones:
+  - Resolver promociones en un motor dedicado antes del calculo final de venta.
+  - Soportar en esta fase promociones `product_discount` y combos `combo_price`.
+  - Aplicar combos primero y luego promociones por producto, respetando `priority` y `pos.allow_promotion_stacking`.
+  - Congelar snapshots promocionales por linea y un resumen en `sales.pricing_snapshot`.
+- Pruebas:
+  - `php artisan test --filter=PromotionsAndCombosTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=LoyaltySalesTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta descuentos porcentuales o fijos por producto y combos a precio fijo.
+  - Las lineas de venta ya guardan el detalle de promociones aplicadas en `promotion_snapshot`.
+  - La venta ya puede conservar un resumen promocional en `pricing_snapshot`.
+  - La suite quedo en `111 passed`, `375 assertions`.
+- Pendientes:
+  - Crear UI o flujo de aplicacion para administrar promociones y combos.
+  - Implementar reglas avanzadas como exclusiones, cupones o horarios.
+  - Integrar auditoria sobre cambios comerciales sensibles.
+
+## 2026-06-15 - Fase 3 auditoria inicial backend
+
+- Objetivo: agregar trazabilidad minima real sobre acciones operativas sensibles sin introducir observers globales ni un subsistema de consulta completo todavia.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Cash/CloseCashSession.php`
+  - `app/Actions/Cash/OpenCashSession.php`
+  - `app/Actions/Credit/RegisterCreditPayment.php`
+  - `app/Actions/Inventory/CreateInventoryAdjustment.php`
+  - `app/Actions/Inventory/CreateInventoryTransfer.php`
+  - `app/Actions/Promotions/CreatePromotion.php`
+  - `app/Actions/Purchases/CreatePurchase.php`
+  - `app/Actions/Purchases/ReturnPurchase.php`
+  - `app/Actions/Sales/CancelSale.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Actions/Sales/RegisterSalePayments.php`
+  - `app/Actions/Sales/ReturnSale.php`
+  - `app/Models/AuditLog.php`
+  - `app/Models/Company.php`
+  - `app/Services/Audit/AuditLogger.php`
+  - `database/migrations/2026_06_15_202500_create_audit_logs_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/AuditLoggingTest.php`
+- Migraciones:
+  - Nueva tabla `audit_logs`.
+- Decisiones:
+  - Registrar auditoria desde acciones explicitas de aplicacion.
+  - Guardar snapshots `before` y `after` planos por atributos.
+  - Omitir entradas cuando una accion idempotente no produjo cambios reales.
+  - Registrar una entrada por `Payment` creado en cobros de venta y abonos de credito.
+- Pruebas:
+  - `php artisan test --filter=AuditLoggingTest`
+  - `php artisan test --filter=CashAndPaymentsTest`
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya registra auditoria para compras, devoluciones de compra, ajustes, traslados, ventas, pagos, apertura/cierre de caja, devoluciones, anulaciones, abonos y promociones.
+  - Los cierres de caja y devoluciones de venta ya dejan snapshots `before` y `after` verificables.
+  - La suite quedo en `113 passed`, `390 assertions`.
+- Pendientes:
+  - Exponer consulta operativa de auditoria con filtros y permisos.
+  - Evaluar captura de `ip_address` cuando estas acciones se invoquen desde capa HTTP.
+  - Extender auditoria a mas dominios cuando entren cuentas por pagar, reportes e integraciones.
+
+## 2026-06-15 - Fase 3 consulta operativa de auditoria
+
+- Objetivo: exponer una consulta backend reutilizable para listar auditoria por empresa sin construir todavia la UI de revision operativa.
+- Archivos modificados:
+  - `app/Actions/Audit/ListAuditLogs.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/AuditLogsQueryTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener la consulta como action de aplicacion reutilizable desde UI, reportes o API futura.
+  - Soportar filtros por `action`, `actor_user_id`, `auditable_type`, `auditable_id`, `date_from` y `date_to`.
+  - Ordenar la salida desde el evento mas reciente al mas antiguo.
+- Pruebas:
+  - `php artisan test --filter=AuditLogsQueryTest`
+  - `php artisan test --filter=AuditLoggingTest`
+  - `php artisan test`
+- Resultado:
+  - El backend ya puede listar auditoria por empresa y filtrar por accion, actor, entidad y rango de fechas.
+  - La suite quedo en `122 passed`, `430 assertions`.
+- Pendientes:
+  - Exponer esta consulta en UI operativa o endpoint dedicado.
+  - Evaluar captura de `ip_address` cuando estas acciones se invoquen desde capa HTTP.
+  - Extender auditoria a mas dominios cuando entren reportes e integraciones.
+
+## 2026-06-15 - Fase 5 cuentas por pagar backend base
+
+- Objetivo: cerrar el circuito financiero minimo de compras permitiendo registrar saldo pendiente, pagos a proveedor y ajuste por devolucion sin esperar todavia un modulo completo de proveedores.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/CreatePurchase.php`
+  - `app/Actions/Purchases/RegisterPurchasePayment.php`
+  - `app/Actions/Purchases/ReturnPurchase.php`
+  - `app/Enums/PayableMovementType.php`
+  - `app/Models/Company.php`
+  - `app/Models/PayableMovement.php`
+  - `app/Models/Purchase.php`
+  - `app/Services/Payables/PayablesLedger.php`
+  - `app/Support/Authorization/PermissionCatalog.php`
+  - `database/migrations/2026_06_15_202600_add_payables_fields_to_purchases_table.php`
+  - `database/migrations/2026_06_15_202700_create_payable_movements_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `docs/roles-y-permisos.md`
+  - `tests/Feature/PurchasePayablesTest.php`
+- Migraciones:
+  - Nuevas columnas `amount_paid`, `balance_due` y `paid_at` en `purchases`.
+  - Nueva tabla `payable_movements`.
+- Decisiones:
+  - Crear un ledger por compra con movimientos `purchase_charge`, `payment` y `purchase_return_adjustment`.
+  - Generar el cargo automaticamente al crear una compra no borrador.
+  - Permitir pago parcial o total posterior mediante una accion dedicada.
+  - Bloquear devoluciones de compra cuando ya existan pagos registrados.
+- Pruebas:
+  - `php artisan test --filter=PurchasePayablesTest`
+  - `php artisan test --filter=PurchaseCreationTest`
+  - `php artisan test`
+- Resultado:
+  - El sistema ya soporta saldo pendiente por compra, pagos a proveedor y compras marcadas como `partially_paid` o `paid`.
+  - Las devoluciones sin pagos previos ya ajustan el saldo de cuentas por pagar a cero.
+  - La suite quedo en `118 passed`, `412 assertions`.
+- Pendientes:
+  - Exponer consulta operativa de cuentas por pagar con filtros por vencimiento y proveedor.
+  - Modelar proveedores formales y conciliaciones de pagos mas avanzadas.
+  - Resolver notas credito o saldos a favor de proveedor para devoluciones con pagos previos.
+
+## 2026-06-15 - Fase 5 consulta operativa de cuentas por pagar
+
+- Objetivo: exponer una consulta backend reutilizable para listar cuentas por pagar filtrando por proveedor, estado y vencimiento sin construir todavia la UI financiera.
+- Archivos modificados:
+  - `app/Actions/Purchases/ListPurchasePayables.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchasePayablesQueryTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener la consulta como action de aplicacion reutilizable desde UI, reportes o API futura.
+  - Soportar filtros por `supplier_name`, `status`, `overdue_only`, `due_from` y `due_to`.
+  - Tratar `status = open` como saldo pendiente mayor a cero, independiente del estado textual de la compra.
+- Pruebas:
+  - `php artisan test --filter=PurchasePayablesQueryTest`
+  - `php artisan test --filter=PurchasePayablesTest`
+  - `php artisan test`
+- Resultado:
+  - El backend ya puede listar cuentas por pagar abiertas, vencidas o por rango de fechas y proveedor.
+  - La suite quedo en `120 passed`, `421 assertions`.
+- Pendientes:
+  - Exponer esta consulta en UI operativa o endpoint dedicado.
+  - Modelar proveedores formales y conciliaciones mas avanzadas.
+
+## 2026-06-15 - Fase 5 proveedores formales backend base
+
+- Objetivo: materializar el dominio de proveedores sobre `people`, enlazar compras a un proveedor de empresa y dejar lista la transicion hacia UI operativa y conciliaciones mas completas.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/CreatePurchase.php`
+  - `app/Actions/Purchases/ListPurchasePayables.php`
+  - `app/Actions/Suppliers/CreateSupplier.php`
+  - `app/Models/Company.php`
+  - `app/Models/Person.php`
+  - `app/Models/Purchase.php`
+  - `app/Models/Supplier.php`
+  - `database/migrations/2026_06_15_202800_create_suppliers_table.php`
+  - `database/migrations/2026_06_15_202900_add_supplier_foreign_key_to_purchases_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchaseCreationTest.php`
+  - `tests/Feature/PurchasePayablesQueryTest.php`
+  - `tests/Feature/SuppliersTest.php`
+- Migraciones:
+  - Nueva tabla `suppliers`.
+  - FK nullable de `purchases.supplier_id` hacia `suppliers`.
+- Decisiones:
+  - Reutilizar `people` como identidad comercial base del proveedor.
+  - Mantener `supplier_name` como snapshot historico aunque exista relacion formal.
+  - Derivar `due_at` desde `payment_term_days` del proveedor cuando la compra no lo reciba manualmente.
+  - Permitir filtro financiero por `supplier_id` sin romper el filtro historico por `supplier_name`.
+- Pruebas:
+  - `php artisan test --filter=SuppliersTest`
+  - `php artisan test --filter=PurchaseCreationTest`
+  - `php artisan test --filter=PurchasePayablesQueryTest`
+- Resultado:
+  - El backend ya soporta alta transaccional de proveedores por empresa.
+  - Las compras ya pueden validar proveedor por tenant, enlazarlo formalmente y congelar su nombre en el documento.
+  - Las cuentas por pagar ya pueden consultarse por proveedor formal ademas del nombre congelado.
+- Pendientes:
+  - Crear UI o endpoint operativo para proveedores.
+  - Implementar edicion, archivado y listados operativos de proveedores.
+  - Resolver conciliaciones avanzadas como notas credito y saldos a favor.
+
+## 2026-06-15 - Fase 7 redencion y expiracion de fidelizacion
+
+- Objetivo: completar el backend de fidelizacion permitiendo consumir puntos en la venta, restaurarlos cuando la venta se devuelve o anula, y expirar saldos antiguos de forma deterministica.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Loyalty/ExpireLoyaltyPoints.php`
+  - `app/Actions/Sales/CancelSale.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Actions/Sales/ReturnSale.php`
+  - `app/Enums/LoyaltyMovementType.php`
+  - `app/Services/Loyalty/LoyaltyLedger.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/LoyaltySalesTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Integrar la redencion como descuento distribuido sobre las lineas de la venta antes de persistirla.
+  - Congelar en `sales.pricing_snapshot.loyalty_redemption` los puntos y el equivalente monetario aplicados.
+  - Restaurar primero puntos redimidos y luego revertir puntos ganados al devolver o anular una venta.
+  - Expirar puntos por FIFO usando `loyalty.points_expiration_days`; valores `<= 0` deshabilitan la expiracion automatica.
+- Pruebas:
+  - `php artisan test --filter=LoyaltySalesTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - El backend ya soporta redencion de puntos en ventas confirmadas.
+  - Las devoluciones y anulaciones ya restauran puntos consumidos y revierten puntos ganados sin dejar saldo incoherente.
+  - El sistema ya puede expirar puntos disponibles por empresa y cliente usando FIFO.
+- Pendientes:
+  - Crear UI operativa para consultar saldo, redimir puntos y lanzar expiraciones.
+  - Evaluar una regla independiente de conversion monetaria si la plataforma deja de usar solo `per_currency`.
+  - Revisar reglas avanzadas cuando existan cupones, membresias premium o campañas de expiracion segmentadas.
+
+## 2026-06-15 - Fase 5 conciliacion base de saldo a favor para proveedores
+
+- Objetivo: permitir devoluciones de compras ya pagadas sin perder trazabilidad financiera, generando saldo a favor del proveedor y habilitando su aplicacion posterior sobre compras pendientes.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/ApplySupplierCreditToPurchase.php`
+  - `app/Actions/Purchases/ReturnPurchase.php`
+  - `app/Enums/PayableMovementType.php`
+  - `app/Models/PayableMovement.php`
+  - `app/Models/Supplier.php`
+  - `app/Services/Payables/PayablesLedger.php`
+  - `database/migrations/2026_06_15_203000_add_supplier_credit_balance_to_suppliers_table.php`
+  - `database/migrations/2026_06_15_203100_add_supplier_fields_to_payable_movements_table.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/modelo-datos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchasePayablesTest.php`
+- Migraciones:
+  - Nueva columna `credit_balance` en `suppliers`.
+  - Nuevas columnas `supplier_id` y `supplier_credit_after` en `payable_movements`.
+- Decisiones:
+  - Generar `supplier_credit_generated` al devolver una compra ya pagada con proveedor formal.
+  - Mantener `purchase_return_adjustment` para cerrar el saldo pendiente del documento y separar el saldo a favor del proveedor en su propio movimiento.
+  - Aplicar saldo a favor manualmente sobre compras pendientes mediante `supplier_credit_applied`.
+  - Seguir bloqueando devoluciones pagadas cuando la compra no tenga proveedor formal enlazado.
+- Pruebas:
+  - `php artisan test --filter=PurchasePayablesTest`
+  - `php artisan test --filter=PurchasePayablesQueryTest`
+  - `php artisan test --filter=PurchaseCreationTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - El backend ya soporta devoluciones pagadas con generacion de saldo a favor del proveedor.
+  - El saldo a favor ya puede aplicarse a una compra pendiente del mismo proveedor.
+  - El ledger financiero ya conserva trazabilidad tanto por compra como por credito vivo del proveedor.
+- Pendientes:
+  - Crear UI o endpoint operativo para consultar y aplicar saldo a favor.
+  - Evaluar aplicacion automatica opcional del credito del proveedor en futuras compras.
+  - Resolver escenarios mas avanzados como devoluciones parciales con multiples pagos o notas debito posteriores.
+
+## 2026-06-15 - Fase 5 UI operativa inicial de proveedores y cuentas por pagar
+
+- Objetivo: exponer la primera capa operativa para el dominio de compras financieras, permitiendo mantener proveedores y aplicar saldo a favor sobre compras abiertas desde Livewire.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Suppliers/UpdateSupplier.php`
+  - `app/Livewire/Purchases/SuppliersPage.php`
+  - `app/Livewire/Purchases/PayablesPage.php`
+  - `app/Support/Authorization/PermissionCatalog.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `docs/roles-y-permisos.md`
+  - `resources/views/components/purchases-nav.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/purchases/suppliers-page.blade.php`
+  - `resources/views/livewire/purchases/payables-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/PermissionAuthorizationTest.php`
+  - `tests/Feature/SuppliersAndPayablesPagesTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Separar el maestro de proveedores y la consulta financiera en dos paginas Livewire.
+  - Introducir `suppliers.view` y `suppliers.manage` para no mezclar mantenimiento de terceros con conciliacion contable.
+  - Dejar la aplicacion de saldo a favor como accion manual, visible por compra y con referencia editable.
+- Pruebas:
+  - `php artisan test --filter=SuppliersAndPayablesPagesTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+  - `php artisan test`
+- Resultado:
+  - El usuario con permisos ya puede crear, editar, activar y desactivar proveedores desde UI.
+  - El usuario con permisos contables ya puede consultar compras abiertas y aplicar saldo a favor del proveedor sin salir del backoffice.
+  - La suite quedo en `136 passed`, `492 assertions`.
+- Pendientes:
+  - Conectar esta base a la futura UI completa de compras y registro de pagos.
+  - Agregar conciliaciones mas avanzadas, archivado y trazabilidad visual del ledger por proveedor.
+
+## 2026-06-16 - Fase 5 UI operativa inicial de compras
+
+- Objetivo: abrir la primera pantalla operativa de compras para registrar documentos, sus lineas, pagos posteriores y devoluciones sin salir del backoffice.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Purchases/PurchasesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/purchases-nav.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/purchases/purchases-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/PermissionAuthorizationTest.php`
+  - `tests/Feature/PurchasesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Reutilizar `CreatePurchase`, `RegisterPurchasePayment` y `ReturnPurchase` desde la misma UI para no duplicar reglas del dominio.
+  - Mantener la aplicacion de pagos restringida a `payables.manage` aunque la compra sea visible desde `purchases.view`.
+  - Conservar la navegacion del modulo `Compras` separada en compras, proveedores y cuentas por pagar.
+- Pruebas:
+  - `php artisan test --filter=PurchasesPageTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+  - `php artisan test`
+- Resultado:
+  - El usuario de compras ya puede crear compras confirmadas, borradores o pagadas desde UI.
+  - El usuario con permisos contables ya puede registrar pagos sobre compras abiertas desde la misma pantalla.
+  - Las devoluciones de compra ya pueden dispararse desde UI y seguir alimentando inventario y saldo a favor del proveedor.
+  - La suite quedo en `139 passed`, `507 assertions`.
+- Pendientes:
+  - Agregar edicion controlada de compras antes de posting definitivo.
+  - Exponer historial visual de movimientos financieros por compra.
+  - Conectar esta base a flujos posteriores de reportes y auditoria visual.
+
+## 2026-06-16 - Fase 5 ledger visual por compra
+
+- Objetivo: exponer la trazabilidad financiera de cada compra sin abrir un modulo separado, reutilizando el ledger de cuentas por pagar ya existente.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Purchases/PayablesPage.php`
+  - `app/Livewire/Purchases/PurchasesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/purchases/partials/payable-ledger.blade.php`
+  - `resources/views/livewire/purchases/payables-page.blade.php`
+  - `resources/views/livewire/purchases/purchases-page.blade.php`
+  - `tests/Feature/PurchasesPageTest.php`
+  - `tests/Feature/SuppliersAndPayablesPagesTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener el ledger como expansion por compra dentro de las pantallas ya operativas.
+  - Mostrar tipo de movimiento, monto, referencia, saldo posterior y saldo a favor posterior.
+  - Reutilizar el mismo parcial Blade en compras y cuentas por pagar para no divergir la lectura del historial.
+- Pruebas:
+  - `php artisan test --filter=PurchasesPageTest`
+  - `php artisan test --filter=SuppliersAndPayablesPagesTest`
+  - `php artisan test`
+- Resultado:
+  - El usuario ya puede auditar visualmente cargos, pagos, ajustes por devolucion y movimientos de saldo a favor directamente sobre cada compra.
+  - La suite quedo en `141 passed`, `511 assertions`.
+- Pendientes:
+  - Agregar filtros o resumenes por tipo de movimiento cuando el volumen historico crezca.
+  - Conectar este ledger con auditoria visual y reportes posteriores.
+
+## 2026-06-16 - Fase 5 edicion controlada de borradores de compra
+
+- Objetivo: permitir ajustes operativos sobre compras en borrador antes del posting definitivo, sin habilitar mutaciones riesgosas sobre documentos ya aplicados.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/UpdateDraftPurchase.php`
+  - `app/Livewire/Purchases/PurchasesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/purchases/purchases-page.blade.php`
+  - `tests/Feature/PurchasesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Restringir la edicion a compras `draft` sin posting, sin devolucion y sin movimientos en `payable_movements`.
+  - Permitir que desde el mismo borrador se cambie el estado final a `confirmed`, `partially_paid` o `paid`.
+  - Reutilizar el mismo posting a inventario y ledger financiero que ya usa la creacion de compras.
+- Pruebas:
+  - `php artisan test --filter=PurchasesPageTest`
+  - `php artisan test --filter=PurchaseCreationTest`
+- Resultado:
+  - El usuario ya puede corregir lineas, costos o encabezado de una compra en borrador y luego confirmarla sin recrear el documento.
+- Pendientes:
+  - Evaluar versionado visual del borrador cuando exista mayor complejidad documental.
+  - Definir si mas adelante se permitiran anulaciones o reaperturas controladas de compras confirmadas.
+
+## 2026-06-16 - Fase 5 consulta consolidada de ledger por proveedor
+
+- Objetivo: dejar listo el backend para futuras vistas y reportes de cuentas por pagar por proveedor, sin depender solo del detalle embebido por compra.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/ListSupplierPayableMovements.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/SupplierPayableMovementsQueryTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Consultar solo movimientos con `supplier_id` formal para construir un ledger coherente por proveedor.
+  - Soportar filtros backend por `supplier_id`, `supplier_name`, `purchase_id`, `movement_type`, `date_from` y `date_to`.
+  - Ordenar del movimiento mas reciente al mas antiguo usando `occurred_at` e `id`.
+- Pruebas:
+  - `php artisan test --filter=SupplierPayableMovementsQueryTest`
+  - `php artisan test --filter=PurchasePayablesQueryTest`
+  - `php artisan test --filter=PurchasePayablesTest`
+  - `php artisan test --filter=SuppliersAndPayablesPagesTest`
+  - `php artisan test --filter=PurchasesPageTest`
+- Resultado:
+  - El backend ya puede listar el historial financiero consolidado de un proveedor formal, incluyendo cargos, pagos, ajustes por devolucion y movimientos de saldo a favor.
+  - La nueva consulta queda lista para reutilizarse desde UI, reportes o auditoria visual posterior sin recalcular el ledger desde cada pantalla.
+- Pendientes:
+  - Exponer esta consulta en una UI operativa o endpoint dedicado.
+  - Definir si se agregaran agregados por proveedor como saldo vivo, ultimo movimiento y aging resumido.
+
+## 2026-06-16 - Fase 5 resumen consolidado por proveedor
+
+- Objetivo: dejar un agregado backend reutilizable para consultar la salud financiera de cada proveedor sin recorrer todo el ledger detallado en cada pantalla.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/ListSupplierPayablesSummary.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/SupplierPayablesSummaryTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Construir el resumen sobre `suppliers` con agregados de compras abiertas y movimientos financieros ya persistidos.
+  - Exponer `credit_balance`, `open_balance_total`, `open_purchases_count`, `overdue_purchases_count`, `last_movement_at` y `next_due_at`.
+  - Soportar filtros backend por `supplier_name`, `has_balance_only` y `overdue_only`.
+- Ajuste posterior del corte:
+  - Se ampliaron las metricas del resumen con `current_balance_total`, `overdue_balance_total` y `net_balance_exposure`.
+  - Se agrego el filtro `has_credit_only` para detectar proveedores con saldo a favor disponible.
+  - Se agregaron buckets de aging `age_0_30_balance_total`, `age_31_60_balance_total`, `age_61_90_balance_total` y `age_91_plus_balance_total`.
+- Pruebas:
+  - `php artisan test --filter=SupplierPayablesSummaryTest`
+  - `php artisan test --filter=SupplierPayableMovementsQueryTest`
+  - `php artisan test --filter=PurchasePayablesTest`
+  - `php artisan test --filter=PurchasePayablesQueryTest`
+  - `php artisan test --filter=SuppliersAndPayablesPagesTest`
+- Resultado:
+  - El backend ya puede entregar un resumen por proveedor con saldo pendiente, credito disponible, ultimo movimiento, proximo vencimiento y antiguedad de cartera por buckets.
+  - La futura UI financiera ya puede consumir un agregado listo para tablero o listado sin rearmar el estado del proveedor desde cada compra.
+- Pendientes:
+  - Exponer este resumen en endpoint dedicado si se requiere reutilizacion externa.
+  - Definir si el siguiente corte agrega totales globales y filtros visuales sobre este agregado.
+
+## 2026-06-16 - Fase 5 consumo operativo del resumen de proveedores en cuentas por pagar
+
+- Objetivo: conectar el agregado financiero por proveedor a la UI actual de cuentas por pagar para revisar cartera y creditos sin salir del flujo operativo.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Purchases/PayablesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `resources/views/livewire/purchases/payables-page.blade.php`
+  - `tests/Feature/SuppliersAndPayablesPagesTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mostrar en la misma pagina tarjetas globales para saldo abierto, saldo vencido, saldo a favor y exposicion neta.
+  - Renderizar un bloque por proveedor con abierto/vencido, credito, proximo vencimiento y buckets de aging.
+  - Mantener `hasCreditOnly` como filtro del agregado por proveedor sin forzar el mismo comportamiento sobre el listado detallado de compras.
+- Ajuste posterior del corte:
+  - Se sincronizaron los filtros `hasCreditOnly` y `agingBucket` entre el agregado de proveedores y el listado detallado de compras.
+  - La consulta `ListPurchasePayables` ahora soporta filtrar compras de proveedores con saldo a favor y buckets de aging.
+- Pruebas:
+  - `php artisan test --filter=SuppliersAndPayablesPagesTest`
+  - `php artisan test --filter=SupplierPayablesSummaryTest`
+  - `php artisan test --filter=PurchasePayablesQueryTest`
+- Resultado:
+  - La pagina de cuentas por pagar ya consume el resumen agregado por proveedor y expone aging y exposicion neta de forma operativa.
+  - El usuario ya puede filtrar rapidamente proveedores con saldo a favor y moverse al detalle de compras con el mismo contexto de aging.
+- Pendientes:
+  - Definir si el siguiente corte agrega exportacion o endpoint del tablero financiero.
+
+## 2026-06-16 - Fase 3 UI inicial de auditoria operativa
+
+- Objetivo: abrir la primera pantalla interna de auditoria para revisar eventos criticos, actores y snapshots `before/after` sin depender aun de reportes avanzados.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Admin/AuditLogsPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/admin/audit-logs-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/AuditLogsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Proteger la pantalla con `settings.manage` para mantenerla dentro del frente administrativo interno.
+  - Permitir filtros por accion, actor, tipo de entidad, ID y rango de fechas.
+  - Mostrar snapshots `before` y `after` expandibles en formato legible dentro de la misma vista.
+- Pruebas:
+  - `php artisan test --filter=AuditLogsPageTest`
+  - `php artisan test --filter=AuditLogsQueryTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+- Resultado:
+  - La plataforma ya tiene una UI de auditoria inicial accesible desde navegacion interna.
+  - El usuario con permisos administrativos ya puede revisar eventos, actores y cambios de estado sin salir del backoffice.
+- Pendientes:
+  - Agregar exportacion, filtros avanzados y cruce posterior con reportes.
+  - Definir si el siguiente corte mezcla auditoria con UI de roles y configuracion o se mantiene como modulo interno independiente.
+
+## 2026-06-16 - Fase 3 UI inicial de roles y asignaciones
+
+- Objetivo: abrir la primera pantalla administrativa para crear roles por empresa y asignarlos a usuarios usando la estructura real de permisos ya existente.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Admin/RolesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/audit-logs-page.blade.php`
+  - `resources/views/livewire/admin/roles-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/RolesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Crear y editar `company_roles` desde UI con seleccion explicita de permisos.
+  - Reutilizar `role_templates` y `company_roles` en la misma pantalla para asignar membresias de usuarios.
+  - Mantener una subnavegacion `Admin` compartida entre auditoria y roles.
+- Pruebas:
+  - `php artisan test --filter=RolesPageTest`
+  - `php artisan test --filter=AuditLogsPageTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+- Resultado:
+  - La plataforma ya cuenta con una UI administrativa inicial para crear roles personalizados y asignarlos a usuarios de la empresa actual.
+  - El modulo `Admin` ya agrupa auditoria y roles dentro de la navegacion interna protegida por permisos.
+- Pendientes:
+  - Agregar edicion mas fina de membresias, validaciones de combinaciones y posiblemente acciones masivas.
+  - Completar la UI de configuracion por empresa para cerrar el resto del paso 1.
+
+## 2026-06-16 - Fase 3 UI inicial de configuracion por empresa
+
+- Objetivo: cerrar la primera capa administrativa interna de configuracion para editar parametros operativos por empresa desde backoffice.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Settings/UpdateCompanySettings.php`
+  - `app/Livewire/Admin/SettingsPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/admin-nav.blade.php`
+  - `resources/views/livewire/admin/settings-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/SettingsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Renderizar la UI desde `CompanySettingCatalog` para no mantener formularios hardcodeados por modulo.
+  - Sincronizar `legal_name`, `display_name` y `tax_id` contra `companies`, dejando el resto de claves en `company_settings`.
+  - Evitar sobrescribir `legal_name` o `display_name` con `null` al guardar la configuracion para preservar integridad de empresa.
+  - Mantener la subnavegacion `Admin` compartida entre configuracion, roles y auditoria.
+- Pruebas:
+  - `php artisan test --filter=SettingsPageTest`
+  - `php artisan test --filter=CompanySettingsTest`
+  - `php artisan test --filter=RolesPageTest`
+  - `php artisan test --filter=AuditLogsPageTest`
+- Resultado:
+  - La plataforma ya permite editar desde UI parametros generales, POS, inventario, caja, impresion, credito y fidelizacion por empresa.
+  - Los datos nucleares de identidad de empresa ya se hidratan y sincronizan correctamente sin romper restricciones de base de datos.
+  - El modulo `Admin` ya cubre el frente interno base de configuracion, roles y auditoria.
+- Pendientes:
+  - Conectar estas configuraciones a reglas operativas reales del POS, caja, credito, promociones e impresion.
+  - Agregar validaciones mas finas por tipo de setting, ayudas contextuales y posiblemente agrupaciones mas especializadas por dominio.
+
+## 2026-06-16 - Fase 3 primer consumo real de settings en caja y POS
+
+- Objetivo: empezar a usar `company_settings` ya administrables en reglas transaccionales reales de caja y ventas.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Cash/OpenCashSession.php`
+  - `app/Actions/Sales/CreateFrozenSale.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Services/Inventory/PostSaleToInventory.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CashAndPaymentsTest.php`
+  - `tests/Feature/FrozenSalesTest.php`
+  - `tests/Feature/SalesCreationTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Si `cash.opening_required` esta deshabilitado y no se envia monto explicito, abrir la sesion de caja en `0.00`.
+  - Bloquear descuentos manuales en ventas y ventas congeladas cuando `pos.allow_manual_discounts` este deshabilitado.
+  - Permitir `sale_out` con saldo negativo solo cuando `pos.allow_negative_stock` este habilitado.
+  - Cuando una venta deja saldo negativo sin costo promedio vigente, usar `products.cost` como fallback para `cost_snapshot` y `inventory_balances.average_cost`.
+- Pruebas:
+  - `php artisan test --filter=CashAndPaymentsTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=FrozenSalesTest`
+- Resultado:
+  - La apertura de caja ya responde a la politica de apertura requerida por empresa.
+  - Las ventas y ventas congeladas ya respetan la politica de descuentos manuales.
+  - El posting de ventas a inventario ya puede bloquear o permitir stock negativo segun configuracion tenant.
+- Pendientes:
+  - Extender el mismo patron de consumo a credito, fidelizacion, impresion y reglas adicionales del POS.
+  - Evaluar si el fallback de costo para stock negativo necesita version posterior con politica mas sofisticada por tenant.
+
+## 2026-06-16 - Fase 3 consumo de settings en reglas de credito
+
+- Objetivo: conectar `credit.block_new_credit_if_overdue` a la autorizacion real de nuevas ventas a credito.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Services/Credit/CreditLedger.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CreditSalesAndPaymentsTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Resolver la mora desde el ledger de credito por venta, usando `credit_due_at` y saldo pendiente agregado por `credit_movements`.
+  - Bloquear nuevas ventas a credito solo cuando exista una venta vencida con saldo todavia abierto.
+  - Permitir el flujo normal cuando la empresa desactive explicitamente `credit.block_new_credit_if_overdue`.
+- Pruebas:
+  - `php artisan test --filter=CreditSalesAndPaymentsTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=AuditLoggingTest`
+- Resultado:
+  - Las nuevas ventas a credito ya se bloquean automaticamente cuando el cliente tiene cartera vencida y la empresa mantiene activa esa politica.
+  - La misma regla puede desactivarse por tenant desde configuracion administrativa sin tocar codigo.
+- Pendientes:
+  - Extender el consumo de settings a fidelizacion e impresion.
+  - Evaluar si futuras vistas de cartera requieren exponer la misma deteccion de mora como consulta reusable para UI y reportes.
+
+## 2026-06-16 - Fase 3 primer consumo de settings en impresion
+
+- Objetivo: conectar `printing.ticket_format`, `printing.show_logo` y `printing.show_saas_branding` a una salida imprimible real de ventas.
+- Archivos modificados:
+  - `README.md`
+  - `app/Http/Controllers/Sales/SaleTicketController.php`
+  - `app/Services/Printing/BuildSaleTicketViewData.php`
+  - `docs/configuracion-empresa.md`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/printing/sales/ticket.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/SaleTicketViewTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Exponer una ruta autenticada `sales/{sale}/ticket` protegida por `sales.view` y empresa activa.
+  - Resolver el ticket mediante un builder reusable que combina datos de `sales`, `sale_items`, `companies` y `company_settings`.
+  - Soportar inicialmente `thermal_80mm` y `letter_a4` como variaciones de HTML imprimible.
+  - Mostrar logo y branding solo cuando la configuracion tenant lo permita.
+- Pruebas:
+  - `php artisan test --filter=SaleTicketViewTest`
+  - `php artisan test --filter=SalesCreationTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+- Resultado:
+  - La plataforma ya tiene una primera salida imprimible real para ventas confirmadas.
+  - Los settings de impresion ya alteran la salida final sin requerir cambios por ticket o por vista duplicada.
+  - La ruta queda lista para ser enlazada luego desde la futura UI POS o desde ventas.
+- Pendientes:
+  - Definir si el ticket termico final seguira en HTML imprimible o migrara a PDF.
+  - Evaluar logos almacenados localmente, QR, desglose de pagos y variantes visuales adicionales del ticket.
+
+## 2026-06-16 - Fase 6 UI inicial de consulta de ventas
+
+- Objetivo: exponer una primera pantalla de ventas en backoffice para consultar documentos y abrir el ticket ya implementado.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Sales/SalesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/SalesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mantener esta primera pantalla como modulo de lectura, sin capturar aun carrito, pagos, congelados o devoluciones desde UI.
+  - Reutilizar `sales.view` para proteger tanto la pagina como el acceso al ticket.
+  - Incluir filtros por estado, tipo y busqueda textual para validar operacion diaria antes del POS completo.
+- Pruebas:
+  - `php artisan test --filter=SalesPageTest`
+  - `php artisan test --filter=SaleTicketViewTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+- Resultado:
+  - La navegacion principal ya expone `Ventas` para usuarios con `sales.view`.
+  - El usuario ya puede revisar ventas confirmadas o de credito y abrir su ticket imprimible sin salir del backoffice.
+- Pendientes:
+  - Conectar creacion, cobro, congelado, anulacion y devolucion a una UI POS real.
+  - Extender la vista de ventas con detalle de pagos, referencias y acciones operativas cuando entre la siguiente iteracion comercial.
+
+## 2026-06-16 - Fase 6 POS minimo para crear ventas
+
+- Objetivo: abrir la primera UI transaccional de ventas para crear documentos `draft` o `confirmed` desde backoffice y enlazarlos al ticket.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Sales/PosPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/sales-nav.blade.php`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/PosPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Crear una ruta `sales/pos` protegida por `sales.create`, separada de la consulta `sales.index`.
+  - Autocompletar el precio base de la linea desde el producto o la presentacion seleccionada.
+  - Exponer el ticket del ultimo documento creado para cerrar el flujo minimo de captura-confirmacion-impresion.
+- Pruebas:
+  - `php artisan test --filter=PosPageTest`
+  - `php artisan test --filter=SalesPageTest`
+  - `php artisan test --filter=SaleTicketViewTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+- Resultado:
+  - El usuario con `sales.create` ya puede armar lineas, confirmar una venta y abrir su ticket inmediatamente.
+  - La navegacion del modulo `Ventas` ya diferencia consulta historica y captura inicial del POS.
+- Pendientes:
+  - Integrar cobro inmediato, pagos mixtos y validacion de caja abierta dentro del mismo flujo UI.
+  - Integrar ventas congeladas, anulaciones y devoluciones operativas desde el frente.
+
+## 2026-06-16 - Fase 6 cobro inmediato dentro del POS inicial
+
+- Objetivo: cerrar el flujo minimo de venta POS confirmada con pagos inmediatos, validacion de caja abierta por empresa y enlace directo al ticket desde la misma UI.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CreatePosSale.php`
+  - `app/Livewire/Sales/PosPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `tests/Feature/PosPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Orquestar la creacion de la venta y el registro de pagos inmediatos en `CreatePosSale` dentro de una sola transaccion.
+  - Autocompletar el monto cuando existe un unico pago inmediato sin valor explicito.
+  - Validar que la sesion de caja abierta pertenezca a la sucursal y caja activas seleccionadas en el POS.
+  - Permitir guardar pagos sin sesion solo cuando `pos.requires_open_cash_session` este deshabilitado para la empresa.
+- Pruebas:
+  - `php artisan test --filter=PosPageTest`
+  - `php artisan test --filter=SalesPageTest`
+  - `php artisan test --filter=SaleTicketViewTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+- Resultado:
+  - El usuario ya puede confirmar una venta POS y registrar su cobro inmediato en el mismo flujo operativo.
+  - La UI ya soporta pagos mixtos iniciales y mantiene enlace directo al ticket del ultimo documento creado.
+  - La validacion de sesion de caja ya quedo alineada con empresa, sucursal, caja y configuracion tenant.
+- Pendientes:
+  - Integrar ventas congeladas, anulaciones y devoluciones operativas desde el frente.
+  - Abrir UI especifica para apertura/cierre de caja y conciliaciones posteriores.
+
+## 2026-06-16 - Fase 6 UI inicial de caja
+
+- Objetivo: exponer una primera pantalla operativa de caja para abrir y cerrar sesiones, revisar efectivo esperado y dejar listo el contexto consumido por POS.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/cash-nav.blade.php`
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Crear una ruta `cash/sessions` y un modulo `Caja` visible desde la navegacion principal cuando el usuario tenga permisos de caja.
+  - Permitir el acceso a la pagina con cualquier permiso de caja, pero proteger apertura y cierre por accion concreta.
+  - Reutilizar `OpenCashSession` y `CloseCashSession` sin duplicar reglas de negocio en la UI.
+  - Mostrar efectivo esperado por sesion a partir de apertura mas pagos `cash` confirmados, y ocultar diferencia final si el usuario no tiene `cash.view_difference`.
+- Pruebas:
+  - `php artisan test --filter=CashSessionsPageTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - El usuario ya puede abrir y cerrar sesiones desde backoffice sin depender solo de pruebas backend o del POS.
+  - Caja ya tiene un punto de entrada operativo coherente con los permisos existentes y con el flujo de cobro inmediato del POS.
+  - Las restricciones por permiso de apertura y cierre quedaron cubiertas con pruebas dedicadas.
+- Pendientes:
+  - Integrar reportes, conciliaciones y cierres asistidos con mas detalle financiero.
+  - Conectar ventas congeladas, anulaciones y devoluciones a una UI comercial completa.
+
+## 2026-06-16 - Fase 6 UI inicial de ventas congeladas
+
+- Objetivo: exponer una primera pantalla operativa para congelar carritos, retomar su snapshot y convertirlos despues a venta real.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Sales/FrozenSalesPage.php`
+  - `app/Models/FrozenSale.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/sales-nav.blade.php`
+  - `resources/views/livewire/sales/frozen-sales-page.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/FrozenSalesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Abrir `sales.frozen` como modulo operativo separado del POS inicial.
+  - Permitir retomar el snapshot en formulario sin mutar automaticamente la congelada original.
+  - Mantener conversion a venta confirmada reutilizando `ConvertFrozenSaleToSale`.
+- Pruebas:
+  - `php artisan test --filter=FrozenSalesPageTest`
+- Resultado:
+  - El usuario ya puede crear, retomar, cancelar y convertir ventas congeladas desde backoffice.
+  - La navegacion comercial ya diferencia POS, consulta historica y congelados.
+- Pendientes:
+  - Definir edicion formal de la misma congelada y limpieza/expiracion automatica mas visible.
+
+## 2026-06-16 - Fase 6 primeras mutaciones operativas en ventas
+
+- Objetivo: permitir devoluciones parciales y anulaciones directamente desde la UI de ventas ya existente.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Sales/SalesPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/flujo-pos.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `tests/Feature/SalesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Reutilizar `SalesPage` para operar mutaciones en vez de crear una segunda pantalla documental.
+  - Proteger devoluciones con `sales.return` y anulaciones con `sales.cancel`.
+  - Mostrar cantidades devueltas y pendientes por linea antes de confirmar la devolucion.
+- Pruebas:
+  - `php artisan test --filter=SalesPageTest`
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+- Resultado:
+  - El usuario ya puede devolver cantidades pendientes y anular ventas elegibles desde la misma consulta operativa.
+  - Las reglas de backend de devolucion y anulacion quedaron reutilizadas sin duplicar logica en la UI.
+- Pendientes:
+  - Agregar confirmaciones mas finas, detalle financiero expandido y acciones masivas o asistidas si luego se requieren.
+
+## 2026-06-16 - Fase 7 UI inicial de credito y abonos
+
+- Objetivo: abrir una primera pantalla de cartera por cliente/venta y registrar abonos sobre ventas a credito.
+- Archivos modificados:
+  - `README.md`
+  - `app/Livewire/Credit/CreditAccountsPage.php`
+  - `docs/decisiones-tecnicas.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/components/credit-nav.blade.php`
+  - `resources/views/livewire/credit/credit-accounts-page.blade.php`
+  - `resources/views/livewire/layout/navigation.blade.php`
+  - `routes/web.php`
+  - `tests/Feature/CreditAccountsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Exponer `credit.index` como modulo propio usando permisos `credit.view` y `credit.manage`.
+  - Consultar cartera por cuenta y por documento a credito, manteniendo el abono sobre la venta puntual.
+  - Validar en UI que la sesion de caja abierta usada para el abono corresponda al contexto operativo de la venta.
+- Pruebas:
+  - `php artisan test --filter=CreditAccountsPageTest`
+  - `php artisan test --filter=CreditSalesAndPaymentsTest`
+- Resultado:
+  - El usuario ya puede revisar saldo por cliente, identificar ventas vencidas y registrar abonos desde backoffice.
+  - El modulo `Credito` ya tiene entrada propia en navegacion y queda desacoplado del flujo comercial de ventas.
+- Pendientes:
+  - Agregar reportes de aging, historiales mas profundos por cliente y conciliaciones financieras posteriores.
+
+## 2026-06-16 - Fase 2 backend base de plataforma SaaS
+
+- Objetivo: materializar el modelo backend de planes, limites, bundles, suscripciones y cupones para dejar lista la capa platform antes de la UI administrativa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Companies/CreateCompany.php`
+  - `app/Actions/Subscriptions/ProvisionCompanySubscription.php`
+  - `app/Models/Company.php`
+  - `app/Models/CompanyFeatureOverride.php`
+  - `app/Models/CompanyLimitOverride.php`
+  - `app/Models/CompanyModuleOverride.php`
+  - `app/Models/Coupon.php`
+  - `app/Models/CouponRedemption.php`
+  - `app/Models/Feature.php`
+  - `app/Models/Module.php`
+  - `app/Models/Plan.php`
+  - `app/Models/PlanLimit.php`
+  - `app/Models/Subscription.php`
+  - `app/Models/SubscriptionBundle.php`
+  - `app/Models/SubscriptionBundleCompany.php`
+  - `app/Models/User.php`
+  - `app/Services/Plans/CompanyPlanResolver.php`
+  - `app/Services/Plans/PlanCatalogBootstrapper.php`
+  - `app/Support/Plans/PlanCatalog.php`
+  - `database/migrations/2026_06_16_000100_create_platform_billing_tables.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CompanyPlanResolverTest.php`
+  - `tests/Feature/CompanyProvisioningTest.php`
+- Migraciones:
+  - `2026_06_16_000100_create_platform_billing_tables.php`
+- Decisiones:
+  - Separar el catalogo comercial de planes en `PlanCatalog` para poder bootstrappear el dominio sin depender todavia de una UI platform.
+  - Aprovisionar automaticamente una suscripcion `basic` en `trialing` al crear empresa, evitando tenants sin contexto comercial minimo.
+  - Resolver acceso efectivo por prioridad `suscripcion directa -> bundle -> overrides por empresa`, dejando permisos tecnicos y settings como capas posteriores.
+- Pruebas:
+  - `php artisan test --filter=CompanyProvisioningTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - El proyecto ya tiene modelo persistente para planes, modulos, features, limites, bundles, suscripciones y cupones.
+  - La creacion de empresa deja una suscripcion inicial lista y el backend ya puede resolver acceso efectivo por plan, bundle y overrides.
+- Pendientes:
+  - Exponer administracion platform de planes, bundles, suscripciones y cupones.
+  - Conectar enforcement real de features y limites a los modulos operativos ya construidos.
+
+## 2026-06-16 - Fase 2 enforcement inicial de plan sobre modulos operativos
+
+- Objetivo: dejar de tratar planes y features como catalogo pasivo y empezar a bloquear o permitir capacidades reales del producto segun el plan efectivo de la empresa.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Promotions/CreatePromotion.php`
+  - `app/Actions/Promotions/UpdatePromotion.php`
+  - `app/Actions/Sales/CreateFrozenSale.php`
+  - `app/Actions/Sales/CreateSale.php`
+  - `app/Livewire/Sales/PosPage.php`
+  - `app/Services/Loyalty/LoyaltyLedger.php`
+  - `app/Services/Promotions/PromotionEngine.php`
+  - `app/Services/Sales/SalePreviewService.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Concerns/InteractsWithCompanyPlans.php`
+  - `tests/Feature/AuditLoggingTest.php`
+  - `tests/Feature/FrozenSalesPageTest.php`
+  - `tests/Feature/FrozenSalesTest.php`
+  - `tests/Feature/LoyaltyAccountsPageTest.php`
+  - `tests/Feature/LoyaltySalesTest.php`
+  - `tests/Feature/OperationalReportsPageTest.php`
+  - `tests/Feature/PosPageTest.php`
+  - `tests/Feature/PromotionsAndCombosTest.php`
+  - `tests/Feature/PromotionsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Tomar `basic` como baseline real y exigir `pro` o `premium` en pruebas y fixtures cuando el flujo usa promociones, fidelizacion o ventas congeladas.
+  - Bloquear creacion y aplicacion de promociones si la empresa no tiene el modulo `promotions`, y reservar combos para la feature `pos.combos`.
+  - Tratar fidelizacion como feature del plan, no solo como setting de empresa, y usar el mismo criterio tanto en ventas confirmadas como en preview POS.
+- Pruebas:
+  - `php artisan test --filter=FrozenSalesTest`
+  - `php artisan test --filter=FrozenSalesPageTest`
+  - `php artisan test --filter=LoyaltySalesTest`
+  - `php artisan test --filter=LoyaltyAccountsPageTest`
+  - `php artisan test --filter=PromotionsAndCombosTest`
+  - `php artisan test --filter=PromotionsPageTest`
+  - `php artisan test --filter=PosPageTest`
+  - `php artisan test --filter=AuditLoggingTest`
+  - `php artisan test --filter=OperationalReportsPageTest`
+- Resultado:
+  - El sistema ya bloquea o permite promociones, combos, fidelizacion, redencion de puntos, descuentos manuales y ventas congeladas segun el plan efectivo.
+  - Las pruebas expresan de forma explicita que `basic` no cubre esos modulos y que `pro/premium` si.
+- Pendientes:
+  - Aplicar el mismo enforcement a limites cuantitativos como usuarios, sucursales, bodegas y cajas.
+  - Llevar estas reglas a una UI platform/admin para gestionar upgrades, overrides y bundles desde backoffice.
+
+## 2026-06-16 - Fase 2 enforcement inicial de `max_companies`
+
+- Objetivo: materializar el primer limite cuantitativo real del plan sobre un flujo que ya existe en produccion interna: la creacion de empresas desde el selector tenant.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Companies/CreateCompany.php`
+  - `app/Livewire/Company/SelectCompanyPage.php`
+  - `app/Services/Plans/OwnerCompanyLimitGuard.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CompanyProvisioningTest.php`
+  - `tests/Feature/CompanySelectionTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Resolver el cupo de empresas del propietario tomando el mayor `max_companies` efectivo entre sus empresas actuales, lo que permite escalar de `basic/pro` a `premium` sin requerir una capa de billing externa todavia.
+  - Bloquear la alta directamente desde `CreateCompany` para cubrir tanto el selector UI como usos de backend y tests.
+  - Reflejar el error en la UI del selector como error de validacion sobre el formulario, sin redireccion ni estado intermedio roto.
+- Pruebas:
+  - `php artisan test --filter=CompanyProvisioningTest`
+  - `php artisan test --filter=CompanySelectionTest`
+  - `php artisan test --filter=CompanyPlanResolverTest`
+  - `php artisan test --filter=PosPageTest`
+- Resultado:
+  - Un propietario con plan `basic` ya no puede crear una segunda empresa.
+  - Un propietario con plan `premium` puede crear hasta tres empresas y recibe bloqueo controlado a partir de la cuarta.
+- Pendientes:
+  - Aplicar limites equivalentes a usuarios, sucursales, bodegas y cajas cuando sus flujos de alta queden formalizados.
+
+## 2026-06-16 - Fase 2 enforcement inicial de `max_users`
+
+- Objetivo: formalizar el alta de miembros de empresa y bloquear nuevas vinculaciones cuando el plan alcance su cupo de usuarios activos.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Companies/AttachUserToCompany.php`
+  - `app/Livewire/Admin/RolesPage.php`
+  - `app/Services/Plans/CompanyUserLimitGuard.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/admin/roles-page.blade.php`
+  - `tests/Feature/RolesPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - No seguir permitiendo altas de miembros solo por `attach` dispersos en pruebas; se crea un servicio dedicado `AttachUserToCompany` para centralizar la validacion del cupo y la semantica de la membresia.
+  - Resolver el alta desde `RolesPage` buscando usuarios existentes por correo o `username`, sin introducir todavia un flujo de invitaciones.
+  - Contar como cupo solo usuarios activos en `company_user`, incluyendo al owner.
+- Pruebas:
+  - `php artisan test --filter=RolesPageTest`
+  - `php artisan test --filter=PermissionAuthorizationTest`
+  - `php artisan test --filter=CompanyProvisioningTest`
+  - `php artisan test --filter=CompanySelectionTest`
+- Resultado:
+  - La empresa ya puede vincular usuarios existentes desde la UI de roles/asignaciones.
+  - Si el plan alcanza `max_users`, la vinculacion se bloquea con error controlado en la misma pantalla.
+- Pendientes:
+  - Extender el mismo enfoque a sucursales, bodegas y cajas cuando se expongan sus altas operativas.
+  - Evaluar un flujo futuro de invitacion por correo con estados `pending/accepted`.
+
+## 2026-06-18 - Fase 6 motivo obligatorio en devoluciones y anulaciones de venta
+
+- Objetivo: cerrar un hueco operativo del checklist maestro obligando a justificar devoluciones y anulaciones desde backend y UI, dejando trazabilidad visible en el documento.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Sales/CancelSale.php`
+  - `app/Actions/Sales/ReturnSale.php`
+  - `app/Livewire/Sales/SalesPage.php`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/sales/sales-page.blade.php`
+  - `tests/Feature/SalesPageTest.php`
+  - `tests/Feature/SalesReturnsAndCancellationTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Exigir motivo no vacio en `CancelSale` y `ReturnSale`, no solo en la UI, para cubrir tambien llamadas futuras desde otros entrypoints.
+  - Persistir el motivo en `sale.notes` con prefijos operativos (`[Anulacion]` y `[Devolucion]`) para dejar trazabilidad inmediata sin abrir todavia una tabla separada de incidencias.
+  - Reemplazar la anulacion directa desde la grilla por un paso corto de confirmacion con textarea, manteniendo el flujo liviano pero mas seguro.
+- Pruebas:
+  - `php artisan test --filter=SalesReturnsAndCancellationTest`
+  - `php artisan test --filter=SalesPageTest`
+- Resultado:
+  - La UI de ventas ya obliga a registrar motivo antes de devolver o anular.
+  - El backend rechaza devoluciones o anulaciones sin justificacion aunque se invoquen fuera de la UI.
+  - La venta conserva el motivo dentro de sus notas, dejando rastro operativo inmediato para soporte y auditoria.
+- Pendientes:
+  - Llevar el mismo criterio de motivo obligatorio a otros flujos sensibles como ajustes manuales, cancelaciones de compras o expiraciones manuales si negocio lo exige.
+  - Evaluar una estructura dedicada de incidencias o comentarios operativos cuando se quiera trazabilidad mas rica por actor y timestamp.
+
+## 2026-06-18 - Fase 8 reportes especializados de cartera y recaudo
+
+- Objetivo: fortalecer el modulo de reportes con cortes mas utiles para conciliacion operativa, sin esperar todavia dashboards temporales o BI externo.
+- Archivos modificados:
+  - `README.md`
+  - `app/Http/Controllers/Reports/ExportOperationalReportController.php`
+  - `app/Livewire/Reports/OperationalReportsPage.php`
+  - `app/Services/Reports/OperationalReportService.php`
+  - `docs/checklist-maestro.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/reports/operational-reports-page.blade.php`
+  - `tests/Feature/CreditSalesAndPaymentsTest.php`
+  - `tests/Feature/OperationalReportsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Calcular el aging sobre ventas a credito abiertas usando movimientos reales de credito por venta, en vez de inferirlo solo desde `credit_accounts.balance_due`.
+  - Exponer desglose de recaudo por `payment_method_code` solo sobre pagos `confirmed`, alineado con conciliacion operativa real.
+  - Aprovechar la misma pantalla y el mismo endpoint CSV para no fragmentar reportes tempranos en varias vistas.
+- Pruebas:
+  - `php artisan test --filter=OperationalReportsPageTest`
+  - `php artisan test --filter=CreditSalesAndPaymentsTest`
+- Resultado:
+  - La pantalla `Reportes` ya muestra aging de cartera por buckets, ventas devueltas/anuladas y desglose de recaudo por medio de pago.
+  - El exportador CSV ya soporta datasets de `payment-methods` y `credit-aging`.
+  - El checklist maestro reduce parte del amarillo de reportes al cubrir cortes operativos que antes estaban ausentes.
+- Pendientes:
+  - Incorporar series temporales, comparativos entre periodos y cortes de rentabilidad mas profundos.
+  - Evaluar reportes financieros dedicados para caja, compras y credito cuando se quiera salir del corte operativo consolidado.
+
+## 2026-06-18 - Fase 6 conciliacion basica de cierres de caja
+
+- Objetivo: endurecer el flujo de cierre de caja usando el estado `reconciled` cuando el conteo cuadra exactamente, dejando `closed` solo para cierres con diferencia.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Cash/CloseCashSession.php`
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `docs/checklist-maestro.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php`
+  - `tests/Feature/CashAndPaymentsTest.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Aprovechar el enum `CashSessionStatus::Reconciled` ya existente para distinguir cierres exactos de cierres con diferencia.
+  - Mantener `closed` para diferencias distintas de cero y no mezclar ambos casos en auditoria o reportes futuros.
+  - Mostrar el estado diferenciado tambien en UI, filtros y tarjetas resumen de caja para que la conciliacion sea visible sin leer montos linea por linea.
+- Pruebas:
+  - `php artisan test --filter='CashAndPaymentsTest|CashSessionsPageTest'`
+- Resultado:
+  - Un cierre con diferencia cero ya queda en estado `reconciled`.
+  - Un cierre con diferencia distinta de cero sigue quedando en `closed`.
+  - La pantalla de caja ya separa sesiones cuadradas de sesiones cerradas con diferencia.
+- Pendientes:
+  - Llevar esta distincion a reportes financieros de caja y cierres asistidos.
+  - Evaluar si los abonos a credito deben restringirse adicionalmente por sucursal/caja operativa o reglas de recaudo mas finas.
+
+## 2026-06-18 - Fase 7 endurecimiento de abonos por contexto operativo
+
+- Objetivo: evitar que un abono de credito quede conciliado contra una caja abierta que no corresponde a la sucursal o caja original de la venta.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Credit/RegisterCreditPayment.php`
+  - `docs/checklist-maestro.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/CreditAccountsPageTest.php`
+  - `tests/Feature/CreditSalesAndPaymentsTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Mover la regla de coherencia de caja/sucursal al backend de `RegisterCreditPayment`, no dejarla solo en la UI.
+  - Exigir misma sucursal para cualquier abono con sesion de caja y, si la venta tiene `cash_register_id`, exigir tambien la misma caja operativa.
+  - Mantener la validacion previa de la UI para feedback rapido, pero hacer que el backend sea la fuente de verdad.
+- Pruebas:
+  - `php artisan test --filter='CreditSalesAndPaymentsTest|CreditAccountsPageTest'`
+- Resultado:
+  - Un abono ya no puede registrarse con una sesion abierta de otra caja aunque pertenezca a la misma empresa.
+  - La UI de credito tambien refleja el error antes de persistir el abono.
+  - El step de conciliaciones operativas queda mas solido en el frente de credito.
+- Pendientes:
+  - Evaluar si en el futuro algunos abonos administrativos podran desviarse de la caja original bajo permisos especiales o flujo de recaudo centralizado.
+  - Llevar reglas similares a otros flujos donde la caja abierta hoy solo se valida por empresa y estado.
+
+## 2026-06-18 - Fase 5 referencia obligatoria al aplicar saldo a favor de proveedor
+
+- Objetivo: endurecer el flujo de cuentas por pagar evitando aplicaciones de saldo a favor sin rastro documental minimo.
+- Archivos modificados:
+  - `README.md`
+  - `app/Actions/Purchases/ApplySupplierCreditToPurchase.php`
+  - `app/Livewire/Purchases/PayablesPage.php`
+  - `docs/checklist-maestro.md`
+  - `docs/registro-cambios-ia.md`
+  - `docs/roadmap.md`
+  - `tests/Feature/PurchasePayablesTest.php`
+  - `tests/Feature/SuppliersAndPayablesPagesTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Exigir referencia obligatoria al aplicar saldo a favor del proveedor, porque este movimiento equivale a una compensacion financiera que debe quedar auditada.
+  - Hacer la validacion en backend y tambien en la UI de `PayablesPage`, de forma análoga a otros endurecimientos recientes.
+  - Mantener los pagos normales de compra sin ese cambio por ahora, para no mezclar dos decisiones operativas distintas en el mismo corte.
+- Pruebas:
+  - `php artisan test --filter='PurchasePayablesTest|SuppliersAndPayablesPagesTest'`
+- Resultado:
+  - Ya no se puede aplicar saldo a favor sin referencia.
+  - La UI de cuentas por pagar obliga a capturar la referencia antes de compensar.
+  - El step de conciliaciones operativas tambien avanza en el frente de compras/CxP.
+- Pendientes:
+  - Definir si pagos normales a proveedor tambien deberan exigir referencia documental en un siguiente corte.
+  - Evaluar reglas adicionales de conciliacion para notas credito parciales o compensaciones mas complejas.
+
+## 2026-06-18 - Seeders demo multiempresa por plan
+
+- Objetivo: dejar una base reproducible para QA manual creando tres empresas demo reales, cada una con un plan distinto del catalogo.
+- Archivos modificados:
+  - `README.md`
+  - `database/seeders/DatabaseSeeder.php`
+  - `database/seeders/DemoCompaniesSeeder.php`
+  - `database/seeders/PlanCatalogSeeder.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Sembrar tres owners distintos en vez de varias empresas para un mismo owner, evitando chocar con `max_companies` del plan base durante el seeding.
+  - Usar el flujo oficial de `CreateCompany` para aprovisionar estructura tenant y luego `ChangeCompanySubscription` para dejar el plan directo activo en `basic`, `pro` y `premium`.
+  - Hacer el seeder idempotente por correo del usuario y empresa legal del owner, para poder reejecutarlo sin duplicar demos.
+- Pruebas:
+  - `php artisan db:seed`
+  - `php artisan db:seed`
+- Resultado:
+  - La base puede cargarse con tres empresas demo listas para QA funcional.
+  - El `README` ya expone credenciales demo y el paso de seeding.
+- Pendientes:
+  - Si luego se quiere un entorno demo mas rico, sembrar catalogo, stock y documentos operativos por empresa.
+
+## 2026-06-18 - Seeders operativos demo con clientes, ventas y deudores
+
+- Objetivo: convertir las empresas demo en entornos realmente navegables para QA manual, con historial comercial y cartera visible.
+- Archivos modificados:
+  - `README.md`
+  - `database/seeders/DatabaseSeeder.php`
+  - `database/seeders/DemoOperationalDataSeeder.php`
+  - `tests/Feature/DemoCompaniesSeederTest.php`
+  - `tests/Feature/DemoOperationalDataSeederTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Sembrar clientes compartidos entre las tres empresas demo para simular compradores recurrentes multi-negocio.
+  - Sembrar clientes especificos con credito y mora en `pro` y `premium`, incluyendo un deudor repetido en mas de una empresa.
+  - Cargar compras historicas para abastecer inventario y dejar tambien cuentas por pagar abiertas desde el inicio.
+  - Mantener el seeder idempotente usando marcadores en `invoice_number` y `sale.notes`.
+- Pruebas:
+  - `php artisan test --filter='DemoCompaniesSeederTest|DemoOperationalDataSeederTest'`
+- Resultado:
+  - Las empresas demo ya no estan vacias: muestran catalogo, proveedores, stock, clientes, ventas, cartera y compradores recurrentes.
+  - QA manual puede validar reportes, ventas, credito y cuentas por pagar con una base mucho mas realista.
+- Pendientes:
+  - Si se quiere una demo aun mas rica, agregar promociones activas, fidelizacion redimida, devoluciones/anulaciones y cierres de caja historicos.
+
+## 2026-06-18 - Segunda capa demo enriquecida para QA manual
+
+- Objetivo: elevar el valor del entorno demo agregando escenarios comerciales mas cercanos a operacion real para pruebas funcionales y recorridos de negocio.
+- Archivos modificados:
+  - `README.md`
+  - `database/seeders/DemoOperationalDataSeeder.php`
+  - `tests/Feature/DemoOperationalDataSeederTest.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Sembrar promociones activas solo donde el plan efectivo lo permite, incluyendo combo fijo exclusivo para `premium`.
+  - Crear saldo inicial de fidelizacion y una venta con redencion real de puntos para dejar el ledger con movimientos utiles desde el dia uno.
+  - Agregar ventas historicas anuladas y parcialmente devueltas, junto con un cierre de caja historico, para habilitar QA de conciliacion, auditoria y reportes.
+- Pruebas:
+  - `php artisan test --filter='DemoCompaniesSeederTest|DemoOperationalDataSeederTest'`
+- Resultado:
+  - Las demos `pro` y `premium` ya exponen promociones y fidelizacion con redencion real.
+  - Las tres demos ya incluyen casos de devolucion, anulacion y al menos un cierre de caja historico.
+  - El contrato del seeding quedo protegido con asserts sobre promociones, movimientos de puntos, ventas anuladas/devueltas y sesiones cerradas.
+- Pendientes:
+  - Ejecutar `php artisan db:seed` sobre una base PostgreSQL local disponible para materializar el dataset fuera del entorno de pruebas.
+
+## 2026-06-18 - Correcciones PostgreSQL reales al ejecutar seed local
+
+- Objetivo: materializar el entorno demo sobre PostgreSQL real y corregir incompatibilidades que no aparecian en pruebas sobre SQLite.
+- Archivos modificados:
+  - `app/Services/Credit/CreditLedger.php`
+  - `app/Services/Sales/SaleDocumentNumberGenerator.php`
+  - `docker-compose.yml`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Ajustar `docker-compose.yml` para PostgreSQL 18+, montando el volumen en `/var/lib/postgresql`, acorde al cambio del image oficial.
+  - Reemplazar `MAX(document_sequence) ... FOR UPDATE` por lectura ordenada del ultimo consecutivo con `lockForUpdate()`, compatible con PostgreSQL.
+  - Hacer que la validacion de cartera vencida consulte `sales.id` en vez de `select *` al usar `GROUP BY` + `HAVING`, evitando error de agrupacion en PostgreSQL.
+- Pruebas:
+  - `php artisan test --filter='SalesCreationTest|CreditSalesAndPaymentsTest|DemoCompaniesSeederTest|DemoOperationalDataSeederTest'`
+  - `php artisan db:seed`
+- Resultado:
+  - El contenedor PostgreSQL local ya arranca correctamente con `docker compose up -d postgres`.
+  - El seeding completo ya fue ejecutado exitosamente sobre la base real.
+  - La base local quedo con `3 companies`, `30 sales`, `9 purchases`, `3 promotions` y `30 loyalty_movements`.
+- Pendientes:
+  - Si se quiere, el siguiente corte ya puede enfocarse en QA manual sobre las demos sembradas en vez de seguir enriqueciendo seeders.
+
+## 2026-06-21 - Rediseño visual del POS tipo terminal
+
+- Objetivo: alejar el POS del estilo dashboard moderno y llevarlo a una interfaz mas cercana a terminal comercial clasica.
+- Archivos modificados:
+  - `docs/flujo-pos.md`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Reemplazar la composicion anterior por una estructura mas literal: cabecera tecnica, rejilla compacta de acciones, area central operativa y barra inferior de captura.
+  - Mantener el flujo `basic` con un unico input de producto y sin selectores manuales de sucursal, bodega, caja, cliente ni fecha.
+  - Conservar la logica Livewire existente para cobro, congelado, tarifas y pagos, cambiando solo la presentacion.
+- Pruebas:
+  - `docker compose exec app php artisan test --filter=PosPageTest --stop-on-failure`
+- Resultado:
+  - El modulo POS ya se acerca mas al lenguaje visual de terminal de caja solicitado.
+  - La funcionalidad existente del POS siguio pasando sus pruebas feature despues del rediseño del Blade.
+- Pendientes:
+  - Ajustar nuevos refinamientos visuales despues de QA manual en navegador sobre densidad, iconografia y proporcion de paneles.
+
+## 2026-06-21 - Correccion del flujo de login y sesiones demo
+
+- Objetivo: estabilizar el acceso a usuarios demo y eliminar cortes de sesion provocados por estado inconsistente del entorno local.
+- Archivos modificados:
+  - `app/Livewire/Forms/LoginForm.php`
+  - `database/migrations/2026_06_21_151800_create_sessions_table.php`
+  - `database/seeders/DemoCompaniesSeeder.php`
+  - `resources/views/livewire/pages/auth/login.blade.php`
+  - `tests/Feature/Auth/LoginTest.php`
+  - `tests/Feature/DemoCompaniesSeederTest.php`
+- Migraciones:
+  - `2026_06_21_151800_create_sessions_table.php`
+- Decisiones:
+  - Mantener el login exclusivamente por `username`, normalizando espacios y mayusculas antes de autenticar.
+  - Crear y versionar la tabla `sessions` porque el proyecto usa `SESSION_DRIVER=database`.
+  - Evitar que `DemoCompaniesSeeder` regenere `remember_token` en cada ejecucion para no invalidar sesiones recordadas.
+  - Usar instrumentacion temporal de consola y logs solo para diagnostico y retirarla una vez confirmado el fix.
+- Pruebas:
+  - `docker compose exec app php artisan migrate:fresh --seed --force`
+  - `docker compose exec app php artisan test --filter=LoginTest --stop-on-failure`
+- Resultado:
+  - Los usuarios `demo.basic`, `demo.pro` y `demo.premium` quedaron nuevamente accesibles con `password`.
+  - El login ya opera sobre sesiones persistidas en base de datos sin depender de estado roto previo.
+  - La instrumentacion temporal de depuracion fue retirada despues de validar la correccion.
+- Pendientes:
+  - Si se vuelve a recrear el entorno local, repetir el flujo de `migrate:fresh --seed` antes de QA manual.
+
+## 2026-06-21 - Refinamiento del POS hacia terminal comercial clasica
+
+- Objetivo: acercar la pantalla de ventas al look & feel de una terminal POS clasica, manteniendo intacto el backend y las interacciones Livewire del modulo.
+- Archivos modificados:
+  - `docs/flujo-pos.md`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Rehacer el Blade del POS con una estructura mas cercana al referente operativo: bloque de auditoria, rejilla superior de acciones, zona central de lineas y franja inferior de captura/totales.
+  - Mantener el `input text` de producto como unico punto de entrada para lector de barras o busqueda por nombre.
+  - Preservar cambio simple de tarifa `V1/V2/V3`, ventas congeladas, preview de promociones, redencion, pagos y enlace al ultimo ticket.
+- Pruebas:
+  - `docker compose exec app php artisan view:clear`
+  - `docker compose exec app php artisan test --filter=PosPageTest --stop-on-failure`
+- Resultado:
+  - El POS ya renderiza una interfaz mas compacta y terminal, bastante mas cercana al layout objetivo pedido para ventas.
+  - La suite `PosPageTest` siguio pasando completa despues del rediseño visual.
+- Pendientes:
+  - QA manual en navegador para cerrar detalles de proporciones, iconografia final y accesos de teclado extra del POS.
+
+## 2026-06-21 - Recuperacion de login demo por base local vacia
+
+- Objetivo: restaurar el acceso cuando `/login` rechaza credenciales correctas por ausencia total de datos demo en la base local.
+- Archivos modificados:
+  - `app/Http/Controllers/Auth/AuthenticatedSessionController.php`
+  - `resources/views/livewire/pages/auth/login.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna nueva.
+- Decisiones:
+  - Retirar nuevamente la instrumentacion temporal de consola y logs del login, porque el problema real no estaba en el formulario sino en la base vacia.
+  - Recuperar el entorno local con `php artisan migrate:fresh --seed --force` para volver a sembrar usuarios, empresas, planes y datos operativos demo.
+- Pruebas:
+  - `docker compose exec app php artisan migrate:fresh --seed --force`
+  - `docker compose exec app php artisan view:clear`
+  - `docker compose exec app php artisan test --filter=DemoCompaniesSeederTest --stop-on-failure`
+- Resultado:
+  - El entorno local volvio a tener datos demo completos.
+  - El login quedo limpio otra vez, sin ruido de depuracion temporal en navegador ni backend.
+  - Los usuarios demo quedaron nuevamente disponibles para autenticacion local.
+- Pendientes:
+  - Si el login vuelve a fallar con credenciales correctas, primero verificar que la tabla `users` no este vacia antes de depurar la UI.
+
+## 2026-06-21 - Aislamiento definitivo de la base de pruebas
+
+- Objetivo: impedir que PHPUnit vuelva a limpiar la base PostgreSQL de desarrollo y elimine usuarios, empresas, datos demo y sesiones activas.
+- Archivos modificados:
+  - `phpunit.xml`
+  - `tests/TestCase.php`
+  - `tests/Feature/TestingEnvironmentIsolationTest.php`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Causa raiz:
+  - Docker inyectaba `DB_CONNECTION=pgsql` y `DB_DATABASE=retail_saas_db` al contenedor `app`.
+  - PHPUnit declaraba SQLite en memoria, pero sin `force="true"`; las variables existentes de Docker prevalecian.
+  - Las pruebas que usan `RefreshDatabase` ejecutaban migraciones destructivas sobre PostgreSQL de desarrollo y dejaban vacia la tabla `users`.
+- Correccion:
+  - Forzar `APP_ENV=testing`, `DB_CONNECTION=sqlite`, `DB_DATABASE=:memory:`, `DB_URL` vacio y `SESSION_DRIVER=array` desde `phpunit.xml`.
+  - Aplicar las mismas variables en `tests/TestCase.php` antes de cargar Laravel, porque el contenedor Docker ya inicia con variables PostgreSQL en el entorno del proceso.
+  - Agregar una prueba de regresion que falla si la suite deja de usar SQLite en memoria.
+  - Restaurar los datos con `php artisan db:seed --force`, sin ejecutar `migrate:fresh` sobre la base local.
+- Validacion:
+  - `PosPageTest`: 8 pruebas y 28 aserciones aprobadas usando SQLite en memoria.
+  - Los hashes de `demo.basic`, `demo.pro` y `demo.premium` validan la contraseña `password`.
+  - La autenticacion HTTP de `demo.basic` responde `302` hacia `/dashboard`.
+- Regla operativa:
+  - Las pruebas automatizadas deben ejecutarse con `php artisan test`; nunca deben apuntar a `retail_saas_db`.
+
+## 2026-06-21 - Busqueda combinada de productos en POS
+
+- Objetivo: permitir que el unico campo de producto funcione tanto con lector de codigo de barras como con busqueda seleccionable por nombre.
+- Archivos modificados:
+  - `app/Livewire/Sales/PosPage.php`
+  - `resources/views/livewire/sales/pos-page.blade.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - Renombrar la referencia visual `Auditoria` a `Operacion`; el documento definitivo sigue siendo el consecutivo interno `VTA-000001` generado al facturar.
+  - Mostrar hasta ocho coincidencias ordenadas por codigo exacto, SKU exacto, nombre exacto y coincidencias parciales.
+  - Resaltar la primera opcion y seleccionarla con `Enter`, usando el texto actual del input para evitar carreras con el debounce de Livewire.
+  - Mantener seleccion por clic, cierre con `Escape` y atributos accesibles de combobox/listbox.
+  - Incluir el numero definitivo de venta en la notificacion de confirmacion.
+  - Dejar la visibilidad del listado bajo control directo de Livewire para evitar que Alpine lo reinicie oculto despues de cada busqueda reactiva.
+  - Tras QA manual, mover el filtrado visible al navegador con Alpine y entregar los productos activos como datos iniciales; la seleccion final sigue pasando por Livewire. Esto elimina la dependencia de una peticion por cada texto escrito.
+  - Pasar la instancia magica `$wire` de Alpine explicitamente al seleccionar; los metodos globales de JavaScript no deben asumir que `this.$wire` esta disponible.
+  - Agregar instrumentacion temporal `[pos]` en consola, historial de `sessionStorage`, hooks de peticiones Livewire, eventos de servidor y `laravel.log` para localizar fallos de seleccion durante QA manual.
+  - El diagnostico mostro que la llamada dinamica desde el objeto Alpine devolvia `undefined` y nunca generaba una peticion Livewire. Se reemplazo por opciones HTML reales con `wire:click`; `Enter` activa el mismo boton nativo.
+  - Un segundo diagnostico encontro que `activeIndex` podia quedar fuera del nuevo conjunto de coincidencias durante una actualizacion reactiva. Se agrego `activeProduct` con fallback seguro para impedir errores Alpine y se movio la limpieza del campo a un evento emitido despues de completar Livewire.
+  - Debido a que el listado Alpine continuo siendo inestable en QA manual, se retiro por completo y se reemplazo por un `datalist` nativo. La seleccion por clic usa `change` y `Enter` envia el valor actual directamente al metodo Livewire.
+  - Detectar en JavaScript cuando Edge completa exactamente una opcion del `datalist` y emitir `change` de inmediato, sin esperar a que el campo pierda el foco.
+  - Los logs posteriores mostraron que los eventos nativos ocurrian pero las directivas del input no iniciaban solicitudes. El campo ahora localiza su componente por `wire:id` y usa la API publica `Livewire.find(id).$call()` para invocar la seleccion de forma explicita.

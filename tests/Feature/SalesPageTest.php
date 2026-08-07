@@ -1,0 +1,290 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Actions\Companies\CreateCompany;
+use App\Actions\Inventory\CreateInventoryAdjustment;
+use App\Actions\Sales\CreateSale;
+use App\Enums\InventoryAdjustmentType;
+use App\Enums\RecordStatus;
+use App\Enums\SaleStatus;
+use App\Livewire\Sales\SalesPage;
+use App\Models\Category;
+use App\Models\CompanyRole;
+use App\Models\Permission;
+use App\Models\RoleTemplate;
+use App\Models\Product;
+use App\Models\Unit;
+use App\Models\User;
+use App\Services\Tenancy\CurrentCompany;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Tests\TestCase;
+
+class SalesPageTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_sales_page_lists_sales_and_exposes_ticket_link(): void
+    {
+        [$owner, $company, $sale] = $this->salesFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->assertSee('Ventas registradas')
+            ->assertSee($sale->document_number)
+            ->assertSee('Abrir ticket')
+            ->assertSee('Arroz visual');
+    }
+
+    public function test_sales_page_can_search_by_internal_document_number(): void
+    {
+        [$owner, $company, $sale] = $this->salesFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->set('search', $sale->document_number)
+            ->assertSee($sale->document_number)
+            ->assertSee('Arroz visual');
+    }
+
+    public function test_sales_page_route_is_forbidden_without_sales_view_permission(): void
+    {
+        [, $company] = $this->salesFixture();
+        $viewer = User::factory()->create();
+
+        $company->users()->attach($viewer->id, [
+            'company_role' => 'accounting_assistant',
+            'role_template_id' => RoleTemplate::query()->where('code', 'accounting_assistant')->value('id'),
+            'status' => RecordStatus::Active->value,
+            'joined_at' => now(),
+        ]);
+
+        $this->actingAs($viewer)
+            ->withSession([CurrentCompany::SESSION_KEY => $company->id])
+            ->get(route('sales.index'))
+            ->assertForbidden();
+    }
+
+    public function test_sales_page_can_register_partial_return_from_ui(): void
+    {
+        [$owner, $company, $sale] = $this->salesFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->call('startReturningSale', $sale->id)
+            ->set('returnItems.0.quantity', '1')
+            ->set('returnReason', 'Cliente devolvio una unidad')
+            ->call('registerReturn')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sales', [
+            'id' => $sale->id,
+            'status' => SaleStatus::PartiallyReturned->value,
+        ]);
+        $this->assertDatabaseHas('sale_items', [
+            'id' => $sale->items->first()->id,
+            'returned_quantity' => '1.000000',
+        ]);
+    }
+
+    public function test_sales_page_can_cancel_draft_sale_from_ui(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Ventas Draft UI SAS',
+        ]);
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+
+        $sale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Draft->value,
+            'items' => [
+                [
+                    'product_id' => $this->productForCompany($company)->id,
+                    'quantity' => '1',
+                    'unit_price' => '1800',
+                ],
+            ],
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->call('startCancellingSale', $sale->id)
+            ->set('cancellationReason', 'Cliente solicito anulacion')
+            ->call('cancelSaleDocument', $sale->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('sales', [
+            'id' => $sale->id,
+            'status' => SaleStatus::Cancelled->value,
+        ]);
+    }
+
+    public function test_sales_page_shows_edit_action_for_draft_sales(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Ventas Draft Link SAS',
+        ]);
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+
+        $sale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Draft->value,
+            'items' => [
+                [
+                    'product_id' => $this->productForCompany($company)->id,
+                    'quantity' => '1',
+                    'unit_price' => '1800',
+                ],
+            ],
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->assertSee('Editar borrador')
+            ->assertSee(route('sales.pos', ['edit' => $sale->id]));
+    }
+
+    public function test_sales_page_shows_modify_action_only_for_confirmed_pos_sales(): void
+    {
+        [$owner, $company, $confirmedSale] = $this->salesFixture();
+        $productId = $confirmedSale->items->first()->product_id;
+
+        $draftSale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $confirmedSale->branch_id,
+            'warehouse_id' => $confirmedSale->warehouse_id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Draft->value,
+            'items' => [
+                ['product_id' => $productId, 'quantity' => '1', 'unit_price' => '1800'],
+            ],
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $component = Livewire::test(SalesPage::class)
+            ->assertSee(route('sales.pos', ['modify' => $confirmedSale->id]));
+
+        $component->assertDontSee(route('sales.pos', ['modify' => $draftSale->id]));
+    }
+
+    public function test_sales_page_return_action_is_forbidden_without_sales_return_permission(): void
+    {
+        [, $company, $sale] = $this->salesFixture();
+        $viewer = User::factory()->create();
+        $companyRole = CompanyRole::query()->create([
+            'company_id' => $company->id,
+            'code' => 'sales_view_only_custom',
+            'display_name' => 'Solo lectura ventas',
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $companyRole->permissions()->attach(
+            Permission::query()->where('code', 'sales.view')->value('id')
+        );
+
+        $company->users()->attach($viewer->id, [
+            'company_role' => 'sales_view_only_custom',
+            'company_role_id' => $companyRole->id,
+            'status' => RecordStatus::Active->value,
+            'joined_at' => now(),
+        ]);
+
+        $this->actingAs($viewer);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->call('startReturningSale', $sale->id)
+            ->assertForbidden();
+    }
+
+    protected function salesFixture(): array
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Ventas UI SAS',
+        ]);
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+        $product = $this->productForCompany($company);
+
+        app(CreateInventoryAdjustment::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'adjustment_type' => InventoryAdjustmentType::Increase->value,
+            'reason' => 'Stock inicial',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => '10',
+                    'unit_cost' => '1000',
+                ],
+            ],
+        ]);
+
+        $sale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'sold_at' => now(),
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => '2',
+                    'unit_price' => '1800',
+                ],
+            ],
+        ]);
+
+        return [$owner, $company, $sale];
+    }
+
+    protected function productForCompany($company): Product
+    {
+        $unit = Unit::query()->create([
+            'company_id' => $company->id,
+            'code' => 'UND',
+            'name' => 'Unidad',
+            'precision_scale' => 0,
+            'status' => RecordStatus::Active->value,
+        ]);
+        $category = Category::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Abarrotes',
+            'code' => 'ABA',
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        return Product::query()->create([
+            'company_id' => $company->id,
+            'category_id' => $category->id,
+            'base_unit_id' => $unit->id,
+            'name' => 'Arroz visual',
+            'cost' => 1000,
+            'price_1' => 1800,
+            'tracks_inventory' => true,
+            'minimum_stock' => 1,
+            'status' => RecordStatus::Active->value,
+        ]);
+    }
+}
