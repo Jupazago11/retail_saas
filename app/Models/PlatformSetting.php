@@ -21,4 +21,14 @@ class PlatformSetting extends Model
     {
         static::updateOrCreate(['key' => $key], ['value' => $value]);
     }
+
+    public static function appName(): string
+    {
+        return static::get('app_name', config('app.name', 'Laravel'));
+    }
+
+    public static function ownerNotificationEmail(): string
+    {
+        return static::get('owner_notification_email', 'jupazago11@gmail.com');
+    }
 }

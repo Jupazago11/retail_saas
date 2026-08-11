@@ -66,8 +66,6 @@ class ProductsPage extends Component
         $found = app(\App\Services\Products\OpenFoodFactsService::class)->findName($barcode);
 
         if ($found === null) {
-            $this->toast('Producto no encontrado en OpenFoodFacts.', 'warning');
-
             return;
         }
 

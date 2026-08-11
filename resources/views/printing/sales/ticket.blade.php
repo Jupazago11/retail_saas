@@ -251,7 +251,7 @@
             <p class="footer-line">Gracias por su compra.</p>
 
             @if ($showSaasBranding)
-                <span class="brand-chip">Powered by Retail SaaS</span>
+                <span class="brand-chip">Powered by {{ \App\Models\PlatformSetting::appName() }}</span>
             @endif
         </section>
     </main>

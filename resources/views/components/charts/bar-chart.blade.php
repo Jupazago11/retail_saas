@@ -57,7 +57,7 @@
     </style>
 
     @if ($points->isEmpty())
-        <p class="text-sm text-stone-400">Sin datos para el filtro actual.</p>
+        <p class="text-sm text-gray-400">Sin datos para el filtro actual.</p>
     @else
         <div class="relative" style="height: {{ $height }}px;">
             <svg viewBox="0 0 {{ $barCount * 60 }} 100" preserveAspectRatio="none"

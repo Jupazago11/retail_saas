@@ -531,13 +531,13 @@
 
             {{-- Marca y referencia de operacion --}}
             <div class="flex flex-col justify-end">
-                <label for="pos-audit" class="mb-0.5 block text-[10px] font-semibold uppercase text-stone-600">Operacion</label>
+                <label for="pos-audit" class="mb-0.5 block text-[10px] font-semibold uppercase text-gray-600">Operacion</label>
                 <input
                     id="pos-audit"
                     type="text"
                     value="{{ $auditReference }}"
                     readonly
-                    class="pos-audit h-9 w-full border border-stone-500 bg-white px-3 text-[14px] font-semibold text-stone-900"
+                    class="pos-audit h-9 w-full border border-stone-500 bg-white px-3 text-[14px] font-semibold text-gray-900"
                 >
             </div>
 
@@ -545,26 +545,26 @@
             <div class="pos-tools">
                 {{-- Cobrar --}}
                 <button type="button" wire:click="openPaymentModal" class="pos-tool pos-tool--primary" title="Cobrar">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386a1.5 1.5 0 0 1 1.455 1.136L5.4 5.25m0 0h13.95l-1.5 7.5H6.75m-1.35-7.5L6.75 12.75m0 0-1.125 5.625A1.5 1.5 0 0 0 7.095 20.25H18M9 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm8.25 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386a1.5 1.5 0 0 1 1.455 1.136L5.4 5.25m0 0h13.95l-1.5 7.5H6.75m-1.35-7.5L6.75 12.75m0 0-1.125 5.625A1.5 1.5 0 0 0 7.095 20.25H18M9 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm8.25 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
                     <span class="pos-tool-badge"></span>
                 </button>
                 {{-- Ticket ultima venta --}}
                 @if ($latestSale)
                     <a href="{{ route('sales.ticket', $latestSale) }}" target="_blank" rel="noopener noreferrer" class="pos-tool" title="Ticket ultima venta">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25h-10.5A2.25 2.25 0 0 0 4.5 6v12a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 18v-2.25m-6-3h7.5m0 0-3-3m3 3-3 3"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25h-10.5A2.25 2.25 0 0 0 4.5 6v12a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 18v-2.25m-6-3h7.5m0 0-3-3m3 3-3 3"/></svg>
                         <span class="pos-tool-badge"></span>
                         <span class="sr-only">Ticket ultima venta</span>
                     </a>
                 @else
                     <div class="pos-tool cursor-default opacity-30" title="Sin ventas aun">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25h-10.5A2.25 2.25 0 0 0 4.5 6v12a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 18v-2.25m-6-3h7.5m0 0-3-3m3 3-3 3"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25h-10.5A2.25 2.25 0 0 0 4.5 6v12a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 18v-2.25m-6-3h7.5m0 0-3-3m3 3-3 3"/></svg>
                     </div>
                 @endif
                 {{-- Congelar venta actual --}}
                 @if ($this->canViewFrozenSales())
                     <button type="button" wire:click="freezeCurrentSale" class="pos-tool" title="Congelar venta actual">
                         {{-- cubo de hielo: cube-transparent Heroicon --}}
-                        <svg xmlns="http://www.w3.org/2000/svg" class="text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
                         <span class="pos-tool-badge pos-tool-badge--red"></span>
                     </button>
                 @else
@@ -574,7 +574,7 @@
                 @if ($this->canViewFrozenSales())
                     <button type="button" wire:click="openFrozenSalesModal" class="pos-tool" title="Ventas congeladas">
                         {{-- cubo de hielo pequeño + flecha hacia abajo --}}
-                        <svg xmlns="http://www.w3.org/2000/svg" class="text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M18 8.5l-6-3.5-6 3.5m12 0-6 3.25m6-3.25v5.9l-6 3.5M6 8.5l6 3.25M6 8.5v5.9l6 3.5m0-5.9v5.9"/>
                             <path stroke-linecap="round" stroke-linejoin="round" d="M12 19.5v2.5m0 0-1.5-1.5m1.5 1.5 1.5-1.5"/>
                         </svg>
@@ -585,7 +585,7 @@
                 @endif
                 {{-- Historial --}}
                 <a href="{{ route('sales.index') }}" class="pos-tool" title="Historial de ventas">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="text-stone-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h18M3 9.75h18M3 15h18M3 20.25h18"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h18M3 9.75h18M3 15h18M3 20.25h18"/></svg>
                     <span class="pos-tool-badge pos-tool-badge--red"></span>
                 </a>
             </div>
@@ -594,18 +594,18 @@
         {{-- â•â• TABLE: area principal de lineas â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
         <div class="pos-table">
             <div class="pos-table-head">
-                <div class="border-r border-stone-300 px-2 py-2">Codigo</div>
-                <div class="border-r border-stone-300 px-2 py-2">Producto</div>
-                <div class="border-r border-stone-300 px-2 py-2 text-right">Cant.</div>
-                <div class="border-r border-stone-300 px-2 py-2 text-right">Precio</div>
-                <div class="border-r border-stone-300 px-2 py-2 text-center">Lista</div>
-                <div class="border-r border-stone-300 px-2 py-2 text-right">Total</div>
+                <div class="border-r border-gray-300 px-2 py-2">Codigo</div>
+                <div class="border-r border-gray-300 px-2 py-2">Producto</div>
+                <div class="border-r border-gray-300 px-2 py-2 text-right">Cant.</div>
+                <div class="border-r border-gray-300 px-2 py-2 text-right">Precio</div>
+                <div class="border-r border-gray-300 px-2 py-2 text-center">Lista</div>
+                <div class="border-r border-gray-300 px-2 py-2 text-right">Total</div>
                 <div class="px-2 py-2 text-center">Acc.</div>
             </div>
 
             @php $hasProducts = collect($items)->contains(fn($i) => !blank($i['product_id'] ?? null)); @endphp
             @if (! $hasProducts)
-                <div class="flex min-h-[340px] items-center justify-center text-sm text-stone-500">
+                <div class="flex min-h-[340px] items-center justify-center text-sm text-gray-500">
                     Escanea o busca un producto para iniciar la venta.
                 </div>
             @else
@@ -619,11 +619,11 @@
                         $barcode = $product?->barcode ?: $product?->sku ?: '---';
                     @endphp
                     <div class="pos-table-row">
-                        <div class="border-r border-stone-200 px-2 py-2 text-stone-600">{{ $barcode }}</div>
-                        <div class="border-r border-stone-200 px-2 py-2">
-                            <div class="font-semibold text-stone-900">{{ $product?->name ?? '—' }}</div>
+                        <div class="border-r border-gray-200 px-2 py-2 text-gray-600">{{ $barcode }}</div>
+                        <div class="border-r border-gray-200 px-2 py-2">
+                            <div class="font-semibold text-gray-900">{{ $product?->name ?? '—' }}</div>
                             @if ($product?->presentations?->isNotEmpty())
-                                <select wire:model.live="items.{{ $index }}.product_presentation_id" class="mt-1 h-7 w-full border border-stone-300 bg-white px-2 text-[11px] text-stone-700">
+                                <select wire:model.live="items.{{ $index }}.product_presentation_id" class="mt-1 h-7 w-full border border-gray-300 bg-white px-2 text-[11px] text-gray-700">
                                     <option value="">Presentacion base</option>
                                     @foreach ($product->presentations as $presentation)
                                         <option value="{{ $presentation->id }}">{{ $presentation->name }}</option>
@@ -631,36 +631,36 @@
                                 </select>
                             @endif
                         </div>
-                        <div class="border-r border-stone-200 px-1.5 py-2">
+                        <div class="border-r border-gray-200 px-1.5 py-2">
                             <div class="flex items-center gap-1">
                                 <button type="button" wire:click="decreaseQuantity({{ $lineKey }})" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-400 bg-[#5c5c5c] text-xl font-black text-amber-400">-</button>
-                                <input type="text" wire:model.live="items.{{ $index }}.quantity" class="h-8 min-w-0 flex-1 border border-stone-300 bg-white px-1 text-center text-[15px] text-stone-900">
+                                <input type="text" wire:model.live="items.{{ $index }}.quantity" class="h-8 min-w-0 flex-1 border border-gray-300 bg-white px-1 text-center text-[15px] text-gray-900">
                                 <button type="button" wire:click="increaseQuantity({{ $lineKey }})" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-400 bg-[#5c5c5c] text-xl font-black text-amber-400">+</button>
                             </div>
                         </div>
-                        <div class="border-r border-stone-200 px-2 py-2 text-right text-[15px] font-semibold text-stone-900">
+                        <div class="border-r border-gray-200 px-2 py-2 text-right text-[15px] font-semibold text-gray-900">
                             {{ Money::format((float) ($item['unit_price'] ?? 0)) }}
                         </div>
-                        <div class="border-r border-stone-200 px-1 py-2">
+                        <div class="border-r border-gray-200 px-1 py-2">
                             @if (count($priceTierOptions) > 1)
                                 <div class="grid grid-cols-3 gap-1">
                                     @foreach ($priceTierOptions as $tier => $option)
                                         <button
                                             type="button"
                                             wire:click="switchPriceTier({{ $lineKey }}, '{{ $tier }}')"
-                                            class="h-8 border text-[11px] font-bold {{ ($item['price_tier'] ?? 'price_1') === $tier ? 'border-amber-500 bg-amber-100 text-amber-800' : 'border-stone-300 bg-white text-stone-700 hover:bg-stone-100' }}"
+                                            class="h-8 border text-[11px] font-bold {{ ($item['price_tier'] ?? 'price_1') === $tier ? 'border-amber-500 bg-amber-50 text-amber-800' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-100' }}"
                                         >
                                             {{ $option['label'] }}
                                         </button>
                                     @endforeach
                                 </div>
                             @else
-                                <button type="button" wire:click="cyclePriceTier({{ $lineKey }})" class="h-8 w-full border border-stone-300 bg-[#f7f7f7] text-[11px] font-bold text-stone-700">
+                                <button type="button" wire:click="cyclePriceTier({{ $lineKey }})" class="h-8 w-full border border-gray-300 bg-[#f7f7f7] text-[11px] font-bold text-gray-700">
                                     {{ strtoupper(str_replace('price_', 'V', (string) ($item['price_tier'] ?? 'price_1'))) }}
                                 </button>
                             @endif
                         </div>
-                        <div class="border-r border-stone-200 px-2 py-2 text-right text-[17px] font-semibold text-stone-900">{{ $lineTotal }}</div>
+                        <div class="border-r border-gray-200 px-2 py-2 text-right text-[17px] font-semibold text-gray-900">{{ $lineTotal }}</div>
                         <div class="flex items-center justify-center px-1 py-2">
                             <button type="button" wire:click="removeItemLine({{ $lineKey }})" class="flex h-8 w-8 items-center justify-center border border-rose-400 bg-gradient-to-b from-rose-50 to-rose-100 text-rose-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] transition-all hover:border-rose-600 hover:from-rose-100 hover:to-rose-200 hover:text-rose-700 active:translate-y-px active:shadow-none" title="Eliminar linea">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 7.5h12m-9.75 0V6a.75.75 0 0 1 .75-.75h6a.75.75 0 0 1 .75.75v1.5m-8.25 0v10.125A1.875 1.875 0 0 0 9.375 19.5h5.25a1.875 1.875 0 0 0 1.875-1.875V7.5"/></svg>
@@ -674,20 +674,20 @@
 
         {{-- FIDELIZACION (solo si aplica) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
         @if ($this->canRedeemLoyalty() || $selectedCustomer || $customerId || $loyaltyPointsToRedeem !== '')
-            <div class="border-t border-stone-300 bg-[#f0efe9] px-3 py-2">
+            <div class="border-t border-gray-300 bg-[#f0efe9] px-3 py-2">
                 <div class="grid gap-1 sm:grid-cols-[1fr_140px_140px]">
                     <div class="pos-stat-box">
                         <span class="pos-stat-label">Cliente</span>
-                        <span class="mt-1 block text-sm font-semibold text-stone-900">{{ $selectedCustomer?->person?->full_name ?? 'Cliente fidelizado' }}</span>
+                        <span class="mt-1 block text-sm font-semibold text-gray-900">{{ $selectedCustomer?->person?->full_name ?? 'Cliente fidelizado' }}</span>
                     </div>
                     <div class="pos-stat-box">
                         <label class="pos-stat-label">Redencion</label>
-                        <input type="text" wire:model.live="loyaltyPointsToRedeem" class="mt-1 h-7 w-full border border-stone-300 bg-white px-2 text-right text-sm text-stone-900">
+                        <input type="text" wire:model.live="loyaltyPointsToRedeem" class="mt-1 h-7 w-full border border-gray-300 bg-white px-2 text-right text-sm text-gray-900">
                         <span class="sr-only">Redencion</span>
                     </div>
                     <div class="pos-stat-box">
                         <span class="pos-stat-label">Equivalente</span>
-                        <span class="mt-1 block text-right text-[15px] font-semibold text-stone-900">{{ $pointsEquivalent }}</span>
+                        <span class="mt-1 block text-right text-[15px] font-semibold text-gray-900">{{ $pointsEquivalent }}</span>
                     </div>
                 </div>
             </div>
@@ -695,8 +695,8 @@
 
         {{-- â•â• PROMOCIONES â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
         @if ($promotions !== [])
-            <div class="border-t border-stone-300 bg-[#fff7e8] px-3 py-1.5 text-xs text-stone-700">
-                <span class="font-semibold text-stone-900">Promociones:</span> {{ $promotionNames }}
+            <div class="border-t border-gray-300 bg-[#fff7e8] px-3 py-1.5 text-xs text-gray-700">
+                <span class="font-semibold text-gray-900">Promociones:</span> {{ $promotionNames }}
             </div>
         @endif
 
@@ -720,7 +720,7 @@
                             data-pos-product-input
                             name="product_lookup"
                             autocomplete="off"
-                            class="h-9 w-full border border-stone-400 bg-white px-2 text-[13px] font-medium text-stone-900"
+                            class="h-9 w-full border border-stone-400 bg-white px-2 text-[13px] font-medium text-gray-900"
                             placeholder="Codigo de barras o nombre"
                         >
                         <ul
@@ -756,7 +756,7 @@
                     {{-- Cambio a devolver --}}
                     <div class="pos-stat-box flex flex-col justify-between">
                         <span class="pos-stat-label">Cambio</span>
-                        <span class="pos-stat-value {{ $isChange ? 'text-emerald-700' : 'text-stone-400' }}">{{ $changeDisplay }}</span>
+                        <span class="pos-stat-value {{ $isChange ? 'text-emerald-700' : 'text-gray-400' }}">{{ $changeDisplay }}</span>
                     </div>
 
                     {{-- Estado + Info --}}
@@ -764,15 +764,15 @@
                         <button
                             type="button"
                             wire:click="$set('saleStatus', '{{ $saleStatus === SaleStatus::Confirmed->value ? SaleStatus::Draft->value : SaleStatus::Confirmed->value }}')"
-                            class="pos-stat-box w-full text-left hover:bg-stone-50 transition-colors"
+                            class="pos-stat-box w-full text-left hover:bg-gray-50 transition-colors"
                             title="Cambiar estado"
                         >
                             <span class="pos-stat-label">Estado</span>
-                            <span class="mt-0.5 block text-right text-[13px] font-bold {{ $saleStatus === SaleStatus::Confirmed->value ? 'text-emerald-700' : 'text-amber-700' }}">
+                            <span class="mt-0.5 block text-right text-[13px] font-bold {{ $saleStatus === SaleStatus::Confirmed->value ? 'text-emerald-700' : 'text-blue-700' }}">
                                 {{ $saleStatus === SaleStatus::Confirmed->value ? 'CONTADO' : 'BORRADOR' }}
                             </span>
                         </button>
-                        <div class="pos-stat-box space-y-0.5 text-[10px] text-stone-600">
+                        <div class="pos-stat-box space-y-0.5 text-[10px] text-gray-600">
                             <p><span class="font-semibold">{{ $this->cashierName() }}</span></p>
                             <p>{{ $this->terminalLabel() }}</p>
                             <p>{{ $this->workDateLabel() }}</p>
@@ -793,15 +793,15 @@
         <div style="width: 100%; max-width: 520px; border: 1px solid #7c7c7c; background: linear-gradient(180deg,#e8e8e8 0%,#dadada 100%); box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
             {{-- Cabecera --}}
             <div class="flex items-center justify-between border-b border-stone-400 px-4 py-2.5" style="background: linear-gradient(180deg,#d4d4d4 0%,#c3c3c3 100%);">
-                <span class="text-[11px] font-bold uppercase tracking-widest text-stone-700">Cobrar Venta</span>
-                <button wire:click="closePaymentModal" class="flex h-7 w-7 items-center justify-center border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] text-stone-500 hover:border-rose-400 hover:text-rose-600" title="Cancelar">
+                <span class="text-[11px] font-bold uppercase tracking-widest text-gray-700">Cobrar Venta</span>
+                <button wire:click="closePaymentModal" class="flex h-7 w-7 items-center justify-center border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] text-gray-500 hover:border-rose-400 hover:text-rose-600" title="Cancelar">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
 
             {{-- Cliente --}}
             <div class="border-b border-stone-400 px-4 py-3">
-                <p class="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-500">Cliente</p>
+                <p class="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">Cliente</p>
 
                 @if ($resolvedCustomerId || $paymentCustomerDocument !== '')
                     <div class="flex items-center gap-2">
@@ -814,13 +814,13 @@
                                     <span class="font-mono text-xs text-emerald-600 opacity-75">{{ $rc->person->document_number }}</span>
                                 @endif
                             @else
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                <span class="text-sm font-semibold text-amber-700">Nuevo cliente</span>
-                                <span class="font-mono text-xs text-amber-600">{{ $paymentCustomerDocument }}</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span class="text-sm font-semibold text-blue-700">Nuevo cliente</span>
+                                <span class="font-mono text-xs text-blue-600">{{ $paymentCustomerDocument }}</span>
                             @endif
                         </div>
                         <button type="button" wire:click="clearPaymentCustomer"
-                            class="flex h-9 w-9 shrink-0 items-center justify-center border border-stone-300 bg-white text-lg leading-none text-stone-400 hover:border-rose-400 hover:text-rose-600">
+                            class="flex h-9 w-9 shrink-0 items-center justify-center border border-gray-300 bg-white text-lg leading-none text-gray-400 hover:border-rose-400 hover:text-rose-600">
                             &times;
                         </button>
                     </div>
@@ -834,45 +834,45 @@
                             x-on:keydown.up.prevent="onUp"
                             x-on:keydown.escape="open = false"
                             placeholder="Nombre o documento del cliente"
-                            class="h-9 w-full border border-stone-400 bg-white px-3 text-sm text-stone-800 placeholder-stone-400"
+                            class="h-9 w-full border border-stone-400 bg-white px-3 text-sm text-gray-800 placeholder-stone-400"
                             autocomplete="off"
                         >
                         <ul x-show="open" x-cloak
-                            class="absolute left-0 right-0 top-full z-50 max-h-48 overflow-y-auto border border-stone-300 bg-white shadow-lg">
+                            class="absolute left-0 right-0 top-full z-50 max-h-48 overflow-y-auto border border-gray-300 bg-white shadow-lg">
                             <template x-for="(c, i) in results" :key="c.id">
                                 <li @mousedown.prevent="select(c)"
                                     :class="{ 'bg-amber-50': i === highlighted }"
-                                    class="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-100 px-3 py-2 hover:bg-amber-50">
-                                    <span class="text-sm font-semibold text-stone-800" x-text="c.name"></span>
-                                    <span class="font-mono text-xs text-stone-400" x-text="c.document"></span>
+                                    class="flex cursor-pointer items-center justify-between gap-2 border-b border-stone-100 px-3 py-2 hover:bg-blue-50">
+                                    <span class="text-sm font-semibold text-gray-800" x-text="c.name"></span>
+                                    <span class="font-mono text-xs text-gray-400" x-text="c.document"></span>
                                 </li>
                             </template>
                             <li x-show="search.length > 0 && results.length === 0"
                                 @mousedown.prevent="createNew"
-                                class="cursor-pointer px-3 py-2 text-sm font-semibold text-amber-700 hover:bg-amber-50">
+                                class="cursor-pointer px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
                                 + Nuevo: <span class="font-mono" x-text="search"></span>
                             </li>
                         </ul>
-                        <p class="mt-1 text-[11px] italic text-stone-400">Sin seleccion: se registrara como anonimo</p>
+                        <p class="mt-1 text-[11px] italic text-gray-400">Sin seleccion: se registrara como anonimo</p>
                     </div>
                 @endif
             </div>
 
             {{-- Total a cobrar --}}
-            <div class="border-b border-stone-300 px-4 py-2.5" style="background: linear-gradient(180deg,#fffef1 0%,#f3edc5 100%);">
+            <div class="border-b border-gray-300 px-4 py-2.5" style="background: linear-gradient(180deg,#fffef1 0%,#f3edc5 100%);">
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold uppercase tracking-wide text-stone-600">Total a cobrar</span>
-                    <span class="text-2xl font-black text-stone-900">{{ $grandTotal }}</span>
+                    <span class="text-[11px] font-bold uppercase tracking-wide text-gray-600">Total a cobrar</span>
+                    <span class="text-2xl font-black text-gray-900">{{ $grandTotal }}</span>
                 </div>
             </div>
 
             {{-- Metodos de pago --}}
             <div class="px-4 py-3 space-y-1.5">
-                <p class="text-[10px] font-bold uppercase tracking-widest text-stone-500 mb-2">Forma de pago</p>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Forma de pago</p>
                 @foreach ($payments as $paymentIndex => $payment)
                     <div class="grid gap-1 grid-cols-[160px_1fr_32px]">
                         <select wire:model.live="payments.{{ $paymentIndex }}.payment_method_code"
-                            class="h-9 border border-stone-400 bg-white px-2 text-sm text-stone-800">
+                            class="h-9 border border-stone-400 bg-white px-2 text-sm text-gray-800">
                             @foreach ($this->paymentMethodOptions() as $code => $label)
                                 <option value="{{ $code }}">{{ $label }}</option>
                             @endforeach
@@ -886,13 +886,13 @@
                                 x-on:blur="onBlur"
                                 placeholder="Valor"
                                 inputmode="numeric"
-                                class="h-9 w-full border border-stone-400 bg-white px-2 text-right text-sm font-semibold text-stone-900">
+                                class="h-9 w-full border border-stone-400 bg-white px-2 text-right text-sm font-semibold text-gray-900">
                         </div>
                         <button type="button" wire:click="removePaymentLine({{ (int) ($payment['_key'] ?? $paymentIndex) }})"
-                            class="h-9 border border-stone-300 bg-white font-bold text-stone-400 hover:border-rose-400 hover:text-rose-600">×</button>
+                            class="h-9 border border-gray-300 bg-white font-bold text-gray-400 hover:border-rose-400 hover:text-rose-600">×</button>
                     </div>
                 @endforeach
-                <button type="button" wire:click="addPaymentLine" class="mt-1 flex h-7 items-center gap-1 border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] px-3 text-[11px] font-semibold text-stone-600 hover:border-stone-500">
+                <button type="button" wire:click="addPaymentLine" class="mt-1 flex h-7 items-center gap-1 border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] px-3 text-[11px] font-semibold text-gray-600 hover:border-stone-500">
                     + Agregar metodo
                 </button>
                 @php
@@ -917,20 +917,20 @@
             <div class="grid grid-cols-2 gap-2 px-4 pb-3">
                 <div class="pos-stat-box">
                     <span class="pos-stat-label">Restante</span>
-                    <span class="pos-stat-value {{ $isChange ? 'text-stone-400' : 'text-rose-600' }}">{{ $remainingDisplay }}</span>
+                    <span class="pos-stat-value {{ $isChange ? 'text-gray-400' : 'text-rose-600' }}">{{ $remainingDisplay }}</span>
                 </div>
                 <div class="pos-stat-box">
                     <span class="pos-stat-label">Cambio</span>
-                    <span class="pos-stat-value {{ $isChange ? 'text-emerald-700' : 'text-stone-400' }}">{{ $changeDisplay }}</span>
+                    <span class="pos-stat-value {{ $isChange ? 'text-emerald-700' : 'text-gray-400' }}">{{ $changeDisplay }}</span>
                 </div>
             </div>
 
             {{-- Acciones --}}
             <div class="flex gap-2 border-t border-stone-400 px-4 py-3" style="background: linear-gradient(180deg,#d4d4d4 0%,#c3c3c3 100%);">
-                <button type="button" wire:click="closePaymentModal" class="h-10 flex-1 border border-stone-500 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] text-sm font-semibold text-stone-700 hover:border-stone-600">
+                <button type="button" wire:click="closePaymentModal" class="h-10 flex-1 border border-stone-500 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] text-sm font-semibold text-gray-700 hover:border-stone-600">
                     Cancelar
                 </button>
-                <button type="button" wire:click="saveSale" class="h-10 flex-1 border border-amber-600 text-sm font-bold tracking-wide text-stone-900 hover:opacity-90" style="background: linear-gradient(180deg,#fbbf24 0%,#d97706 100%);">
+                <button type="button" wire:click="saveSale" class="h-10 flex-1 border border-amber-600 text-sm font-bold tracking-wide text-gray-900 hover:opacity-90" style="background: linear-gradient(180deg,#fbbf24 0%,#d97706 100%);">
                     {{ $saleStatus === 'confirmed' ? 'Confirmar y cobrar' : 'Guardar borrador' }}
                 </button>
             </div>
@@ -944,30 +944,30 @@
         <div style="width: 100%; max-width: 560px; border: 1px solid #7c7c7c; background: linear-gradient(180deg,#e8e8e8 0%,#dadada 100%); box-shadow: 0 20px 40px rgba(0,0,0,0.4);">
             {{-- Cabecera --}}
             <div class="flex items-center justify-between border-b border-stone-400 px-4 py-2.5" style="background: linear-gradient(180deg,#d4d4d4 0%,#c3c3c3 100%);">
-                <span class="text-[11px] font-bold uppercase tracking-widest text-stone-700">Ventas Congeladas</span>
-                <button wire:click="closeFrozenSalesModal" class="flex h-7 w-7 items-center justify-center border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] text-stone-500 hover:border-rose-400 hover:text-rose-600" title="Cerrar">
+                <span class="text-[11px] font-bold uppercase tracking-widest text-gray-700">Ventas Congeladas</span>
+                <button wire:click="closeFrozenSalesModal" class="flex h-7 w-7 items-center justify-center border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] text-gray-500 hover:border-rose-400 hover:text-rose-600" title="Cerrar">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             {{-- Lista --}}
             <div class="max-h-80 overflow-y-auto">
                 @forelse ($frozenSalesForModal as $fs)
-                    <div class="flex items-center gap-3 border-b border-stone-300 px-4 py-3">
+                    <div class="flex items-center gap-3 border-b border-gray-300 px-4 py-3">
                         <div class="min-w-0 flex-1">
-                            <p class="truncate text-[13px] font-semibold text-stone-900">{{ $fs['label'] }}</p>
-                            <p class="mt-0.5 text-[11px] text-stone-500">
+                            <p class="truncate text-[13px] font-semibold text-gray-900">{{ $fs['label'] }}</p>
+                            <p class="mt-0.5 text-[11px] text-gray-500">
                                 {{ $fs['created_at'] }} &middot; {{ $fs['creator_name'] }} &middot; {{ $fs['items_count'] }}&nbsp;{{ $fs['items_count'] === 1 ? 'item' : 'items' }}
                             </p>
                         </div>
                         <button
                             wire:click="resumeFrozenSale({{ $fs['id'] }})"
-                            class="flex h-8 shrink-0 items-center border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] px-3 text-[11px] font-bold uppercase tracking-wide text-stone-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] transition-all hover:border-amber-500 hover:from-amber-50 hover:to-amber-100 hover:text-amber-800 active:translate-y-px"
+                            class="flex h-8 shrink-0 items-center border border-stone-400 bg-gradient-to-b from-[#fdfdfd] to-[#ececec] px-3 text-[11px] font-bold uppercase tracking-wide text-gray-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] transition-all hover:border-amber-500 hover:from-amber-50 hover:to-amber-100 hover:text-amber-800 active:translate-y-px"
                         >
                             Retomar
                         </button>
                     </div>
                 @empty
-                    <div class="px-4 py-8 text-center text-sm text-stone-500">
+                    <div class="px-4 py-8 text-center text-sm text-gray-500">
                         No hay ventas congeladas abiertas.
                     </div>
                 @endforelse
@@ -976,4 +976,54 @@
     </div>
 
 @endif
+
+{{-- Modal: confirmar salida al dashboard con venta sin terminar --}}
+<div
+    x-data="{ open: false, freezing: false }"
+    x-on:pos-leave-guard-open.window="open = true"
+    x-show="open"
+    x-cloak
+    class="fixed inset-0 z-[60] flex items-center justify-center p-4"
+    style="background: rgba(0,0,0,0.5);"
+>
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" x-show="open" x-on:click.outside="open = false">
+        <h3 class="text-lg font-black text-gray-900">Tienes una venta sin terminar</h3>
+        <p class="mt-2 text-sm leading-6 text-gray-600">
+            Hay productos en el carrito. ¿Qué quieres hacer antes de ir al panel principal?
+        </p>
+        <div class="mt-6 flex flex-col gap-2">
+            <button
+                type="button"
+                x-bind:disabled="freezing"
+                x-on:click="
+                    freezing = true;
+                    $wire.freezeCurrentSale().then(() => {
+                        freezing = false;
+                        const stillHasItems = ($wire.items || []).some(i => i.product_id);
+                        if (stillHasItems) { return; }
+                        window.location.href = window.posPendingHomeHref;
+                    });
+                "
+                class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+            >
+                <span x-show="!freezing">Sí, congelar venta y salir</span>
+                <span x-show="freezing" x-cloak>Congelando venta...</span>
+            </button>
+            <button
+                type="button"
+                x-on:click="window.location.href = window.posPendingHomeHref"
+                class="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+            >
+                Sí, salir sin guardar nada
+            </button>
+            <button
+                type="button"
+                x-on:click="open = false"
+                class="rounded-lg px-4 py-2.5 text-sm font-semibold text-gray-500 transition hover:bg-gray-100"
+            >
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
 </div>

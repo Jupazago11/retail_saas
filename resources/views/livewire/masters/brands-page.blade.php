@@ -1,17 +1,17 @@
 <div class="py-10">
     <div class="mx-auto grid max-w-7xl gap-6 px-4 sm:px-6 lg:grid-cols-[0.95fr_1.35fr] lg:px-8">
         <div class="space-y-6">
-            <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <div class="flex items-center justify-between">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Formulario</p>
-                        <h3 class="mt-2 text-2xl font-black text-stone-900">
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Formulario</p>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">
                             {{ $editingBrandId ? 'Editar marca' : 'Nueva marca' }}
                         </h3>
                     </div>
 
                     @if ($editingBrandId)
-                        <button wire:click="resetBrandForm" class="text-sm font-medium text-stone-500">
+                        <button wire:click="resetBrandForm" class="text-sm font-medium text-gray-500">
                             Cancelar
                         </button>
                     @endif
@@ -19,31 +19,31 @@
 
                 <form wire:submit="saveBrand" class="mt-6 space-y-4">
                     <div>
-                        <label for="brand-name" class="text-sm font-medium text-stone-700">Nombre</label>
-                        <input wire:model="name" id="brand-name" type="text" class="mt-1 block w-full rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                        <label for="brand-name" class="text-sm font-medium text-gray-700">Nombre</label>
+                        <input wire:model="name" id="brand-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
-                    <button type="submit" class="inline-flex rounded-full bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white">
+                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
                         {{ $editingBrandId ? 'Actualizar marca' : 'Guardar marca' }}
                     </button>
                 </form>
             </div>
         </div>
 
-        <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
             <div class="flex items-end justify-between gap-4">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Listado</p>
-                    <h3 class="mt-2 text-2xl font-black text-stone-900">Marcas registradas</h3>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Listado</p>
+                    <h3 class="mt-2 text-2xl font-black text-gray-900">Marcas registradas</h3>
                 </div>
-                <p class="text-sm text-stone-500">{{ $brands->count() }} registros</p>
+                <p class="text-sm text-gray-500">{{ $brands->count() }} registros</p>
             </div>
 
             <div class="mt-6 overflow-x-auto">
                 <table class="min-w-full divide-y divide-stone-200 text-sm">
                     <thead>
-                        <tr class="text-left text-stone-500">
+                        <tr class="text-left text-gray-500">
                             <th class="pb-3 font-medium">Nombre</th>
                             <th class="pb-3 font-medium">Estado</th>
                             <th class="pb-3 font-medium text-right">Acciones</th>
@@ -51,12 +51,12 @@
                     </thead>
                     <tbody class="divide-y divide-stone-100">
                         @forelse ($brands as $brand)
-                            <tr wire:key="brand-{{ $brand->id }}">
-                                <td class="py-4 font-medium text-stone-900">{{ $brand->name }}</td>
+                            <tr wire:key="brand-{{ $brand->id }}" class="even:bg-gray-50">
+                                <td class="py-4 font-medium text-gray-900">{{ $brand->name }}</td>
                                 <td class="py-4">
-                                    <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $brand->status === 'active' ? 'bg-emerald-100 text-emerald-700' : ($brand->status === 'inactive' ? 'bg-stone-200 text-stone-700' : 'bg-amber-100 text-amber-700') }}">
+                                    <x-status-badge :color="$brand->status === 'active' ? 'emerald' : ($brand->status === 'inactive' ? 'stone' : 'amber')">
                                         {{ $brand->status }}
-                                    </span>
+                                    </x-status-badge>
                                 </td>
                                 <td class="py-4 text-right">
                                     <div class="flex justify-end gap-2">
@@ -65,10 +65,10 @@
                                                 Restaurar
                                             </button>
                                         @else
-                                            <button wire:click="editBrand({{ $brand->id }})" class="rounded-full border border-stone-300 px-3 py-1 font-medium text-stone-700">
+                                            <button wire:click="editBrand({{ $brand->id }})" class="rounded-full border border-gray-300 px-3 py-1 font-medium text-gray-700">
                                                 Editar
                                             </button>
-                                            <button wire:click="toggleBrandStatus({{ $brand->id }})" class="rounded-full border border-amber-300 px-3 py-1 font-medium text-amber-700">
+                                            <button wire:click="toggleBrandStatus({{ $brand->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
                                                 {{ $brand->status === 'active' ? 'Desactivar' : 'Activar' }}
                                             </button>
                                             <button wire:click="archiveBrand({{ $brand->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
@@ -80,7 +80,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="3" class="py-6 text-center text-stone-500">Aun no hay marcas creadas para esta empresa.</td>
+                                <td colspan="3" class="py-6 text-center text-gray-500">Aun no hay marcas creadas para esta empresa.</td>
                             </tr>
                         @endforelse
                     </tbody>

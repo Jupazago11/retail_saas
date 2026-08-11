@@ -71,7 +71,7 @@
     </style>
 
     @if ($points->isEmpty())
-        <p class="text-sm text-stone-400">Sin datos para el filtro actual.</p>
+        <p class="text-sm text-gray-400">Sin datos para el filtro actual.</p>
     @else
         <div class="relative" style="height: {{ $height }}px;">
             <svg viewBox="0 0 {{ $width }} 100" preserveAspectRatio="none"
@@ -127,7 +127,7 @@
             @endif
         </div>
 
-        <div class="mt-4 max-h-56 overflow-y-auto rounded-2xl ring-1" style="border-color: var(--axis-line);">
+        <div class="mt-4 max-h-56 overflow-y-auto rounded-lg ring-1" style="border-color: var(--axis-line);">
             <table class="min-w-full text-xs">
                 <thead class="sticky top-0" style="background: var(--surface-1);">
                     <tr class="text-left" style="color: var(--text-muted);">

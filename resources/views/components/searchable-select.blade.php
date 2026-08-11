@@ -25,19 +25,19 @@
         @if ($id) id="{{ $id }}" @endif
         placeholder="{{ $placeholder }}"
         autocomplete="off"
-        {{ $attributes->merge(['class' => 'block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm']) }}
+        {{ $attributes->merge(['class' => 'block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm']) }}
     >
 
     <ul
         x-show="open && filtered.length"
         x-cloak
-        class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-stone-200 bg-white py-1 text-sm shadow-lg"
+        class="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-gray-200 bg-white py-1 text-sm shadow-lg"
     >
         <template x-for="(option, index) in filtered" :key="option.id">
             <li
                 x-on:click="choose(option)"
                 x-on:mouseenter="highlighted = index"
-                :class="highlighted === index ? 'bg-amber-50 text-stone-900' : 'text-stone-700'"
+                :class="highlighted === index ? 'bg-amber-50 text-gray-900' : 'text-gray-700'"
                 class="cursor-pointer px-3 py-1.5"
                 x-text="option.label"
             ></li>
@@ -47,7 +47,7 @@
     <p
         x-show="open && touched && ! filtered.length"
         x-cloak
-        class="absolute z-20 mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-400 shadow-lg"
+        class="absolute z-20 mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-400 shadow-lg"
     >
         Sin resultados
     </p>

@@ -7,7 +7,7 @@ Guia corta para levantar `retail_saas` en WSL sin chocar con otros proyectos.
 Copia y pega esto en una terminal WSL:
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 docker compose up -d
 rm -f public/hot
 docker compose exec app php artisan optimize:clear
@@ -25,7 +25,7 @@ Luego abre:
 Usa este bloque en otra terminal WSL:
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 docker compose up -d vite
 docker compose exec vite sh -lc "npm install && npm run dev -- --host 0.0.0.0 --port 5174"
 ```
@@ -33,7 +33,7 @@ docker compose exec vite sh -lc "npm install && npm run dev -- --host 0.0.0.0 --
 Verifica:
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 cat public/hot
 ```
 
@@ -44,7 +44,7 @@ Debe mostrar `http://localhost:5174`.
 Pega esto:
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 rm -f public/hot
 docker compose exec app php artisan optimize:clear
 docker compose run --rm --entrypoint /bin/sh vite -lc "npm install && npm run build"
@@ -53,21 +53,21 @@ docker compose run --rm --entrypoint /bin/sh vite -lc "npm install && npm run bu
 ## Ver estado
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 docker compose ps
 ```
 
 ## Ver logs
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 docker compose logs -f
 ```
 
 ## Apagar todo
 
 ```bash
-cd /home/jupazago/Documentos/saas/retail_saas
+cd /home/jupazago/repos/retail_saas
 docker compose down
 ```
 

@@ -242,6 +242,25 @@ document.addEventListener('keydown', (event) => {
     }
 });
 
+// Si el cajero se va al dashboard con productos en el carrito del POS
+// (click accidental en el logo), interceptamos y preguntamos que hacer
+// con la venta en curso en vez de perderla en silencio.
+document.addEventListener('click', (event) => {
+    const link = event.target.closest('[data-app-home-link]');
+    if (!link) return;
+
+    const wire = findPosWire(link);
+    if (!wire) return;
+
+    const items = wire.items ?? [];
+    const hasProducts = items.some((item) => item?.product_id);
+    if (!hasProducts) return;
+
+    event.preventDefault();
+    window.posPendingHomeHref = link.href;
+    window.dispatchEvent(new CustomEvent('pos-leave-guard-open'));
+});
+
 window.toastStack = (sessionToast = null) => ({
     toasts: [],
     nextId: 0,

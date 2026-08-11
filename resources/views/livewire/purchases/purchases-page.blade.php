@@ -4,7 +4,7 @@
         <x-purchases-nav />
 
         @unless ($canCreatePurchases)
-            <div class="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+            <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
                 <p class="text-sm font-semibold uppercase tracking-[0.22em]">Prerequisitos</p>
                 <p class="mt-2 text-sm">
                     Antes de registrar compras debes tener al menos una sucursal activa y una bodega activa.
@@ -12,16 +12,16 @@
             </div>
         @endunless
 
-        <div class="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-stone-200">
+        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
             <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-700">Compras</p>
-                    <h3 class="mt-1 text-2xl font-black text-stone-900">Compras registradas</h3>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Compras</p>
+                    <h3 class="mt-1 text-2xl font-black text-gray-900">Compras registradas</h3>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por factura o proveedor"
-                        class="w-52 rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
-                    <select wire:model.live="statusFilter" class="rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                        class="w-52 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                    <select wire:model.live="statusFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         <option value="">Todos los estados</option>
                         <option value="draft">Borrador</option>
                         <option value="confirmed">Confirmada</option>
@@ -29,7 +29,7 @@
                         <option value="paid">Pagada</option>
                         <option value="returned">Devuelta</option>
                     </select>
-                    <select wire:model.live="supplierFilterId" class="rounded-2xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                    <select wire:model.live="supplierFilterId" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         <option value="">Todos los proveedores</option>
                         @foreach ($suppliers as $supplier)
                             @php
@@ -47,7 +47,7 @@
             <div class="mt-6 overflow-x-auto">
                 <table class="min-w-full divide-y divide-stone-200 text-sm">
                     <thead>
-                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                             <th class="pb-2">Compra</th>
                             <th class="pb-2">Proveedor</th>
                             <th class="pb-2">Sucursal / Bodega</th>
@@ -65,23 +65,22 @@
                                 ])));
                                 $supplierLabel = $supplierLabel !== '' ? $supplierLabel : ($purchase->supplier_name ?: 'Sin proveedor');
                             @endphp
-                            <tr wire:key="purchase-row-{{ $purchase->id }}">
+                            <tr wire:key="purchase-row-{{ $purchase->id }}" class="even:bg-gray-50">
                                 <td class="py-3 align-middle">
-                                    <p class="font-semibold text-stone-900">{{ $purchase->invoice_number ?: 'Compra #'.$purchase->id }}</p>
-                                    <p class="text-xs text-stone-400">{{ optional($purchase->purchased_at)->format('d/m/Y') ?: 'Sin fecha' }}</p>
+                                    <p class="font-semibold text-gray-900">{{ $purchase->invoice_number ?: 'Compra #'.$purchase->id }}</p>
+                                    <p class="text-xs text-gray-400">{{ optional($purchase->purchased_at)->format('d/m/Y') ?: 'Sin fecha' }}</p>
                                 </td>
-                                <td class="py-3 align-middle text-stone-700">
+                                <td class="py-3 align-middle text-gray-700">
                                     {{ $supplierLabel }}
                                 </td>
-                                <td class="py-3 align-middle text-xs text-stone-500">
+                                <td class="py-3 align-middle text-xs text-gray-500">
                                     <p>{{ $purchase->branch?->name }}</p>
                                     <p>{{ $purchase->warehouse?->name }}</p>
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
-                                    <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold
-                                        {{ $purchase->status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
-                                           ($purchase->status === 'returned' ? 'bg-rose-100 text-rose-700' :
-                                           ($purchase->status === 'draft' ? 'bg-stone-200 text-stone-700' : 'bg-amber-100 text-amber-700')) }}">
+                                    <x-status-badge :color="$purchase->status === 'paid' ? 'emerald' :
+                                        ($purchase->status === 'returned' ? 'rose' :
+                                        ($purchase->status === 'draft' ? 'stone' : 'amber'))">
                                         {{ match($purchase->status) {
                                             'draft'          => 'Borrador',
                                             'confirmed'      => 'Confirmada',
@@ -90,12 +89,12 @@
                                             'returned'       => 'Devuelta',
                                             default          => $purchase->status
                                         } }}
-                                    </span>
+                                    </x-status-badge>
                                 </td>
                                 <td class="py-3 align-middle text-right whitespace-nowrap">
-                                    <p class="font-semibold text-stone-900">${{ \App\Support\Money::format((float) $purchase->total) }}</p>
+                                    <p class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $purchase->total) }}</p>
                                     @if ((float) $purchase->balance_due > 0)
-                                        <p class="text-xs text-amber-600">Saldo ${{ \App\Support\Money::format((float) $purchase->balance_due) }}</p>
+                                        <p class="text-xs text-blue-600">Saldo ${{ \App\Support\Money::format((float) $purchase->balance_due) }}</p>
                                     @endif
                                 </td>
                                 <td class="py-3 align-middle">
@@ -108,13 +107,13 @@
                                         <div {!! $tip !!}>
                                             <button wire:click="editPurchase({{ $purchase->id }})"
                                                 @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-blue-600 hover:bg-blue-50 transition">
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2.414a2 2 0 01.586-1.415z"/>
                                                 </svg>
                                             </button>
                                             <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
-                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
+                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
                                                 Editar borrador
                                                 <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
                                             </div>
@@ -124,13 +123,13 @@
                                         <div {!! $tip !!}>
                                             <button wire:click="toggleLedger({{ $purchase->id }})"
                                                 @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg transition {{ $expandedLedgerPurchaseId === $purchase->id ? 'text-stone-700 bg-stone-100' : 'text-stone-400 hover:text-stone-700 hover:bg-stone-100' }}">
+                                                class="p-1.5 rounded-lg transition {{ $expandedLedgerPurchaseId === $purchase->id ? 'text-gray-700 bg-gray-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100' }}">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                                                 </svg>
                                             </button>
                                             <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
-                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
+                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
                                                 Movimientos
                                                 <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
                                             </div>
@@ -140,13 +139,13 @@
                                         <div {!! $tip !!}>
                                             <button wire:click="startRegisteringPayment({{ $purchase->id }})"
                                                 @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-emerald-600 hover:bg-emerald-50 transition">
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
                                                 </svg>
                                             </button>
                                             <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
-                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
+                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
                                                 Registrar pago
                                                 <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
                                             </div>
@@ -158,13 +157,13 @@
                                             <button wire:click="returnPurchase({{ $purchase->id }})"
                                                 wire:confirm="¿Devolver esta compra? Esta accion no se puede deshacer."
                                                 @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/>
                                                 </svg>
                                             </button>
                                             <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
-                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
+                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
                                                 Devolver compra
                                                 <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
                                             </div>
@@ -176,9 +175,9 @@
                             </tr>
 
                             @if ($payingPurchaseId === $purchase->id)
-                                <tr wire:key="purchase-pay-{{ $purchase->id }}">
+                                <tr wire:key="purchase-pay-{{ $purchase->id }}" class="even:bg-gray-50">
                                     <td colspan="6" class="pb-4 pt-1">
-                                        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                                             <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar pago · {{ $purchase->invoice_number ?: 'Compra #'.$purchase->id }}</p>
                                             <div class="flex flex-col gap-3 md:flex-row md:items-end">
                                                 <div class="flex-1"
@@ -188,26 +187,26 @@
                                                         parse(s) { return parseFloat(String(s).replace(/\./g,'').replace(',','.')); }
                                                     }"
                                                     x-effect="display = fmt(parseFloat($wire.paymentAmount))">
-                                                    <label class="text-xs font-medium text-stone-700">Monto</label>
+                                                    <label class="text-xs font-medium text-gray-700">Monto</label>
                                                     <input type="text" inputmode="decimal"
                                                         x-model="display"
                                                         @blur="const n = parse(display); if (!isNaN(n)) { display = fmt(n); $wire.paymentAmount = n.toFixed(2); }"
-                                                        class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                     @error('paymentAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                                 <div class="flex-1">
-                                                    <label class="text-xs font-medium text-stone-700">Referencia</label>
+                                                    <label class="text-xs font-medium text-gray-700">Referencia</label>
                                                     <input wire:model="paymentReference" type="text"
-                                                        class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                     @error('paymentReference') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                                 <div class="flex gap-2">
                                                     <button wire:click="registerPayment"
-                                                        class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700">
+                                                        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                                                         Confirmar
                                                     </button>
                                                     <button wire:click="cancelRegisteringPayment"
-                                                        class="rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">
+                                                        class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                                                         Cancelar
                                                     </button>
                                                 </div>
@@ -218,7 +217,7 @@
                             @endif
 
                             @if ($expandedLedgerPurchaseId === $purchase->id)
-                                <tr wire:key="purchase-ledger-{{ $purchase->id }}">
+                                <tr wire:key="purchase-ledger-{{ $purchase->id }}" class="even:bg-gray-50">
                                     <td colspan="6" class="pb-4 pt-1">
                                         @include('livewire.purchases.partials.payable-ledger', ['purchase' => $purchase])
                                     </td>
@@ -226,7 +225,7 @@
                             @endif
                         @empty
                             <tr>
-                                <td colspan="6" class="py-10 text-center text-stone-400">
+                                <td colspan="6" class="py-10 text-center text-gray-400">
                                     Aun no hay compras registradas con el filtro actual.
                                 </td>
                             </tr>
@@ -240,7 +239,7 @@
     {{-- Boton flotante + --}}
     @if ($canCreatePurchases)
         <button wire:click="openModal" title="Nueva compra"
-            style="position:fixed;bottom:2rem;right:2rem;z-index:9999;width:3.5rem;height:3.5rem;border-radius:9999px;background:#1c1917;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,0.25);"
+            style="position:fixed;bottom:2rem;right:2rem;z-index:9999;width:3.5rem;height:3.5rem;border-radius:9999px;background:#2563eb;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,0.25);"
             onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#1c1917'">
             <svg xmlns="http://www.w3.org/2000/svg" style="width:1.75rem;height:1.75rem" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -254,17 +253,17 @@
             class="fixed inset-0 z-50 flex items-center justify-center p-4"
             style="background: rgba(0,0,0,0.5);">
             <div wire:key="purchase-modal-{{ $editingPurchaseId ?? 'new' }}"
-                class="w-full max-w-2xl rounded-3xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
+                class="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
 
                 {{-- Header --}}
                 <div class="flex-shrink-0 flex items-center justify-between border-b border-stone-100 px-5 py-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-widest text-amber-700">
+                        <p class="text-xs font-semibold uppercase tracking-widest text-blue-700">
                             {{ $editingPurchaseId ? 'Editar' : 'Nueva' }}
                         </p>
-                        <h3 class="mt-0.5 text-lg font-black text-stone-900">Compra</h3>
+                        <h3 class="mt-0.5 text-lg font-black text-gray-900">Compra</h3>
                     </div>
-                    <button wire:click="closeModal" class="text-stone-400 hover:text-stone-700 text-xl leading-none px-1">&times;</button>
+                    <button wire:click="closeModal" class="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">&times;</button>
                 </div>
 
                 {{-- Form --}}
@@ -276,9 +275,9 @@
                         <div class="grid gap-3 {{ $showBranch && $showWarehouse ? 'sm:grid-cols-2' : '' }}">
                             @if ($showBranch)
                             <div>
-                                <label for="purchase-branch" class="text-xs font-medium text-stone-700">Sucursal</label>
+                                <label for="purchase-branch" class="text-xs font-medium text-gray-700">Sucursal</label>
                                 <select wire:model.live="branchId" id="purchase-branch"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="">Selecciona</option>
                                     @foreach ($branches as $branch)
                                         <option value="{{ $branch->id }}">{{ $branch->name }}</option>
@@ -289,9 +288,9 @@
                             @endif
                             @if ($showWarehouse)
                             <div>
-                                <label for="purchase-warehouse" class="text-xs font-medium text-stone-700">Bodega</label>
+                                <label for="purchase-warehouse" class="text-xs font-medium text-gray-700">Bodega</label>
                                 <select wire:model="warehouseId" id="purchase-warehouse"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="">Selecciona</option>
                                     @foreach ($warehouses as $warehouse)
                                         <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
@@ -339,19 +338,19 @@
                                 }
                             }"
                             @click.outside="open = false">
-                            <label class="text-xs font-medium text-stone-700">Proveedor</label>
+                            <label class="text-xs font-medium text-gray-700">Proveedor</label>
                             <input type="text"
                                 x-model="query"
                                 @focus="open = true"
                                 @input="open = true; clearSupplierId(); $wire.supplierName = $event.target.value"
                                 placeholder="Buscar o escribir proveedor..."
                                 autocomplete="off"
-                                class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             <div x-show="open && filtered.length > 0"
-                                class="absolute z-20 mt-1 w-full rounded-xl bg-white shadow-lg ring-1 ring-stone-200 max-h-48 overflow-y-auto">
+                                class="absolute z-20 mt-1 w-full rounded-xl bg-white shadow-lg ring-1 ring-gray-200 max-h-48 overflow-y-auto">
                                 <template x-for="s in filtered" :key="s.id">
                                     <button type="button" @click.stop="select(s)"
-                                        class="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50"
+                                        class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                                         x-text="s.name"></button>
                                 </template>
                             </div>
@@ -361,15 +360,15 @@
 
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label for="purchase-invoice-number" class="text-xs font-medium text-stone-700">Factura</label>
+                                <label for="purchase-invoice-number" class="text-xs font-medium text-gray-700">Factura</label>
                                 <input wire:model="invoiceNumber" id="purchase-invoice-number" type="text"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('invoiceNumber') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label for="purchase-type" class="text-xs font-medium text-stone-700">Tipo</label>
+                                <label for="purchase-type" class="text-xs font-medium text-gray-700">Tipo</label>
                                 <select wire:model="purchaseType" id="purchase-type"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="invoice">Factura</option>
                                     <option value="remission">Remision</option>
                                     <option value="receipt">Recibo de caja</option>
@@ -382,9 +381,9 @@
 
                         <div class="grid gap-3 sm:grid-cols-3">
                             <div>
-                                <label for="purchase-status" class="text-xs font-medium text-stone-700">Estado inicial</label>
+                                <label for="purchase-status" class="text-xs font-medium text-gray-700">Estado inicial</label>
                                 <select wire:model.live="purchaseStatus" id="purchase-status"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="draft">Borrador</option>
                                     <option value="confirmed">Confirmada</option>
                                     <option value="partially_paid">Parcialmente pagada</option>
@@ -393,39 +392,39 @@
                                 @error('purchaseStatus') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label for="purchase-purchased-at" class="text-xs font-medium text-stone-700">Fecha compra</label>
+                                <label for="purchase-purchased-at" class="text-xs font-medium text-gray-700">Fecha compra</label>
                                 <input wire:model="purchasedAt" id="purchase-purchased-at" type="date"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('purchasedAt') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label for="purchase-due-at" class="text-xs font-medium text-stone-700">Vence</label>
+                                <label for="purchase-due-at" class="text-xs font-medium text-gray-700">Vence</label>
                                 <input wire:model="dueAt" id="purchase-due-at" type="date"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('dueAt') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
                         @if (in_array($purchaseStatus, ['partially_paid', 'paid'], true))
                             <div>
-                                <label for="purchase-initial-paid-amount" class="text-xs font-medium text-stone-700">Pago inicial</label>
+                                <label for="purchase-initial-paid-amount" class="text-xs font-medium text-gray-700">Pago inicial</label>
                                 <input wire:model="initialPaidAmount" id="purchase-initial-paid-amount" type="number" min="0" step="0.01"
-                                    class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('initialPaidAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         @endif
 
                         <div>
-                            <label for="purchase-total-amount" class="text-xs font-medium text-stone-700">Monto total</label>
+                            <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total</label>
                             <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
-                                class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm">
+                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             @error('totalAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label for="purchase-notes" class="text-xs font-medium text-stone-700">Notas</label>
+                            <label for="purchase-notes" class="text-xs font-medium text-gray-700">Notas</label>
                             <textarea wire:model="notes" id="purchase-notes" rows="3"
-                                class="mt-1 block w-full rounded-xl border-stone-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-sm"></textarea>
+                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
                             @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
@@ -434,11 +433,11 @@
                     {{-- Footer --}}
                     <div class="flex-shrink-0 flex gap-2 border-t border-stone-100 px-5 py-3">
                         <button type="button" wire:click="closeModal"
-                            class="rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">
+                            class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                             Cancelar
                         </button>
                         <button type="submit"
-                            class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60">
+                            class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
                             {{ $editingPurchaseId ? 'Actualizar borrador' : 'Guardar compra' }}
                         </button>
                     </div>

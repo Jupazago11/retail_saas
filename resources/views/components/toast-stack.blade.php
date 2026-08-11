@@ -31,7 +31,7 @@
             x-transition:leave="transform transition ease-in duration-200"
             x-transition:leave-start="translate-y-0 opacity-100"
             x-transition:leave-end="translate-y-2 opacity-0"
-            class="pointer-events-auto overflow-hidden rounded-2xl border border-l-4 shadow-2xl backdrop-blur"
+            class="pointer-events-auto overflow-hidden rounded-lg border border-l-4 shadow-2xl backdrop-blur"
             :class="toastTheme(toast.type)"
         >
             <div class="flex items-start gap-3 px-4 py-4">

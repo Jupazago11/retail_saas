@@ -3,23 +3,23 @@
 
         {{-- Header --}}
         <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">Plataforma</p>
-            <h1 class="mt-1 text-2xl font-black text-stone-900">Usuarios</h1>
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
+            <h1 class="mt-1 text-2xl font-black text-gray-900">Usuarios</h1>
         </div>
 
         {{-- Buscador --}}
-        <div class="rounded-3xl bg-white p-6 ring-1 ring-stone-200">
+        <div class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
             <div class="flex items-center gap-3">
                 <input wire:model.live.debounce.300ms="search" type="text"
                     placeholder="Buscar por nombre, email o usuario..."
-                    class="w-72 rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
-                <span class="text-xs text-stone-400">{{ $users->total() }} usuarios</span>
+                    class="w-72 rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                <span class="text-xs text-gray-400">{{ $users->total() }} usuarios</span>
             </div>
 
             <div class="mt-5 overflow-x-auto">
                 <table class="min-w-full divide-y divide-stone-200 text-sm">
                     <thead>
-                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-stone-500">
+                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                             <th class="pb-2">Usuario</th>
                             <th class="pb-2">Email</th>
                             <th class="pb-2 w-px whitespace-nowrap">Empresas</th>
@@ -30,35 +30,35 @@
                     </thead>
                     <tbody class="divide-y divide-stone-100">
                         @forelse ($users as $user)
-                            <tr wire:key="user-{{ $user->id }}">
+                            <tr wire:key="user-{{ $user->id }}" class="even:bg-gray-50">
                                 <td class="py-3 align-middle">
-                                    <p class="font-semibold text-stone-900">{{ $user->name }}</p>
-                                    <p class="text-xs text-stone-400">@{{ $user->username }}</p>
+                                    <p class="font-semibold text-gray-900">{{ $user->name }}</p>
+                                    <p class="text-xs text-gray-400">@{{ $user->username }}</p>
                                 </td>
-                                <td class="py-3 align-middle text-xs text-stone-600">{{ $user->email ?? '—' }}</td>
-                                <td class="py-3 align-middle text-center text-xs text-stone-600 w-px whitespace-nowrap">
+                                <td class="py-3 align-middle text-xs text-gray-600">{{ $user->email ?? '—' }}</td>
+                                <td class="py-3 align-middle text-center text-xs text-gray-600 w-px whitespace-nowrap">
                                     {{ $user->companies_count }}
                                 </td>
-                                <td class="py-3 align-middle text-xs text-stone-400 w-px whitespace-nowrap">
+                                <td class="py-3 align-middle text-xs text-gray-400 w-px whitespace-nowrap">
                                     {{ $user->created_at->format('d/m/Y') }}
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
                                     @if ($user->is_platform_admin)
-                                        <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">superadmin</span>
+                                        <x-status-badge color="amber">superadmin</x-status-badge>
                                     @else
-                                        <span class="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-400">usuario</span>
+                                        <x-status-badge color="stone">usuario</x-status-badge>
                                     @endif
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap text-right">
                                     <button wire:click="startResetPassword({{ $user->id }})"
-                                        class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-600 transition hover:border-amber-400 hover:text-amber-700">
+                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
                                         Restablecer contraseña
                                     </button>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-10 text-center text-xs text-stone-400">Sin usuarios.</td>
+                                <td colspan="6" class="py-10 text-center text-xs text-gray-400">Sin usuarios.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -77,23 +77,23 @@
         <div class="fixed inset-0 z-50 bg-black/40"></div>
 
         <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:click="closeResetModal">
-            <div class="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl ring-1 ring-stone-200" wire:click.stop>
+            <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl ring-1 ring-gray-200" wire:click.stop>
 
                 @if (! $passwordSaved)
-                    <h3 class="text-lg font-black text-stone-900">Restablecer contraseña</h3>
-                    <p class="mt-1 text-xs text-stone-400">
-                        Nueva contraseña para <span class="font-semibold text-stone-600">{{ $resettingUserName }}</span>.
+                    <h3 class="text-lg font-black text-gray-900">Restablecer contraseña</h3>
+                    <p class="mt-1 text-xs text-gray-400">
+                        Nueva contraseña para <span class="font-semibold text-gray-600">{{ $resettingUserName }}</span>.
                         Se reemplaza la anterior de inmediato; no hay forma de recuperarla despues.
                     </p>
 
                     <div class="mt-5">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Contraseña nueva</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Contraseña nueva</label>
                         <div class="mt-1 flex items-center gap-2">
                             <div class="relative flex-1">
                                 <input wire:model="newPassword" type="{{ $showPasswordText ? 'text' : 'password' }}"
-                                    class="w-full rounded-2xl border-stone-300 pr-10 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                                    class="w-full rounded-lg border-gray-300 pr-10 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <button type="button" wire:click="togglePasswordVisibility"
-                                    class="absolute inset-y-0 right-0 flex items-center px-3 text-stone-400 hover:text-stone-600"
+                                    class="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 hover:text-gray-600"
                                     title="{{ $showPasswordText ? 'Ocultar' : 'Mostrar' }}">
                                     @if ($showPasswordText)
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -108,7 +108,7 @@
                                 </button>
                             </div>
                             <button type="button" wire:click="regeneratePassword"
-                                class="rounded-full border border-stone-300 px-3 py-2 text-xs font-semibold text-stone-600 transition hover:border-amber-400 hover:text-amber-700">
+                                class="rounded-full border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
                                 Generar otra
                             </button>
                         </div>
@@ -117,33 +117,33 @@
 
                     <div class="mt-6 flex justify-end gap-3">
                         <button wire:click="closeResetModal"
-                            class="rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50">
+                            class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
                             Cancelar
                         </button>
                         <button wire:click="confirmResetPassword"
-                            class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700">
+                            class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                             Restablecer
                         </button>
                     </div>
                 @else
-                    <h3 class="text-lg font-black text-stone-900">Contraseña actualizada</h3>
-                    <p class="mt-1 text-xs text-stone-400">
-                        Copiala y enviasela a <span class="font-semibold text-stone-600">{{ $resettingUserName }}</span> ahora.
+                    <h3 class="text-lg font-black text-gray-900">Contraseña actualizada</h3>
+                    <p class="mt-1 text-xs text-gray-400">
+                        Copiala y enviasela a <span class="font-semibold text-gray-600">{{ $resettingUserName }}</span> ahora.
                         No se va a volver a mostrar.
                     </p>
 
-                    <div class="mt-5 flex items-center justify-between rounded-2xl bg-stone-50 px-4 py-3 ring-1 ring-stone-200" x-data>
-                        <code class="text-sm font-semibold tracking-wide text-stone-900" x-ref="passwordText">{{ $newPassword }}</code>
+                    <div class="mt-5 flex items-center justify-between rounded-lg bg-gray-50 px-4 py-3 ring-1 ring-gray-200" x-data>
+                        <code class="text-sm font-semibold tracking-wide text-gray-900" x-ref="passwordText">{{ $newPassword }}</code>
                         <button type="button"
                             x-on:click="navigator.clipboard.writeText($refs.passwordText.textContent.trim())"
-                            class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-600 transition hover:border-amber-400 hover:text-amber-700">
+                            class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
                             Copiar
                         </button>
                     </div>
 
                     <div class="mt-6 flex justify-end">
                         <button wire:click="closeResetModal"
-                            class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700">
+                            class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                             Cerrar
                         </button>
                     </div>

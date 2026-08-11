@@ -4,26 +4,26 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <title>Plataforma — {{ config('app.name', 'Retail SaaS') }}</title>
+        <title>Plataforma — {{ \App\Models\PlatformSetting::appName() }}</title>
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
         <div class="flex min-h-screen">
 
             {{-- Sidebar --}}
-            <aside class="flex w-56 flex-col bg-stone-950">
+            <aside class="flex w-56 flex-col border-r border-gray-200 bg-[#fafafa]">
                 {{-- Logo --}}
                 <div class="flex items-center gap-3 px-5 py-5">
-                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500">
-                        <x-application-logo class="h-5 w-auto fill-stone-950" />
+                    <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
+                        <x-application-logo class="h-5 w-auto fill-white" />
                     </div>
                     <div>
-                        <p class="text-xs font-bold leading-tight text-white">Retail SaaS</p>
-                        <p class="text-[9px] font-semibold uppercase tracking-[0.2em] text-stone-500">Plataforma</p>
+                        <p class="text-xs font-bold leading-tight text-gray-900">{{ \App\Models\PlatformSetting::appName() }}</p>
+                        <p class="text-[9px] font-semibold uppercase tracking-[0.2em] text-gray-500">Plataforma</p>
                     </div>
                 </div>
 
-                <div class="mx-4 border-t border-stone-800"></div>
+                <div class="mx-4 border-t border-gray-200"></div>
 
                 {{-- Nav --}}
                 <nav class="flex-1 space-y-0.5 px-3 py-4">
@@ -49,8 +49,8 @@
                         <a href="{{ $item['href'] }}"
                            class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition
                                   {{ $item['active']
-                                     ? 'bg-amber-500 text-stone-950'
-                                     : 'text-stone-400 hover:bg-stone-800 hover:text-white' }}">
+                                     ? 'bg-blue-50 text-blue-700'
+                                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
                             {{-- Icon --}}
                             @if ($item['icon'] === 'chart')
                                 <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
@@ -73,11 +73,11 @@
                 </nav>
 
                 {{-- Logout --}}
-                <div class="border-t border-stone-800 p-3">
+                <div class="border-t border-gray-200 p-3">
                     <form method="POST" action="{{ route('logout') }}">
                         @csrf
                         <button type="submit"
-                            class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-stone-500 transition hover:bg-stone-800 hover:text-rose-400">
+                            class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-rose-600">
                             <svg class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                             Cerrar sesion
                         </button>
@@ -86,7 +86,7 @@
             </aside>
 
             {{-- Content --}}
-            <div class="flex min-h-screen flex-1 flex-col bg-stone-100">
+            <div class="flex min-h-screen flex-1 flex-col bg-gray-100">
                 <x-toast-stack />
                 <main class="flex-1 px-8 py-8">
                     {{ $slot }}

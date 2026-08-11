@@ -235,9 +235,12 @@ class PosPage extends Component
             if (! preg_match('/^-?\d+(?:\.\d+)?$/', $current)) {
                 $current = '1';
             }
-            $this->items[$existingIndex]['quantity'] = rtrim(rtrim(bcadd($current, '1', 6), '0'), '.');
+            $newQuantity = rtrim(rtrim(bcadd($current, '1', 6), '0'), '.');
+            $this->items[$existingIndex]['quantity'] = $newQuantity;
             $this->quickProductId = null;
             $this->productLookup = '';
+
+            $this->toast("{$product->name}: cantidad actualizada a {$newQuantity}.", 'success');
 
             return;
         }
@@ -674,7 +677,8 @@ class PosPage extends Component
 
         $createPosSale = app(CreatePosSale::class);
 
-        $validated = $this->validate([
+        try {
+            $validated = $this->validate([
             'branchId' => [
                 'required',
                 Rule::exists('branches', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
@@ -740,7 +744,14 @@ class PosPage extends Component
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
+        ], [
+            'cashSessionId.required' => 'Debes abrir una sesión de caja antes de cobrar.',
         ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->toast(collect($e->errors())->flatten()->first() ?? 'Revisa los datos de la venta antes de confirmar.', 'error');
+
+            return;
+        }
 
         $payload = [
             'branch_id' => (int) $validated['branchId'],

@@ -15,7 +15,7 @@
         <a
             href="{{ route('purchases.index') }}"
             wire:navigate
-            class="{{ request()->routeIs('purchases.index') ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
+            class="{{ request()->routeIs('purchases.index') ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
         >
             Compras
         </a>
@@ -25,7 +25,7 @@
         <a
             href="{{ route('purchases.imports') }}"
             wire:navigate
-            class="{{ request()->routeIs('purchases.imports') ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
+            class="{{ request()->routeIs('purchases.imports') ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
         >
             Importar
         </a>
@@ -35,7 +35,7 @@
         <a
             href="{{ route('purchases.suppliers') }}"
             wire:navigate
-            class="{{ request()->routeIs('purchases.suppliers') ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
+            class="{{ request()->routeIs('purchases.suppliers') ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
         >
             Proveedores
         </a>
@@ -45,7 +45,7 @@
         <a
             href="{{ route('purchases.suppliers.imports') }}"
             wire:navigate
-            class="{{ request()->routeIs('purchases.suppliers.imports') ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
+            class="{{ request()->routeIs('purchases.suppliers.imports') ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
         >
             Importar proveedores
         </a>
@@ -55,7 +55,7 @@
         <a
             href="{{ route('purchases.payables') }}"
             wire:navigate
-            class="{{ request()->routeIs('purchases.payables') ? 'bg-stone-900 text-white' : 'bg-white text-stone-700 border border-stone-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
+            class="{{ request()->routeIs('purchases.payables') ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
         >
             Cuentas por pagar
         </a>

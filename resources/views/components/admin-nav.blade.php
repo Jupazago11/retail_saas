@@ -12,8 +12,8 @@
     @if ($reportsEnabled && $canViewReports)
         <a href="{{ route('reports.index') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('reports.*'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('reports.*'),
+            'bg-blue-600 text-white' => request()->routeIs('reports.*'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('reports.*'),
         ])>
             Reportes
         </a>
@@ -22,8 +22,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.subscription') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.subscription'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.subscription'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.subscription'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.subscription'),
         ])>
             Suscripcion
         </a>
@@ -32,8 +32,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.bundles') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.bundles'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.bundles'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.bundles'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.bundles'),
         ])>
             Bundles
         </a>
@@ -42,8 +42,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.coupons') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.coupons'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.coupons'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.coupons'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.coupons'),
         ])>
             Cupones
         </a>
@@ -52,8 +52,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.overrides') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.overrides'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.overrides'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.overrides'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.overrides'),
         ])>
             Overrides
         </a>
@@ -62,8 +62,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.structure') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.structure'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.structure'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.structure'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.structure'),
         ])>
             Estructura
         </a>
@@ -72,8 +72,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.settings') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.settings'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.settings'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.settings'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.settings'),
         ])>
             Configuracion
         </a>
@@ -82,8 +82,8 @@
     @if ($canManageSettings)
         <a href="{{ route('admin.audit-logs') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.audit-logs'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.audit-logs'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.audit-logs'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.audit-logs'),
         ])>
             Auditoria
         </a>
@@ -92,8 +92,8 @@
     @if ($canManageRoles)
         <a href="{{ route('admin.roles') }}" wire:navigate @class([
             'rounded-full px-4 py-2 text-sm font-semibold transition',
-            'bg-stone-900 text-white' => request()->routeIs('admin.roles'),
-            'border border-stone-300 text-stone-700 hover:border-stone-400' => ! request()->routeIs('admin.roles'),
+            'bg-blue-600 text-white' => request()->routeIs('admin.roles'),
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => ! request()->routeIs('admin.roles'),
         ])>
             Roles
         </a>

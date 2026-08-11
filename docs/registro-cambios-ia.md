@@ -1,5 +1,216 @@
 # Registro de Cambios IA
 
+## 2026-08-10 - Correo de bienvenida mas calido, y guardia de salida accidental del POS con venta sin terminar
+
+- Objetivo: el usuario pidio dos cosas separadas: (1) que el correo de bienvenida de una cuenta nueva se sienta agradecido y personal, no generico, con mejor estilo visual; (2) que si un cajero tiene productos en el carrito del POS y hace click por error en el logo (volviendo al dashboard), se le pregunte que hacer en vez de perder la venta en curso sin avisar.
+- Archivos modificados:
+  - `resources/views/emails/welcome-user.blade.php` — copy reescrito (agradecimiento personal, nombre de pila, lista "Para empezar"), icono de check, eyebrow "Cuenta creada", CTA renombrado a "Entrar a mi cuenta"
+  - `resources/views/layouts/app.blade.php` — `data-app-home-link` en el link del logo (hook para el guard)
+  - `resources/js/app.js` — nuevo listener de click que intercepta ese link cuando el carrito del POS tiene productos
+  - `resources/views/livewire/sales/pos-page.blade.php` — nuevo modal de confirmacion con 3 opciones (congelar y salir / salir sin guardar / cancelar)
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Correo: se uso `Str::of($user->name)->before(' ')` para saludar solo con el primer nombre (mas calido que el nombre completo), se agrego un icono de check en circulo (texto unicode "✓" sobre `bgcolor`, no imagen/SVG, para maxima compatibilidad de correo) y una lista numerada "Para empezar" con los 3 primeros pasos reales del producto (catalogo, POS, reportes).
+  - Guard del POS: se reutilizo la accion ya existente `freezeCurrentSale()` (la misma que usa el boton "Congelar" normal del POS) en vez de crear una ruta nueva — "Si, congelar venta y salir" simplemente la invoca via `$wire.freezeCurrentSale()` desde Alpine y navega solo si el carrito efectivamente quedo vacio despues (verificacion extra: si el freeze fallara por algun motivo de negocio — permiso, limite de plan — el usuario se queda en la pagina en vez de perder la venta silenciosamente).
+  - La deteccion de "hay productos en el carrito" se hace client-side leyendo `wire.items` del componente Livewire de la pagina (via el helper `findPosWire()` ya existente en `app.js`, que localiza el componente por el marcador `[data-pos-shell]`), sin necesidad de una llamada al servidor solo para decidir si mostrar el modal.
+  - El guard esta acotado al link del logo del header (el disparador de "accidente" mas realista dado que la app no tiene sidebar de navegacion); no se agrego un guardia de `beforeunload` para cerrar pestaña/recargar, que no fue lo pedido y usa un prompt nativo del navegador no personalizable.
+  - Con el carrito vacio, el link del logo sigue navegando normal sin ninguna interrupcion — el guard nunca aparece si no hay nada que perder.
+- Pruebas:
+  - Correo: renderizado localmente y confirmado visualmente (icono, copy, lista); reenviado a una cuenta de Gmail real para verificar el render en un cliente de correo real, no solo en navegador.
+  - Guard del POS: verificado en Chromium real (Playwright) con `demo.premium`: (1) carrito vacio + click en logo → navega directo a `/dashboard`, sin modal; (2) carrito con producto + click en logo → se queda en `/sales/pos`, aparece el modal; (3) "Cancelar" → modal se cierra, sigue en `/sales/pos`; (4) "Si, congelar venta y salir" → navega a `/dashboard`, y se confirmo en la base de datos que la venta congelada quedo creada (`frozen_sales`, status `open`). 0 errores de consola en todos los casos.
+- Resultado:
+  - El correo de bienvenida ya transmite agradecimiento genuino en vez de sonar a plantilla generica. El cajero ya no puede perder una venta en curso por un click accidental en el logo sin que se le pregunte primero, con la opcion de congelarla (recuperable despues desde "Ventas congeladas") en vez de perderla.
+
+## 2026-08-10 - POS: fix de "Confirmar y cobrar" silencioso, aviso al reescanear, y quitar aviso tecnico de OpenFoodFacts
+
+- Objetivo: el usuario reporto tres problemas en la operacion diaria: (1) un aviso "Producto no encontrado en OpenFoodFacts" exponia el nombre de una API externa a cajeros que no tienen por que saber que existe; (2) al escanear el codigo de barras de un producto ya agregado al carrito (para sumar cantidad), no habia ninguna confirmacion visual, dejando a la cajera sin saber si el escaneo funciono; (3) el boton "Confirmar y cobrar" del POS no hacia nada al hacer clic, sin ningun error visible, bloqueando la venta.
+- Archivos modificados:
+  - `app/Livewire/Products/ProductsPage.php` — se quita el toast de "no encontrado" en `lookupBarcode()`
+  - `app/Livewire/Sales/PosPage.php` — nuevo toast de exito en `addQuickProductLine()` al incrementar cantidad de un item existente; `saveSale()` envuelve `$this->validate(...)` en try/catch con mensaje personalizado para `cashSessionId`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones y diagnostico (bug real encontrado, no solo un ajuste cosmetico):
+  - El "no encontrado en OpenFoodFacts" nunca fue un error real — es una consulta opcional de enriquecimiento que no bloquea nada; mostrar un warning con el nombre de la API era ruido tecnico sin ninguna accion util para el cajero. Se elimino el toast, el lookup ahora falla en silencio (el cajero simplemente escribe el nombre a mano, como ya funcionaba antes de este ajuste).
+  - `addQuickProductLine()` ya sumaba la cantidad correctamente cuando el producto escaneado ya estaba en el carrito, pero no emitia ningun toast — se agrego `$this->toast("{nombre}: cantidad actualizada a {N}.", 'success')` en ese mismo punto.
+  - Diagnostico del boton "Confirmar y cobrar": `saveSale()` valida `cashSessionId` como requerido (`Rule::requiredIf($this->requiresImmediatePayments() && $this->requiresOpenCashSession())`) cuando la venta es de contado y la empresa exige caja abierta (`pos.requires_open_cash_session`, default `true`). Si no hay ninguna `cash_session` en estado `open`, el campo queda vacio y la validacion falla — pero en **cero** lugares de `pos-page.blade.php` hay una directiva `@error` o un campo visible ligado a `cashSessionId`, asi que la `ValidationException` que lanza Livewire se resolvia con un re-render invisible: sin toast, sin mensaje, sin ningun cambio perceptible en pantalla. Confirmado en la base real: la empresa de prueba del usuario ("Fachada") tenia 0 sesiones de caja abiertas en el momento del reporte.
+  - Fix: se envuelve el `$this->validate(...)` completo en `try/catch (ValidationException $e)`, mostrando el primer mensaje de error como toast. Se agrego ademas un mensaje personalizado para el caso mas comun (`cashSessionId.required` → "Debes abrir una sesión de caja antes de cobrar.") en vez del texto generico de Laravel ("El campo cash session id es obligatorio."). Nota tecnica: `Rule::requiredIf()` dispara internamente la regla `required` (no `required_if`), asi que la clave de mensaje personalizado correcta es `cashSessionId.required`, no `cashSessionId.required_if` (primer intento fallido, corregido tras probarlo en navegador real y ver que seguia mostrando el mensaje generico).
+  - Este fix es generico: a partir de ahora, **cualquier** falla de validacion en `saveSale()` (no solo la de caja) se muestra como toast en vez de fallar en silencio.
+- Pruebas:
+  - Verificacion en Chromium real (Playwright) contra el stack completo, usando `demo.premium`: (1) reescanear el mismo producto dos veces muestra el toast "Aceite Vegetal 900ml: cantidad actualizada a 2." y la cantidad en el carrito sube correctamente; (2) se cerro temporalmente la sesion de caja abierta de `demo.premium` (`UPDATE cash_sessions SET status='closed'`), se confirmo que "Confirmar y cobrar" ahora muestra "Debes abrir una sesión de caja antes de cobrar." en vez de no hacer nada, y se restauro el estado original de la sesion; (3) con la sesion abierta de nuevo, una venta completa se confirmo correctamente ("Venta confirmada correctamente: PRM-000013"), confirmando que el try/catch no rompio el camino feliz. 0 errores de consola en las tres pruebas.
+- Resultado:
+  - El cajero ya no ve avisos tecnicos sobre APIs externas; recibe confirmacion visual clara cada vez que un escaneo suma cantidad a un producto ya agregado; y si "Confirmar y cobrar" falla por cualquier motivo de validacion (mas comunmente, no tener una caja abierta), ahora se le dice exactamente que le falta en vez de quedarse sin respuesta.
+
+## 2026-08-10 - Cards sin barra de acento superior (estilo shadcn/ui minimalista)
+
+- Objetivo: tras el rediseño shadcn/ui, las tarjetas del dashboard y de Ventas seguian con una barra de color solida arriba (herencia del rediseño "menos pastel" anterior a esta sesion). El usuario pidio un look mas minimalista y fiel a shadcn: sin la barra, el color solo en el icono.
+- Archivos modificados:
+  - `resources/views/dashboard.blade.php` — se quita la barra de acento (`div absolute inset-x-0 top-0`) y la clave `bar` (ya sin uso) de `$moduleColorTokens`; radio de card normalizado de `rounded-[30px]` (arbitrario) a `rounded-xl` (12px, el token de card del spec); icono de `rounded-[22px]` a `rounded-xl`; hover simplificado (se quita el `-translate-y-1`, queda solo `hover:shadow-md hover:border-gray-300`)
+  - `resources/views/livewire/sales/sales-page.blade.php` — se quita `$accentBar` (ya redundante, el estado de la venta ya se ve en la pastilla `$statusBadge`) y su `div`; radio de `rounded-lg` a `rounded-xl`; mismo hover simplificado
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Se relevo primero con `grep` cuantos archivos tenian el patron de barra de acento antes de tocar nada — solo estos 2 (`dashboard.blade.php`, `sales-page.blade.php`); el resto de "cards" del proyecto (Caja, Credito, Fidelizacion, Promociones) ya no tenian barra, asi que no requirieron cambios.
+  - El color por modulo/estado no se perdio: sigue vivo en el circulo del icono (dashboard) y en la pastilla de estado (`<x-status-badge>` en ventas) — la barra era una señal de color redundante, no la unica.
+- Pruebas:
+  - Verificacion visual en Chromium real (Playwright) en dashboard y Ventas como `demo.premium`: cards blancas, borde gris sutil, sin barra superior, color solo en icono/badge. 0 errores de consola.
+- Resultado:
+  - Las tarjetas del proyecto quedan con el look minimalista shadcn/ui: blanco + borde sutil + sombra suave, sin bloques de color solido.
+
+## 2026-08-10 - Seeder de usuario superadmin de plataforma
+
+- Objetivo: no existia ningun usuario `is_platform_admin` en la base — el usuario pidio crear uno dedicado y agregarlo al seeder para que sobreviva a futuros `migrate:fresh`.
+- Archivos modificados:
+  - `database/seeders/PlatformSuperAdminSeeder.php` (nuevo)
+  - `database/seeders/DatabaseSeeder.php` — se agrega a la cadena de seeders
+- Migraciones:
+  - Ninguna.
+- Decisiones:
+  - Usuario: `superadmin` / `jupazago11@gmail.com` / contraseña `123456`, con `is_platform_admin = true`. Sin empresa propia (el rol de plataforma opera entre empresas, no necesita una).
+  - Se uso el mismo correo real que ya es el destinatario de `PlatformSetting::ownerNotificationEmail()`, para que la misma persona que recibe los avisos de registro pueda tambien administrar la plataforma.
+  - Seeder idempotente (`firstOrNew` por email, mismo patron que `DemoCompaniesSeeder`): correr `db:seed` de nuevo no duplica el usuario ni pisa cambios si ya existe, solo actualiza los campos gestionados.
+  - Nota de seguridad: `123456` es una contrasena deliberadamente debil pedida explicitamente por el usuario para este entorno; es la cuenta de mayor privilegio del sistema (cruza todas las empresas), por lo que antes de cualquier despliegue real conviene cambiarla.
+- Pruebas:
+  - Corrido standalone contra la base actual (`db:seed --class=PlatformSuperAdminSeeder`), verificado en `tinker` que el hash de `123456` valida correctamente. Login real via Playwright con usuario `superadmin`/`123456`: redirige a `/platform/companies`, 0 errores de consola.
+- Resultado:
+  - Ya existe una cuenta superadmin utilizable para entrar a `Plataforma`, y queda sembrada automaticamente en cualquier base nueva o reseteada.
+
+## 2026-08-10 - Rediseno completo estilo shadcn/ui: azul de marca, radios y componentes en toda la aplicacion
+
+- Objetivo: el usuario mostro un proyecto propio con un look tipo shadcn/ui (React+Tailwind+Radix) y pidio replicarlo en este proyecto (Blade+Tailwind+Livewire): azul `#2563eb` de marca, radios de 8px/12px, cards con borde suave, tablas con filas alternadas, badges tipo pill, sidebar claro con item activo azul, y gradiente azul->morado solo para el CTA del hero y headers de correo.
+- Archivos modificados: prácticamente toda `resources/views/**/*.blade.php` (barrido mecanico de tokens Tailwind), mas cambios dirigidos en `resources/views/components/{primary-button,secondary-button,danger-button,text-input,modal}.blade.php`, `resources/views/layouts/{app,platform}.blade.php`, `resources/views/emails/{welcome-user,new-account-admin}.blade.php`, `resources/views/welcome.blade.php`, `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`.
+- Migraciones:
+  - Ninguna.
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - Antes de tocar codigo se confirmo con el usuario que el spec pedia un sidebar que **no existe** en la app (la navegacion real es el dashboard-launcher; el archivo de sidebar de Breeze nunca se incluye en ningun layout). El usuario eligio mantener el dashboard como esta, sin construir un sidebar nuevo para la app operativa.
+  - Se descubrio en el camino que `layouts/platform.blade.php` (area de Plataforma/superadmin) si tiene un sidebar real y usado — ese si se restyleo al patron claro+azul del spec.
+  - Barrido mecanico via `sed` sobre toda la carpeta de vistas para los tokens sin ambiguedad (radios, `stone`→`gray`, foco de inputs, boton solido oscuro→azul). Un primer barrido de `text-amber-700→text-blue-700` rompio por accidente el color semantico "amber" de `<x-status-badge>` y de un par de indicadores de negocio (ej. "Dev. parcial", cliente sin credito en el POS) — se detectaron y corrigieron todos los casos revisando cada coincidencia de `bg-amber-* + text-blue-*` antes de dar el barrido por cerrado.
+  - Se dejo fuera del barrido, a proposito, el boton de cobro del POS (`pos-page.blade.php`) — ya tenia una estetica deliberada de "registradora fisica" de una sesion anterior, no relacionada con la marca general; convertirlo a azul se juzgo mas riesgoso que valioso.
+  - La pagina publica (`welcome.blade.php`) solo recibio el CTA principal con el gradiente; el resto del hero oscuro se dejo con sus acentos originales por prioridad (queda pendiente si se quiere extender ahi tambien).
+  - Los correos transaccionales migraron su header al gradiente azul->morado permitido por el spec, y la caja de credenciales de bienvenida paso de estilo ambar a los tokens "info azul claro" del spec (no habia un token "warning" propio, y mostrar la contraseña es informacion, no una advertencia).
+- Pruebas:
+  - `php artisan view:cache`: compila las ~85 vistas Blade sin errores tras el barrido masivo.
+  - Verificacion visual en Chromium real (Playwright): landing publica, login, dashboard, Productos (tabla con filas alternadas), Compras (pestañas y badges en azul/semantico correcto), Credito, y Plataforma > Empresas (sidebar claro, promoviendo temporalmente un usuario demo a superadmin solo para la captura y revirtiendolo). Cero errores de consola en todas las pantallas.
+- Resultado:
+  - Toda la aplicacion comparte ahora la identidad visual azul tipo shadcn/ui: mismo radio de borde, mismo azul, mismos componentes de boton/input/modal/badge/tabla en todas las pantallas, sin la calidez ambar/stone anterior — salvo las 2 excepciones documentadas (POS de cobro y landing publica) que quedan explicitamente fuera de alcance por ahora.
+
+## 2026-08-10 - Fix: aviso de registro atrapado por caida del worker de cola, y codigo de acceso obligatorio para registrarse
+
+- Objetivo: el usuario reporto que tras registrar una cuenta de prueba, le llego el correo de bienvenida pero no el aviso de nueva cuenta a su correo personal. Ademas pidio agregar un codigo de acceso fijo y obligatorio en el formulario de registro (sin persistirlo en BD) para frenar registros no deseados de gente sin invitacion.
+- Archivos modificados:
+  - `docker-compose.yml` — `restart: unless-stopped` en el servicio `queue`
+  - `app/Mail/NewAccountRegisteredMail.php` — ya no implementa `ShouldQueue`, se envia sincrono
+  - `resources/views/livewire/pages/auth/register.blade.php` — `Mail::queue()` → `Mail::send()` para el aviso al admin; nuevo campo `accessCode` obligatorio validado contra `1998`
+  - `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Diagnostico (detalle completo en `docs/decisiones-tecnicas.md`):
+  - Causa raiz real: un `migrate:fresh` anterior (para limpiar la BD de una cuenta de prueba) hizo que el worker de `queue`, en su chequeo periodico de reinicio (`Worker::stopIfNecessary()` contra la tabla `cache`), chocara justo en el instante en que esa tabla se borraba y recreaba. La excepcion no capturada tumbo el proceso PHP en primer plano del contenedor, y sin politica de reinicio, `queue` quedo apagado. El correo de aviso al admin (encolado) quedo atrapado en la tabla `jobs` sin nadie que lo procesara.
+  - Se reinicio manualmente el contenedor (proceso el correo atrapado) y se corrigio estructuralmente en dos frentes: `restart: unless-stopped` (para que Docker lo revivan solo ante cualquier crash futuro) y quitarle la dependencia de la cola al correo de aviso (se envia sincrono, igual que el de bienvenida), porque el proposito mismo de ese correo es no depender de un proceso que puede morir silenciosamente.
+  - El codigo de acceso (`1998`) vive como constante en el propio componente Livewire, se valida en el servidor y nunca se envia al navegador (no aparece en HTML/JS), asi que no es descubrible inspeccionando la pagina.
+- Pruebas:
+  - Verificado en vivo (Playwright) contra el stack real: registro con codigo incorrecto → error visible, ningun usuario creado; registro con codigo correcto → usuario creado en BD, ambos correos enviados sin excepciones en `storage/logs/laravel.log`. Confirmado que `queue` se recupera solo tras un crash gracias a `restart: unless-stopped`, y que proceso el correo de aviso que habia quedado atrapado desde antes de este cambio.
+- Resultado:
+  - El aviso de nueva cuenta al dueno de la plataforma ya no depende de que el worker de cola este vivo, y el contenedor de cola se auto-recupera si vuelve a caerse. El formulario publico de registro ahora exige un codigo de acceso (`1998`, no editable desde UI ni guardado en BD) para poder crear una cuenta.
+
+## 2026-08-10 - Correos de registro: aviso al dueno de plataforma y bienvenida con credenciales
+
+- Objetivo: cuando alguien crea una cuenta nueva, el usuario (dueno de la plataforma) quiere recibir un aviso a su correo; y la persona que se registra debe recibir un correo de bienvenida con su usuario y contrasena, porque muchos tenderos (publico no tecnico) olvidan su clave.
+- Archivos modificados:
+  - `app/Mail/NewAccountRegisteredMail.php` (nuevo), `app/Mail/WelcomeUserMail.php` (nuevo)
+  - `resources/views/emails/new-account-admin.blade.php` (nuevo), `resources/views/emails/welcome-user.blade.php` (nuevo)
+  - `resources/views/livewire/pages/auth/register.blade.php` — dispara ambos correos al final de `register()`
+  - `app/Models/PlatformSetting.php` — nuevo `ownerNotificationEmail()`
+  - `app/Livewire/Platform/PlatformSettingsPage.php`, `resources/views/livewire/platform/platform-settings-page.blade.php` — nuevo campo "Correo para notificaciones de nuevas cuentas"
+  - `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna (reutiliza `platform_settings`).
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - Se le planteo al usuario el riesgo de enviar la contrasena en texto plano por correo (precedente del proyecto: `Plataforma > Usuarios` nunca la envia, solo la muestra una vez en un modal) frente a dos alternativas mas seguras; eligio expresamente mantenerla en el correo de bienvenida.
+  - `WelcomeUserMail` (contiene la contrasena) se envia sincrono, sin `ShouldQueue`, para no dejarla parqueada en texto plano en la tabla `jobs`. `NewAccountRegisteredMail` (sin datos sensibles) si se encola normalmente.
+  - Ambos envios en `try/catch` con `Log::error()`: un fallo de correo nunca bloquea el registro.
+  - El destinatario del aviso es un ajuste nuevo y separado de `contact_email` (que es el correo de soporte visible a clientes), editable en `Plataforma > Configuracion`, default `jupazago11@gmail.com`.
+  - Plantillas de correo con HTML basado en tablas y estilos inline (no las variables CSS de `ticket.blade.php`), por compatibilidad con clientes de correo como Outlook; misma paleta ambar/stone y `PlatformSetting::appName()` del resto de la app.
+- Pruebas:
+  - Registro real de una cuenta de prueba via Playwright contra el stack completo (`web`, `app`, `queue`, `mailpit`); confirmado con la API de Mailpit (`GET /api/v1/messages`) que llegaron los 2 correos; capturas del HTML renderizado de ambos (`/view/{id}.html`) confirman el diseño y que usuario/contrasena/nombre/correo/fecha aparecen correctos. Confirmado que el aviso al admin fue procesado por el worker de `queue` sin intervencion manual. Sin errores en logs de `app` ni `queue`. Cuenta de prueba eliminada al terminar.
+- Resultado:
+  - Toda cuenta nueva dispara automaticamente un aviso al correo de plataforma configurado y un correo de bienvenida con estilo al usuario, con sus credenciales de acceso.
+
+## 2026-08-10 - Header auto-ocultable extendido a toda la aplicacion (no solo el dashboard)
+
+- Objetivo: el header auto-ocultable se habia implementado solo para `/dashboard`; el usuario pidio que se comporte igual en todas las pantallas, porque el sistema se usara en monitores chicos y ahorrar espacio vertical importa en cualquier modulo, no solo en el launcher.
+- Archivos modificados:
+  - `resources/views/layouts/app.blade.php` — se elimino la bifurcacion `@if($launcherMode) ... @else ...` que duplicaba el header (uno auto-ocultable, otro estatico); ahora hay un unico bloque de header compartido por todas las paginas autenticadas
+  - `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - `$launcherMode` (`request()->routeIs('dashboard')`) se conserva unicamente para elegir el fondo de la pagina (`radial-gradient` en el dashboard, `bg-stone-100` en el resto); ya no controla el comportamiento del header.
+- Pruebas:
+  - Verificacion manual en Chromium real (Playwright, contenedor `mcr.microsoft.com/playwright` en red `host`) en `/products` (pagina no-dashboard): header colapsado por defecto (`height: 1px`), se expande al pasar el mouse (`height: 81px`), boton "Cerrar sesion" visible y alcanzable durante el hover, vuelve a colapsar al alejar el mouse. 0 errores de consola.
+- Resultado:
+  - El header se oculta y despliega con el mouse en cualquier pantalla del sistema, no solo en el dashboard, liberando espacio vertical consistentemente en monitores chicos o laptop.
+
+## 2026-08-10 - Rediseno visual completo: superficies neutras con acento por color, sin relleno pastel
+
+- Objetivo: el usuario pidio que la interfaz se vea "mas profesional, no con tanto pastel" en todo el proyecto — las tarjetas de modulos del dashboard y decenas de pastillas de estado usaban fondos pastel solidos y saturados (`bg-emerald-100`, hex ad-hoc por tarjeta) que daban una sensacion "de juguete". Se acordo con el usuario el estilo "neutro con acento por modulo" (superficie blanca/gris, el color solo en icono/pastilla) y aplicarlo a todo el proyecto de una vez, no solo al dashboard.
+- Archivos modificados:
+  - `resources/views/components/status-badge.blade.php` (nuevo) — componente `<x-status-badge :color="...">`, unica fuente de verdad del estilo de pastilla de estado
+  - `resources/views/dashboard.blade.php` — tarjetas de "Modulos operativos" con superficie neutra, `$moduleColorTokens` (10 colores fijos por modulo)
+  - 24 vistas mas con pastillas de estado migradas a `<x-status-badge>` o suavizadas in-place: `livewire/sales/{sales-page,pos-page,frozen-sales-page}.blade.php`, `livewire/purchases/{purchases-page,payables-page,suppliers-page}.blade.php`, `livewire/products/{products-page,product-presentations-page,attributes-page,product-variants-page}.blade.php`, `livewire/masters/{categories-page,brands-page,units-page}.blade.php`, `livewire/cash/cash-sessions-page.blade.php`, `livewire/credit/credit-accounts-page.blade.php`, `livewire/loyalty/loyalty-accounts-page.blade.php`, `livewire/promotions/promotions-page.blade.php`, `livewire/platform/{dashboard-page,subscriptions-page,platform-coupons-page,plans-page,users-page,companies-page}.blade.php`, `livewire/admin/{company-structure-page,subscription-page}.blade.php`, `livewire/company/select-company-page.blade.php`, `livewire/pages/subscription-pending.blade.php`
+  - `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - `<x-status-badge>` usa un array PHP de clases Tailwind literales por color (no interpolacion `"bg-{$color}-50"`), porque el scanner de contenido de Tailwind necesita ver la clase como texto literal en el archivo para generarla en el CSS compilado.
+  - Pastillas estaticas (`<span>`) migradas al componente; botones interactivos con `wire:click` (toggle activo/inactivo de productos y proveedores) se dejaron como estaban pero con las mismas clases suavizadas in-place, porque forzarlos dentro de un componente pensado para contenido de solo lectura habria complicado la logica de eventos sin beneficio real.
+  - No se tocaron los `hover:bg-{color}-100` (interacciones, no pastel estatico) ni `responsive-nav-link.blade.php` (scaffolding de Breeze sin ninguna referencia activa en el proyecto).
+- Pruebas:
+  - `php artisan view:cache`: compila las ~85 vistas Blade del proyecto sin errores, confirma que ningun `@if`/`@endif`/componente quedo mal cerrado tras las ~35 migraciones de pastillas.
+  - Verificacion manual en Chromium real (Playwright, contenedor `mcr.microsoft.com/playwright` en red `host` ya que este sandbox WSL no tiene navegador propio): dashboard (dos resoluciones), Productos, Compras, Cuentas por pagar, Ventas, Credito y Caja como `demo.premium` — 0 errores de consola, pastillas con el nuevo estilo suave (`bg-X-50` + anillo) en los 7 colores usados (emerald, amber, rose, sky, violet, blue, stone).
+  - Pendiente: no se pudo verificar visualmente `Plataforma`/`Admin > Estructura` en esta sesion por falta de un usuario `is_platform_admin` sembrado localmente; el cambio ahi paso `view:cache` sin errores pero queda una revision visual pendiente con sesion de superadmin.
+- Resultado:
+  - Toda la aplicacion comparte ahora un mismo lenguaje visual: superficies blancas/neutras, y el color reservado a icono, barra de acento o pastilla de estado — sin fondos pastel solidos saturados en ninguna pantalla operativa.
+
+## 2026-08-10 - Dashboard: header auto-ocultable, grilla de modulos adaptativa, y fix de Alpine.js inerte en esa pagina
+
+- Objetivo: en monitores chicos o laptop el header del dashboard (logo + nombre + "Cerrar sesion") ocupaba demasiado espacio vertical y le quitaba protagonismo a los "Modulos operativos"; se pidio que se oculte por defecto y se despliegue al pasar el mouse arriba, y que la grilla de modulos no deje una fila final cortada o con una sola tarjeta huerfana en resoluciones de laptop.
+- Archivos modificados:
+  - `resources/views/layouts/app.blade.php` — header del modo launcher (`x-data="{ headerOpen: false }"`, franja colapsable con `@mouseenter`/`@mouseleave`/`@click`); agregado `@livewireStyles`/`@livewireScripts`
+  - `resources/views/dashboard.blade.php` — grilla `sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` (antes sin `lg`), tarjetas mas compactas (`min-h`, iconos, tipografia)
+  - `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna.
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - El auto-ocultado solo se aplico al header del modo launcher (`/dashboard`); el header estatico del resto de paginas autenticadas no se toco a proposito, ya que todos los demas modulos necesitan "Cerrar sesion" siempre visible sin depender de hover.
+  - Bug real encontrado con Playwright (no visible solo leyendo codigo): `/dashboard` es una `Closure` en `routes/web.php` que retorna una vista Blade plana, sin ningun componente Livewire. Livewire v3 solo auto-inyecta su script (que en este proyecto trae Alpine.js empaquetado; `app.js` nunca importa `alpinejs` por su cuenta) cuando renderiza al menos un componente Livewire durante el request — como el dashboard no renderiza ninguno, Alpine jamas se inicializaba ahi. Esto tambien afectaba silenciosamente al `x-data` de sidebar ya existente en el layout (sin sintoma visible antes porque el modo launcher no usa esa barra lateral). Se corrigio agregando `@livewireStyles`/`@livewireScripts` explicitos en `layouts/app.blade.php`, forzando la inyeccion sin importar si la pagina trae un componente Livewire.
+- Pruebas:
+  - Verificacion manual en Chromium real (Playwright corrido via contenedor `mcr.microsoft.com/playwright` en red `host`, ya que el sandbox WSL de esta sesion no tiene un navegador local ni Playwright con Chromium compatible con Alpine musl del contenedor `vite`): estado inicial colapsado, hover expande el header, alejar el mouse lo vuelve a colapsar (confirmado leyendo `Alpine.$data()`, no solo bounding box). Grilla probada en 1366×768, 1280×720 y 1100×700: a 1100px paso de una fila final de 1 tarjeta huerfana (4+1) a una distribucion 3+2. Navegacion real dashboard → modulo Livewire (`/products`) sin errores de consola tras agregar los directivas de Livewire.
+- Resultado:
+  - El dashboard da mas protagonismo a los modulos operativos en pantallas chicas, sin perder acceso a "Cerrar sesion" (aparece al pasar el mouse arriba o tocar la franja). La grilla ya no deja tarjetas visualmente huerfanas o cortadas en resoluciones de laptop. Como efecto colateral, Alpine.js ahora funciona correctamente en `/dashboard`, algo que nunca habia sido cierto.
+
+## 2026-08-10 - Nombre de marca centralizado en una sola variable
+
+- Objetivo: el proyecto va a cambiar de nombre comercial (dejar de usar "Retail SaaS") y el texto estaba repetido a mano en 8 vistas distintas (titulos de pestaña, sidebar, header del layout autenticado, layout de plataforma, footer del ticket, placeholder de configuracion). Se pidio dejar el nombre como una unica variable para poder renombrar la marca desde un solo lugar en el futuro.
+- Archivos modificados:
+  - `app/Models/PlatformSetting.php` — nuevo metodo estatico `appName()`
+  - `app/Livewire/Platform/PlatformSettingsPage.php` — `mount()` usa `PlatformSetting::appName()` en vez de duplicar la logica de fallback
+  - `resources/views/welcome.blade.php`, `resources/views/livewire/layout/navigation.blade.php`, `resources/views/printing/sales/ticket.blade.php`, `resources/views/layouts/app.blade.php`, `resources/views/layouts/guest.blade.php`, `resources/views/layouts/platform.blade.php`, `resources/views/livewire/pages/subscription-pending.blade.php`, `resources/views/livewire/platform/platform-settings-page.blade.php` — texto literal "Retail SaaS" (o `config('app.name')` suelto) reemplazado por `\App\Models\PlatformSetting::appName()`
+  - `docs/decisiones-tecnicas.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna (se reutiliza la tabla `platform_settings` ya existente).
+- Decisiones (detalle completo en `docs/decisiones-tecnicas.md`):
+  - `PlatformSetting::appName()` resuelve en cascada: fila `platform_settings.app_name` (editable en caliente desde `Plataforma > Configuracion`, sin redeploy) y si esta vacia cae a `config('app.name')` (`APP_NAME` de `.env`). El campo "Nombre de la plataforma" del formulario de Configuracion ya guardaba este valor desde antes, pero ninguna vista lo leia — quedaba muerto.
+  - Se dejaron intactos los identificadores tecnicos internos que nunca se muestran a un usuario (`localStorage` key en `login.blade.php`, namespace JS `window.retailSaas` y su debug key en `app.js`, `User-Agent` HTTP que `OpenFoodFactsService` envia a la API externa): no son marca visible y tocarlos no aporta al objetivo pedido.
+- Pruebas:
+  - `php artisan view:clear` + `php artisan config:clear` sin errores; `curl` a `/` y `/login` responde `200` en ambos casos tras el cambio.
+  - Verificado que ninguna vista visible (`resources/views/**`) sigue conteniendo el texto literal "Retail SaaS" salvo el `localStorage` key tecnico ya documentado como intencional.
+- Resultado:
+  - El nombre de marca ya se resuelve desde un unico punto (`PlatformSetting::appName()`). Con el nombre definitivo aun sin elegir, la app sigue mostrando "Retail SaaS" por el fallback de `.env`; cuando se defina, cambiarlo en `Plataforma > Configuracion > Aplicacion` (o en `APP_NAME` de `.env`) lo actualiza en toda la aplicacion sin tocar ninguna vista.
+
 ## 2026-08-06 - Clientes: nombre real en vez de "Cliente #N", busqueda que funciona con Ñ, y habilitar credito a un cliente existente
 
 - Objetivo: en el POS, un cliente ya creado ("Ñato") aparecia en la busqueda como "Cliente #20" en vez de su nombre; buscar por "Ñ" no lo encontraba; y en `/credit` no habia forma de encontrarlo para habilitarle una cuenta de credito por primera vez.

@@ -4,7 +4,7 @@
     </h2>
 
     @isset($description)
-        <p class="mt-1 text-sm text-stone-500">
+        <p class="mt-1 text-sm text-gray-500">
             {{ $description }}
         </p>
     @endisset

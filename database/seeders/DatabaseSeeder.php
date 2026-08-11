@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AuthorizationCatalogSeeder::class,
             PlanCatalogSeeder::class,
+            PlatformSuperAdminSeeder::class,
             DemoCompaniesSeeder::class,
             DemoOperationalDataSeeder::class,
         ]);

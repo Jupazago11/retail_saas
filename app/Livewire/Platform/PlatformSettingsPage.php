@@ -20,6 +20,7 @@ class PlatformSettingsPage extends Component
     public string $contactEmail = '';
     public string $contactPhone = '';
     public string $appName     = '';
+    public string $ownerNotificationEmail = '';
 
     public function mount(): void
     {
@@ -33,7 +34,8 @@ class PlatformSettingsPage extends Component
         $this->planPrice    = PlatformSetting::get('plan_price',    config('platform.plan_price', ''));
         $this->contactEmail = PlatformSetting::get('contact_email', config('platform.contact_email', ''));
         $this->contactPhone = PlatformSetting::get('contact_phone', config('platform.contact_phone', ''));
-        $this->appName      = PlatformSetting::get('app_name',      config('app.name', ''));
+        $this->appName      = PlatformSetting::appName();
+        $this->ownerNotificationEmail = PlatformSetting::ownerNotificationEmail();
     }
 
     public function save(): void
@@ -50,6 +52,7 @@ class PlatformSettingsPage extends Component
             'contactEmail' => ['nullable', 'email', 'max:255'],
             'contactPhone' => ['nullable', 'string', 'max:50'],
             'appName'      => ['nullable', 'string', 'max:100'],
+            'ownerNotificationEmail' => ['nullable', 'email', 'max:255'],
         ]);
 
         $settings = [
@@ -62,6 +65,7 @@ class PlatformSettingsPage extends Component
             'contact_email' => $this->contactEmail,
             'contact_phone' => $this->contactPhone,
             'app_name'      => $this->appName,
+            'owner_notification_email' => $this->ownerNotificationEmail,
         ];
 
         foreach ($settings as $key => $value) {

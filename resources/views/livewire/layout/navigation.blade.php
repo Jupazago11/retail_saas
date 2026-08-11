@@ -184,24 +184,24 @@ new class extends Component
     ></div>
 
     <aside
-        class="fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-stone-200 bg-white shadow-xl transition-all duration-300 lg:static lg:shrink-0 lg:translate-x-0 lg:shadow-none"
+        class="fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-gray-200 bg-white shadow-xl transition-all duration-300 lg:static lg:shrink-0 lg:translate-x-0 lg:shadow-none"
         :class="(sidebarOpen ? 'translate-x-0 ' : '-translate-x-full lg:translate-x-0 ') + (sidebarCollapsed ? 'lg:w-24' : 'lg:w-72')"
     >
-        <div class="flex items-center justify-between border-b border-stone-200 px-5 py-5" :class="sidebarCollapsed ? 'lg:px-4' : ''">
+        <div class="flex items-center justify-between border-b border-gray-200 px-5 py-5" :class="sidebarCollapsed ? 'lg:px-4' : ''">
             <a href="{{ route('dashboard') }}" class="flex min-w-0 items-center gap-3">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-950 text-white">
+                <div class="flex h-12 w-12 items-center justify-center rounded-lg bg-stone-950 text-white">
                     <x-application-logo class="h-7 w-auto fill-current" />
                 </div>
 
                 <div class="min-w-0" :class="sidebarCollapsed ? 'lg:hidden' : ''">
-                    <p class="truncate text-sm font-semibold uppercase tracking-[0.28em] text-amber-700">Retail SaaS</p>
-                    <p class="truncate text-sm text-stone-500">Operacion central</p>
+                    <p class="truncate text-sm font-semibold uppercase tracking-[0.28em] text-blue-700">{{ \App\Models\PlatformSetting::appName() }}</p>
+                    <p class="truncate text-sm text-gray-500">Operacion central</p>
                 </div>
             </a>
 
             <button
                 type="button"
-                class="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-stone-200 text-stone-500 transition hover:border-amber-300 hover:text-amber-700 lg:hidden"
+                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition hover:border-blue-300 hover:text-blue-700 lg:hidden"
                 @click="sidebarOpen = false"
             >
                 <span class="sr-only">Cerrar menu</span>
@@ -211,21 +211,21 @@ new class extends Component
             </button>
         </div>
 
-        <div class="border-b border-stone-200 px-5 py-5" :class="sidebarCollapsed ? 'lg:px-4' : ''">
+        <div class="border-b border-gray-200 px-5 py-5" :class="sidebarCollapsed ? 'lg:px-4' : ''">
             <a
                 href="{{ route('companies.select') }}"
                
-                class="flex items-center gap-3 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-stone-900 transition hover:border-amber-300 hover:bg-amber-100/70"
+                class="flex items-center gap-3 rounded-[24px] border border-amber-200 bg-amber-50 px-4 py-4 text-gray-900 transition hover:border-blue-300 hover:bg-amber-100/70"
                 @click="sidebarOpen = false"
                 title="{{ $currentCompanyName ?: 'Empresa activa' }}"
             >
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-sm font-semibold text-white">
+                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-sm font-semibold text-white">
                     {{ $companyInitials }}
                 </div>
 
                 <div class="min-w-0" :class="sidebarCollapsed ? 'lg:hidden' : ''">
-                    <p class="text-xs font-semibold uppercase tracking-[0.28em] text-amber-700">Empresa activa</p>
-                    <p class="truncate text-sm font-medium text-stone-800">{{ $currentCompanyName ?: 'Sin empresa' }}</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.28em] text-blue-700">Empresa activa</p>
+                    <p class="truncate text-sm font-medium text-gray-800">{{ $currentCompanyName ?: 'Sin empresa' }}</p>
                 </div>
             </a>
         </div>
@@ -235,12 +235,12 @@ new class extends Component
                 <a
                     href="{{ $item['href'] }}"
                    
-                    class="{{ $item['active'] ? 'bg-stone-950 text-white shadow-lg shadow-stone-950/10' : 'text-stone-600 hover:bg-stone-100 hover:text-stone-950' }} flex items-center gap-3 rounded-2xl px-4 py-3 transition"
+                    class="{{ $item['active'] ? 'bg-stone-950 text-white shadow-lg shadow-stone-950/10' : 'text-gray-600 hover:bg-gray-100 hover:text-stone-950' }} flex items-center gap-3 rounded-lg px-4 py-3 transition"
                     :class="sidebarCollapsed ? 'lg:justify-center lg:px-3' : ''"
                     @click="sidebarOpen = false"
                     title="{{ $item['label'] }}"
                 >
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl {{ $item['active'] ? 'bg-white/10 text-white' : 'bg-stone-200/70 text-stone-700' }}">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg {{ $item['active'] ? 'bg-white/10 text-white' : 'bg-stone-200/70 text-gray-700' }}">
                         @switch($item['icon'])
                             @case('dashboard')
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 13h7V4H4zm9 7h7v-9h-7zm0-16v5h7V4zM4 20h7v-5H4z" /></svg>
@@ -283,31 +283,31 @@ new class extends Component
             @endforeach
         </nav>
 
-        <div class="border-t border-stone-200 p-4">
-            <div class="rounded-[26px] border border-stone-200 bg-stone-50 p-4" :class="sidebarCollapsed ? 'lg:px-3' : ''">
+        <div class="border-t border-gray-200 p-4">
+            <div class="rounded-[26px] border border-gray-200 bg-gray-50 p-4" :class="sidebarCollapsed ? 'lg:px-3' : ''">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-stone-950 text-sm font-semibold text-white">
+                    <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-stone-950 text-sm font-semibold text-white">
                         {{ $userInitial }}
                     </div>
 
                     <div class="min-w-0" :class="sidebarCollapsed ? 'lg:hidden' : ''">
-                        <div class="truncate text-sm font-semibold text-stone-900" x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
-                        <div class="truncate text-xs text-stone-500">{{ $usernameHandle }}</div>
+                        <div class="truncate text-sm font-semibold text-gray-900" x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
+                        <div class="truncate text-xs text-gray-500">{{ $usernameHandle }}</div>
                     </div>
                 </div>
 
                 <div class="mt-4 space-y-2" :class="sidebarCollapsed ? 'lg:hidden' : ''">
-                    <a href="{{ route('profile') }}" class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm text-stone-600 transition hover:bg-white hover:text-stone-950" @click="sidebarOpen = false">
+                    <a href="{{ route('profile') }}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-gray-600 transition hover:bg-white hover:text-stone-950" @click="sidebarOpen = false">
                         <span>Perfil</span>
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" /></svg>
                     </a>
 
-                    <a href="{{ route('companies.select') }}" class="flex items-center justify-between rounded-2xl px-3 py-2 text-sm text-stone-600 transition hover:bg-white hover:text-stone-950" @click="sidebarOpen = false">
+                    <a href="{{ route('companies.select') }}" class="flex items-center justify-between rounded-lg px-3 py-2 text-sm text-gray-600 transition hover:bg-white hover:text-stone-950" @click="sidebarOpen = false">
                         <span>Cambiar empresa</span>
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6l6 6-6 6" /></svg>
                     </a>
 
-                    <button wire:click="logout" type="button" class="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-sm text-rose-600 transition hover:bg-rose-50">
+                    <button wire:click="logout" type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-rose-600 transition hover:bg-rose-50">
                         <span>Cerrar sesion</span>
                         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17l5-5-5-5M20 12H9" /><path stroke-linecap="round" stroke-linejoin="round" d="M11 19H6a2 2 0 01-2-2V7a2 2 0 012-2h5" /></svg>
                     </button>
@@ -315,15 +315,15 @@ new class extends Component
 
                 <div class="mt-4 hidden lg:block" x-show="sidebarCollapsed">
                     <div class="flex flex-col items-center gap-2">
-                        <a href="{{ route('profile') }}" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-600 transition hover:border-amber-300 hover:text-amber-700" title="Perfil">
+                        <a href="{{ route('profile') }}" class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-blue-300 hover:text-blue-700" title="Perfil">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M20 21a8 8 0 00-16 0" /><circle cx="12" cy="7" r="4" /></svg>
                         </a>
 
-                        <a href="{{ route('companies.select') }}" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-stone-200 bg-white text-stone-600 transition hover:border-amber-300 hover:text-amber-700" title="Cambiar empresa">
+                        <a href="{{ route('companies.select') }}" class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 transition hover:border-blue-300 hover:text-blue-700" title="Cambiar empresa">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7l8-4 8 4-8 4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M4 12l8 4 8-4" /><path stroke-linecap="round" stroke-linejoin="round" d="M4 17l8 4 8-4" /></svg>
                         </a>
 
-                        <button wire:click="logout" type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100" title="Cerrar sesion">
+                        <button wire:click="logout" type="button" class="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100" title="Cerrar sesion">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17l5-5-5-5M20 12H9" /><path stroke-linecap="round" stroke-linejoin="round" d="M11 19H6a2 2 0 01-2-2V7a2 2 0 012-2h5" /></svg>
                         </button>
                     </div>

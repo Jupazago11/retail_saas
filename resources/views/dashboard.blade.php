@@ -33,8 +33,7 @@
                 'description' => 'Categorias, marcas, unidades y productos.',
                 'href' => route('products.index'),
                 'visible' => ($planModules['products'] ?? false) && ($canViewMasters || $canViewProducts),
-                'tone' => 'bg-[#f6efe3] text-[#6d4421] border-[#e7c9a0]',
-                'accent' => 'from-[#f4c98a] to-[#e39c52]',
+                'color' => 'amber',
                 'icon' => 'catalog',
             ],
             [
@@ -42,8 +41,7 @@
                 'description' => 'Documentos, proveedores y cuentas por pagar.',
                 'href' => $canViewPurchases ? route('purchases.index') : ($canViewSuppliers ? route('purchases.suppliers') : route('purchases.payables')),
                 'visible' => ($planModules['purchases'] ?? false) && ($canViewPurchases || $canViewSuppliers || $canViewPayables),
-                'tone' => 'bg-[#dbe8ff] text-[#173d7a] border-[#a7c4ff]',
-                'accent' => 'from-[#7db1ff] to-[#3f74d6]',
+                'color' => 'blue',
                 'icon' => 'purchases',
             ],
             [
@@ -51,8 +49,7 @@
                 'description' => 'POS, historial comercial y tickets.',
                 'href' => $canCreateSales ? route('sales.pos') : route('sales.index'),
                 'visible' => ($planModules['pos'] ?? false) && ($canCreateSales || $canViewSales),
-                'tone' => 'bg-[#dff7ea] text-[#15523c] border-[#97ddba]',
-                'accent' => 'from-[#62dba4] to-[#2ca36d]',
+                'color' => 'emerald',
                 'icon' => 'sales',
             ],
             [
@@ -60,8 +57,7 @@
                 'description' => 'Ajustes masivos e ingresos operativos.',
                 'href' => route('inventory.imports'),
                 'visible' => ($planModules['imports'] ?? false) && ($planFeatures['imports.excel'] ?? false) && $canAccessInventory,
-                'tone' => 'bg-[#fce4dc] text-[#8a3625] border-[#f3b39f]',
-                'accent' => 'from-[#f7a87b] to-[#de6a42]',
+                'color' => 'orange',
                 'icon' => 'inventory',
             ],
             [
@@ -69,8 +65,7 @@
                 'description' => 'Aperturas, cierres y control de efectivo.',
                 'href' => route('cash.sessions'),
                 'visible' => ($planModules['cash'] ?? false) && $canAccessCash,
-                'tone' => 'bg-[#efe2ff] text-[#5d2f90] border-[#caa7ff]',
-                'accent' => 'from-[#b27cf4] to-[#7a4cc5]',
+                'color' => 'violet',
                 'icon' => 'cash',
             ],
             [
@@ -78,8 +73,7 @@
                 'description' => 'Cartera, clientes y abonos pendientes.',
                 'href' => route('credit.index'),
                 'visible' => ($planModules['credit'] ?? false) && ($planFeatures['credit.enabled'] ?? false) && $canAccessCredit,
-                'tone' => 'bg-[#fff1cf] text-[#7b5a08] border-[#f0d57b]',
-                'accent' => 'from-[#f4d35d] to-[#d6a91e]',
+                'color' => 'fuchsia',
                 'icon' => 'credit',
             ],
             [
@@ -87,8 +81,7 @@
                 'description' => 'Descuentos por producto y combos.',
                 'href' => route('promotions.index'),
                 'visible' => ($planModules['promotions'] ?? false) && $canManagePromotions,
-                'tone' => 'bg-[#ffe0e8] text-[#8f274a] border-[#f7a8bf]',
-                'accent' => 'from-[#f58cae] to-[#d64f79]',
+                'color' => 'rose',
                 'icon' => 'promotions',
             ],
             [
@@ -96,8 +89,7 @@
                 'description' => 'Puntos, saldos y movimientos del cliente.',
                 'href' => route('loyalty.index'),
                 'visible' => ($planModules['loyalty'] ?? false) && ($planFeatures['loyalty.enabled'] ?? false) && $canManageLoyalty,
-                'tone' => 'bg-[#ddf6f2] text-[#14645b] border-[#93ddd3]',
-                'accent' => 'from-[#6fe1d0] to-[#2ea99b]',
+                'color' => 'teal',
                 'icon' => 'loyalty',
             ],
             [
@@ -105,8 +97,7 @@
                 'description' => 'Resumen comercial, recaudo y analitica.',
                 'href' => route('reports.index'),
                 'visible' => ($planModules['reports'] ?? false) && $canViewReports,
-                'tone' => 'bg-[#e5ecff] text-[#28428e] border-[#a9baf7]',
-                'accent' => 'from-[#8ea6ff] to-[#5670db]',
+                'color' => 'indigo',
                 'icon' => 'reports',
             ],
             [
@@ -114,71 +105,77 @@
                 'description' => 'Configuracion, estructura, roles y auditoria.',
                 'href' => $canManageSettings ? route('admin.settings') : route('admin.roles'),
                 'visible' => $canManageSettings || $canManageRoles,
-                'tone' => 'bg-[#ece9e3] text-[#50483a] border-[#c9c0b2]',
-                'accent' => 'from-[#9d9589] to-[#6e665a]',
+                'color' => 'stone',
                 'icon' => 'admin',
             ],
         ])->filter(fn (array $item) => $item['visible'])->values();
+
+        $moduleColorTokens = [
+            'amber'   => ['icon' => 'bg-amber-50 text-amber-600'],
+            'blue'    => ['icon' => 'bg-blue-50 text-blue-600'],
+            'emerald' => ['icon' => 'bg-emerald-50 text-emerald-600'],
+            'orange'  => ['icon' => 'bg-orange-50 text-orange-600'],
+            'violet'  => ['icon' => 'bg-violet-50 text-violet-600'],
+            'fuchsia' => ['icon' => 'bg-fuchsia-50 text-fuchsia-600'],
+            'rose'    => ['icon' => 'bg-rose-50 text-rose-600'],
+            'teal'    => ['icon' => 'bg-teal-50 text-teal-600'],
+            'indigo'  => ['icon' => 'bg-indigo-50 text-indigo-600'],
+            'stone'   => ['icon' => 'bg-gray-100 text-gray-600'],
+        ];
     @endphp
 
     <div class="space-y-8">
         <span class="sr-only">{{ $company->display_name }}</span>
         <section>
-            <div class="mb-5 flex items-center justify-between gap-4">
+            <div class="mb-4 flex items-center justify-between gap-4">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-amber-700">Accesos</p>
-                    <h2 class="mt-1 text-2xl font-black text-stone-900 sm:text-3xl">Modulos operativos</h2>
+                    <p class="text-xs font-semibold uppercase tracking-[0.3em] text-blue-700">Accesos</p>
+                    <h2 class="mt-1 text-xl font-black text-gray-900 sm:text-2xl">Modulos operativos</h2>
                 </div>
 
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 @foreach ($launcherItems as $item)
-                    <a href="{{ $item['href'] }}" class="group relative block cursor-pointer overflow-hidden rounded-[30px] border p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.12)] {{ $item['tone'] }}">
-                        <div class="absolute inset-x-0 top-0 h-2 bg-gradient-to-r {{ $item['accent'] }}"></div>
-                        <div class="flex min-h-[220px] flex-col">
-                            <div>
-                                <div class="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-[22px] bg-white/80 text-current shadow-sm">
+                    @php($tokens = $moduleColorTokens[$item['color']])
+                    <a href="{{ $item['href'] }}" class="group block cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition duration-200 hover:border-gray-300 hover:shadow-md">
+                        <div class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl {{ $tokens['icon'] }}">
                                     @switch($item['icon'])
     @case('catalog')
-        <x-heroicon-o-squares-2x2 class="h-7 w-7" />
+        <x-heroicon-o-squares-2x2 class="h-6 w-6" />
         @break
     @case('purchases')
-        <x-heroicon-o-document-text class="h-7 w-7" />
+        <x-heroicon-o-document-text class="h-6 w-6" />
         @break
     @case('sales')
-        <x-heroicon-o-shopping-cart class="h-7 w-7" />
+        <x-heroicon-o-shopping-cart class="h-6 w-6" />
         @break
     @case('inventory')
-        <x-heroicon-o-archive-box class="h-7 w-7" />
+        <x-heroicon-o-archive-box class="h-6 w-6" />
         @break
     @case('cash')
-        <x-heroicon-o-banknotes class="h-7 w-7" />
+        <x-heroicon-o-banknotes class="h-6 w-6" />
         @break
     @case('credit')
-        <x-heroicon-o-credit-card class="h-7 w-7" />
+        <x-heroicon-o-credit-card class="h-6 w-6" />
         @break
     @case('promotions')
-        <x-heroicon-o-gift-top class="h-7 w-7" />
+        <x-heroicon-o-gift-top class="h-6 w-6" />
         @break
     @case('loyalty')
-        <x-heroicon-o-heart class="h-7 w-7" />
+        <x-heroicon-o-heart class="h-6 w-6" />
         @break
     @case('reports')
-        <x-heroicon-o-chart-bar class="h-7 w-7" />
+        <x-heroicon-o-chart-bar class="h-6 w-6" />
         @break
     @case('admin')
-        <x-heroicon-o-cog-6-tooth class="h-7 w-7" />
+        <x-heroicon-o-cog-6-tooth class="h-6 w-6" />
         @break
 @endswitch
                                 </div>
 
-                                <h3 class="text-2xl font-black tracking-tight">{{ $item['label'] }}</h3>
-                                <p class="mt-3 text-sm leading-6 opacity-90">{{ $item['description'] }}</p>
-                            </div>
-
-
-                        </div>
+                        <h3 class="text-xl font-black tracking-tight text-gray-900">{{ $item['label'] }}</h3>
+                        <p class="mt-2 text-sm leading-6 text-gray-500">{{ $item['description'] }}</p>
                     </a>
                 @endforeach
             </div>

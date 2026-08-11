@@ -8,21 +8,21 @@
     {{-- Header --}}
     <div class="flex items-center justify-between">
         <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">Plataforma</p>
-            <h1 class="mt-1 text-2xl font-black text-stone-900">Cupones</h1>
+            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
+            <h1 class="mt-1 text-2xl font-black text-gray-900">Cupones</h1>
         </div>
         <button wire:click="openCreate"
-            class="rounded-full bg-stone-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-stone-700">
+            class="rounded-full bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
             + Nuevo cupón
         </button>
     </div>
 
     {{-- Tabla --}}
-    <div class="rounded-3xl bg-white p-6 ring-1 ring-stone-200">
+    <div class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-stone-200 text-sm">
                 <thead>
-                    <tr class="text-left text-xs font-semibold uppercase tracking-wide text-stone-500">
+                    <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                         <th class="pb-2">Código</th>
                         <th class="pb-2">Nombre</th>
                         <th class="pb-2">Descuento</th>
@@ -35,12 +35,12 @@
                 </thead>
                 <tbody class="divide-y divide-stone-100">
                     @forelse ($coupons as $coupon)
-                        <tr wire:key="coupon-{{ $coupon->id }}">
-                            <td class="py-3 align-middle font-mono text-xs font-bold text-stone-900">
+                        <tr wire:key="coupon-{{ $coupon->id }}" class="even:bg-gray-50">
+                            <td class="py-3 align-middle font-mono text-xs font-bold text-gray-900">
                                 {{ $coupon->code }}
                             </td>
-                            <td class="py-3 align-middle text-stone-700">{{ $coupon->name }}</td>
-                            <td class="py-3 align-middle text-xs text-stone-600">
+                            <td class="py-3 align-middle text-gray-700">{{ $coupon->name }}</td>
+                            <td class="py-3 align-middle text-xs text-gray-600">
                                 @if ($coupon->discount_type === 'percentage')
                                     {{ $coupon->discount_value }}%
                                 @else
@@ -50,17 +50,17 @@
                             <td class="py-3 align-middle">
                                 <div class="flex flex-wrap gap-1">
                                     @foreach ($coupon->plans as $plan)
-                                        <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{{ $plan->name }}</span>
+                                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">{{ $plan->name }}</span>
                                     @endforeach
                                     @if ($coupon->plans->isEmpty())
-                                        <span class="text-xs text-stone-400">Todos</span>
+                                        <span class="text-xs text-gray-400">Todos</span>
                                     @endif
                                 </div>
                             </td>
-                            <td class="py-3 align-middle text-xs text-stone-400 w-px whitespace-nowrap">
+                            <td class="py-3 align-middle text-xs text-gray-400 w-px whitespace-nowrap">
                                 {{ $coupon->expires_at?->format('d/m/Y') ?? '—' }}
                             </td>
-                            <td class="py-3 align-middle text-xs text-stone-600 w-px whitespace-nowrap">
+                            <td class="py-3 align-middle text-xs text-gray-600 w-px whitespace-nowrap">
                                 {{ $coupon->redemptions_count ?? $coupon->redemptions->count() }}
                                 @if ($coupon->total_uses_limit)
                                     / {{ $coupon->total_uses_limit }}
@@ -68,19 +68,19 @@
                             </td>
                             <td class="py-3 align-middle w-px whitespace-nowrap">
                                 @if ($coupon->status === 'active')
-                                    <span class="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">activo</span>
+                                    <x-status-badge color="emerald">activo</x-status-badge>
                                 @else
-                                    <span class="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold text-stone-500">inactivo</span>
+                                    <x-status-badge color="stone">inactivo</x-status-badge>
                                 @endif
                             </td>
                             <td class="py-3 align-middle w-px whitespace-nowrap">
                                 <div class="flex justify-end gap-2">
                                     <button wire:click="startEdit({{ $coupon->id }})"
-                                        class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-600 transition hover:border-amber-400 hover:text-amber-700">
+                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
                                         Editar
                                     </button>
                                     <button wire:click="toggleStatus({{ $coupon->id }})"
-                                        class="rounded-full border border-stone-300 px-3 py-1 text-xs font-semibold text-stone-600 transition hover:border-stone-400">
+                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-stone-400">
                                         {{ $coupon->status === 'active' ? 'Inactivar' : 'Activar' }}
                                     </button>
                                 </div>
@@ -88,7 +88,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="py-10 text-center text-xs text-stone-400">Sin cupones creados.</td>
+                            <td colspan="8" class="py-10 text-center text-xs text-gray-400">Sin cupones creados.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -100,71 +100,71 @@
     {{-- Modal --}}
     @if ($showModal)
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div class="w-full max-w-lg rounded-3xl bg-white p-6 shadow-xl ring-1 ring-stone-200">
-                <h3 class="text-lg font-black text-stone-900">{{ $editingId ? 'Editar cupón' : 'Nuevo cupón' }}</h3>
+            <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl ring-1 ring-gray-200">
+                <h3 class="text-lg font-black text-gray-900">{{ $editingId ? 'Editar cupón' : 'Nuevo cupón' }}</h3>
 
                 <div class="mt-5 grid grid-cols-2 gap-4">
                     <div class="col-span-2 sm:col-span-1">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Código</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código</label>
                         <input wire:model="code" type="text" placeholder="DESC20"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500 uppercase">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600 uppercase">
                         @error('code') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="col-span-2 sm:col-span-1">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
                         <input wire:model="name" type="text"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Tipo de descuento</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de descuento</label>
                         <select wire:model="discountType"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="percentage">Porcentaje (%)</option>
                             <option value="fixed_amount">Monto fijo</option>
                         </select>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Valor</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</label>
                         <input wire:model="discountValue" type="number" min="0" step="0.01"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('discountValue') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Válido desde</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Válido desde</label>
                         <input wire:model="startsAt" type="date"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Expira</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Expira</label>
                         <input wire:model="expiresAt" type="date"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Usos totales</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Usos totales</label>
                         <input wire:model="totalUsesLimit" type="number" min="1" placeholder="Sin límite"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Usos por empresa</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Usos por empresa</label>
                         <input wire:model="perCompanyLimit" type="number" min="1" placeholder="Sin límite"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
 
                     <div class="col-span-2">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Aplica a planes (vacío = todos)</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Aplica a planes (vacío = todos)</label>
                         <div class="mt-2 flex flex-wrap gap-2">
                             @foreach ($plans as $plan)
-                                <label class="flex items-center gap-2 text-sm text-stone-700">
+                                <label class="flex items-center gap-2 text-sm text-gray-700">
                                     <input type="checkbox" wire:model="selectedPlanIds" value="{{ $plan->id }}"
-                                        class="rounded border-stone-300 text-amber-600 focus:ring-amber-500">
+                                        class="rounded border-gray-300 text-blue-600 focus:ring-blue-600">
                                     {{ $plan->name }}
                                 </label>
                             @endforeach
@@ -172,9 +172,9 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-stone-500">Estado</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</label>
                         <select wire:model="status"
-                            class="mt-1 w-full rounded-2xl border-stone-300 text-sm shadow-sm focus:border-amber-500 focus:ring-amber-500">
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="active">Activo</option>
                             <option value="inactive">Inactivo</option>
                         </select>
@@ -183,11 +183,11 @@
 
                 <div class="mt-6 flex justify-end gap-3">
                     <button wire:click="closeModal"
-                        class="rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-600 transition hover:bg-stone-50">
+                        class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
                         Cancelar
                     </button>
                     <button wire:click="save"
-                        class="rounded-full bg-stone-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-stone-700">
+                        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                         {{ $editingId ? 'Actualizar' : 'Crear cupón' }}
                     </button>
                 </div>

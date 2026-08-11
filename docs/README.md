@@ -27,6 +27,7 @@ Esta carpeta centraliza las decisiones del proyecto antes de generar migraciones
 - `roadmap.md`: fases de implementacion.
 - `docker-local.md`: lineamientos de Docker local.
 - `comandos-wsl.md`: comandos listos para pegar en WSL y operar este proyecto.
+- `entornos-de-trabajo.md`: dispositivos donde trabaja el usuario (laptop/PC de escritorio), como levantar el proyecto en cada uno y pasos de primera vez en un dispositivo nuevo.
 - `deploy-railway.md`: lineamientos de despliegue en Railway.
 
 ## Regla operativa
