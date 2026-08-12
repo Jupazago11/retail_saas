@@ -20,7 +20,14 @@ new class extends Component
         try {
             $validated = $this->validate([
                 'current_password' => ['required', 'string', 'current_password'],
-                'password' => ['required', 'string', Password::defaults(), 'confirmed'],
+                'password' => [
+                    'required', 'string', Password::defaults(), 'confirmed',
+                    function (string $attribute, string $value, \Closure $fail): void {
+                        if (Hash::check($value, Auth::user()->password)) {
+                            $fail('La nueva contraseña no puede ser igual a la actual.');
+                        }
+                    },
+                ],
             ]);
         } catch (ValidationException $e) {
             $this->reset('current_password', 'password', 'password_confirmation');
@@ -35,7 +42,7 @@ new class extends Component
         $this->reset('current_password', 'password', 'password_confirmation');
 
         $this->dispatch('password-updated');
-        $this->dispatch('toast', type: 'success', message: 'Contrasena actualizada correctamente.');
+        $this->dispatch('toast', type: 'success', message: 'Contraseña actualizada correctamente.');
     }
 }; ?>
 

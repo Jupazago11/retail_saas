@@ -1,229 +1,124 @@
 <div class="pb-10">
-    <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
         <x-admin-nav />
 
-        <div class="grid gap-6 lg:grid-cols-3">
-        <div class="space-y-6">
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Plan efectivo</p>
-                <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $snapshot['plan']?->name ?? 'Sin plan' }}</h3>
-                <p class="mt-2 text-sm text-gray-500">{{ $this->sourceLabel($snapshot['source']) }}</p>
-
-                <dl class="mt-6 space-y-3 text-sm">
-                    <div class="flex items-center justify-between gap-4">
-                        <dt class="text-gray-500">Codigo</dt>
-                        <dd class="font-semibold text-gray-900">{{ $snapshot['plan']?->code ?? '-' }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-4">
-                        <dt class="text-gray-500">Precio base</dt>
-                        <dd class="font-semibold text-gray-900">${{ $snapshot['plan'] ? $this->formatMoney($snapshot['plan']->base_price) : '0.00' }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-4">
-                        <dt class="text-gray-500">Modulos</dt>
-                        <dd class="font-semibold text-gray-900">{{ count($snapshot['modules']) }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-4">
-                        <dt class="text-gray-500">Features</dt>
-                        <dd class="font-semibold text-gray-900">{{ count($snapshot['features']) }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between gap-4">
-                        <dt class="text-gray-500">Limites</dt>
-                        <dd class="font-semibold text-gray-900">{{ count($snapshot['limits']) }}</dd>
-                    </div>
-                </dl>
-            </div>
-
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Cambio manual</p>
-                <h3 class="mt-2 text-2xl font-black text-gray-900">Actualizar suscripcion directa</h3>
-
-                <form wire:submit="saveSubscription" class="mt-6 space-y-4">
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Plan</label>
-                        <select wire:model="selectedPlanId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Selecciona un plan</option>
-                            @foreach ($plans as $plan)
-                                <option value="{{ $plan->id }}">{{ $plan->name }} ({{ $plan->code }})</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Estado</label>
-                        <select wire:model.live="subscriptionStatus" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="active">Activa</option>
-                            <option value="trialing">Trial</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Inicio efectivo</label>
-                        <input wire:model="startsAt" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    </div>
-                    @if ($subscriptionStatus === 'trialing')
-                        <div>
-                            <label class="text-sm font-medium text-gray-700">Dias de trial</label>
-                            <input wire:model="trialDays" type="number" min="1" max="365" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        </div>
+        {{-- Plan actual --}}
+        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <div class="flex flex-wrap items-start justify-between gap-6">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Tu plan actual</p>
+                    <h3 class="mt-1 text-3xl font-black text-gray-900">{{ $snapshot['plan']?->name ?? 'Sin plan activo' }}</h3>
+                    @if ($snapshot['plan'])
+                        <p class="mt-1 text-xl font-bold text-gray-700">
+                            ${{ $this->formatMoney($snapshot['plan']->base_price) }}<span class="text-sm font-normal text-gray-400">/mes</span>
+                        </p>
                     @endif
-                    @error('selectedPlanId') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('subscriptionStatus') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('startsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('trialDays') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
+                </div>
 
-                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
-                        Guardar suscripcion
-                    </button>
-                </form>
+                <div class="text-right">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Renovacion</p>
+                    @if ($snapshot['subscription']?->ends_at)
+                        <p class="mt-1 text-lg font-bold text-gray-900">{{ $snapshot['subscription']->ends_at->format('d/m/Y') }}</p>
+                    @elseif ($snapshot['subscription']?->trial_ends_at)
+                        <p class="mt-1 text-lg font-bold text-gray-900">{{ $snapshot['subscription']->trial_ends_at->format('d/m/Y') }}</p>
+                        <p class="text-xs text-amber-600">Fin del periodo de prueba</p>
+                    @else
+                        <p class="mt-1 text-sm text-gray-400">Sin vencimiento definido</p>
+                    @endif
+                </div>
             </div>
+
+            @if ($this->whatsappUrl() !== '')
+                <a href="{{ $this->whatsappUrl() }}" target="_blank" rel="noopener"
+                    class="mt-5 inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">
+                    <x-heroicon-o-chat-bubble-left-right class="h-4 w-4" />
+                    Enviar comprobante de pago por WhatsApp
+                </a>
+                <p class="mt-2 text-xs text-gray-400">Tambien es el numero de soporte de {{ \App\Models\PlatformSetting::appName() }}.</p>
+            @endif
         </div>
 
-        <div class="space-y-6 lg:col-span-2 lg:col-start-2">
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <div class="flex items-end justify-between gap-4">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Historial directo</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Suscripciones registradas</h3>
-                    </div>
-                    <p class="text-sm text-gray-500">{{ $directSubscriptions->count() }} registros</p>
-                </div>
+        {{-- Otros planes --}}
+        @if ($otherPlans->isNotEmpty())
+            <div>
+                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Otros planes disponibles</p>
+                <div class="mt-3 -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
+                    @foreach ($otherPlans as $plan)
+                        <article class="w-64 shrink-0 snap-start rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">{{ $plan->code }}</p>
+                            <h4 class="mt-1 text-lg font-black text-gray-900">{{ $plan->name }}</h4>
+                            <p class="mt-1 text-2xl font-black text-gray-900">
+                                ${{ $this->formatMoney($plan->base_price) }}<span class="text-xs font-normal text-gray-400">/mes</span>
+                            </p>
 
-                <div class="mt-6 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-stone-200 text-sm">
-                        <thead>
-                            <tr class="text-left text-gray-500">
-                                <th class="pb-3 font-medium">Plan</th>
-                                <th class="pb-3 font-medium">Estado</th>
-                                <th class="pb-3 font-medium">Inicio</th>
-                                <th class="pb-3 font-medium">Fin</th>
-                                <th class="pb-3 font-medium">Trial hasta</th>
-                                <th class="pb-3 font-medium">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-stone-100">
-                            @forelse ($directSubscriptions as $subscription)
-                                <tr>
-                                    <td class="py-4 font-medium text-gray-900">{{ $subscription->plan?->name ?? 'Sin plan' }}</td>
-                                    <td class="py-4 text-gray-600">{{ $this->statusLabel($subscription->status) }}</td>
-                                    <td class="py-4 text-gray-600">{{ optional($subscription->starts_at)?->format('Y-m-d H:i') ?? '-' }}</td>
-                                    <td class="py-4 text-gray-600">{{ optional($subscription->ends_at)?->format('Y-m-d H:i') ?? '-' }}</td>
-                                    <td class="py-4 text-gray-600">{{ optional($subscription->trial_ends_at)?->format('Y-m-d H:i') ?? '-' }}</td>
-                                    <td class="py-4">
-                                        <div class="flex flex-wrap gap-2">
-                                            @if ($subscription->status !== 'ended')
-                                                <button type="button" wire:click="endSubscription({{ $subscription->id }})" class="rounded-full border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700">
-                                                    Finalizar
-                                                </button>
-                                            @else
-                                                <button type="button" wire:click="renewSubscription({{ $subscription->id }})" class="rounded-full border border-emerald-300 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                                    Renovar
-                                                </button>
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="6" class="py-6 text-center text-gray-500">No hay suscripciones directas registradas.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <div class="flex items-end justify-between gap-4">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Bundles</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Asignaciones por bundle</h3>
-                    </div>
-                    <p class="text-sm text-gray-500">{{ $bundleMemberships->count() }} registros</p>
-                </div>
-
-                <div class="mt-6 overflow-x-auto">
-                    <table class="min-w-full divide-y divide-stone-200 text-sm">
-                        <thead>
-                            <tr class="text-left text-gray-500">
-                                <th class="pb-3 font-medium">Bundle</th>
-                                <th class="pb-3 font-medium">Plan asignado</th>
-                                <th class="pb-3 font-medium">Owner</th>
-                                <th class="pb-3 font-medium">Estado bundle</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-stone-100">
-                            @forelse ($bundleMemberships as $membership)
-                                <tr>
-                                    <td class="py-4 font-medium text-gray-900">{{ $membership->bundle?->name ?? 'Sin bundle' }}</td>
-                                    <td class="py-4 text-gray-600">{{ $membership->plan?->name ?? $membership->bundle?->subscriptions->first()?->plan?->name ?? '-' }}</td>
-                                    <td class="py-4 text-gray-600">{{ $membership->bundle?->owner?->name ?? '-' }}</td>
-                                    <td class="py-4 text-gray-600">{{ $membership->bundle?->status ?? '-' }}</td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="4" class="py-6 text-center text-gray-500">No hay bundles asociados a esta empresa.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <div class="flex items-end justify-between gap-4">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Catalogo</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Planes disponibles</h3>
-                    </div>
-                    <p class="text-sm text-gray-500">{{ $plans->count() }} planes</p>
-                </div>
-
-                <div class="mt-6 grid gap-4 xl:grid-cols-3">
-                    @foreach ($plans as $plan)
-                        <article class="rounded-xl border border-gray-200 p-5">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <h4 class="text-lg font-black text-gray-900">{{ $plan->name }}</h4>
-                                    <p class="text-sm text-gray-500">{{ $plan->code }} - {{ $plan->billing_period }}</p>
-                                </div>
-                                <x-status-badge color="amber">
-                                    ${{ $this->formatMoney($plan->base_price) }}
-                                </x-status-badge>
-                            </div>
-
-                            <div class="mt-4 space-y-3 text-sm">
-                                <div>
-                                    <p class="font-semibold text-gray-900">Modulos</p>
-                                    <p class="mt-1 text-gray-600">{{ $plan->modules->pluck('name')->implode(', ') }}</p>
-                                </div>
-                                <div>
-                                    <p class="font-semibold text-gray-900">Features</p>
-                                    <p class="mt-1 text-gray-600">{{ $plan->features->pluck('name')->implode(', ') }}</p>
-                                </div>
-                                @php
-                                    $limitLabels = [
-                                        'max_users' => 'Usuarios',
-                                        'max_companies' => 'Empresas',
-                                        'max_branches' => 'Sucursales',
-                                        'max_warehouses' => 'Bodegas',
-                                        'max_cash_registers' => 'Cajas',
-                                        'max_products' => 'Productos',
-                                        'max_monthly_sales' => 'Ventas/mes',
-                                        'max_electronic_documents' => 'Docs. electrónicos',
-                                    ];
-                                @endphp
-                                <div>
-                                    <p class="font-semibold text-gray-900">Limites</p>
-                                    <ul class="mt-1 space-y-1 text-gray-600">
-                                        @foreach ($plan->limits as $limit)
-                                            <li>{{ $limitLabels[$limit->limit_key] ?? $limit->limit_key }}: {{ number_format((int) $limit->limit_value) }}</li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            </div>
+                            @if ($plan->modules->isNotEmpty())
+                                <ul class="mt-4 space-y-1.5 text-xs text-gray-600">
+                                    @foreach ($plan->modules as $module)
+                                        <li class="flex items-center gap-1.5">
+                                            <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                                            {{ $module->name }}
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </article>
                     @endforeach
                 </div>
             </div>
+        @endif
+
+        {{-- Equipos en alquiler (solo lectura) --}}
+        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Hardware</p>
+            <h3 class="mt-2 text-2xl font-black text-gray-900">Equipos en alquiler</h3>
+            <p class="mt-1 text-sm text-gray-500">Impresora termica y lector de codigo de barras alquilados a esta empresa. La entrega y el alquiler los gestiona el equipo de {{ \App\Models\PlatformSetting::appName() }}, no se activan desde aqui.</p>
+
+            <div class="mt-5 space-y-4">
+                @foreach ($equipmentTypes as $type)
+                    @php
+                        $rentals = $this->activeEquipmentRentals($type);
+                        $requestedCount = $this->requestedEquipmentCount($type);
+                    @endphp
+                    <div class="rounded-lg border border-gray-200 p-4">
+                        <div class="flex items-center justify-between gap-4">
+                            <div>
+                                <p class="font-semibold text-gray-900">{{ $type->label() }}</p>
+                                <p class="text-xs text-gray-500">${{ $this->formatMoney(\App\Support\EquipmentRentalCatalog::monthlyPrice($type)) }}/mes por unidad</p>
+                            </div>
+
+                            @if ($rentals->count() > 0)
+                                <x-status-badge color="emerald">{{ $rentals->count() }} {{ \Illuminate\Support\Str::plural('unidad', $rentals->count()) }}</x-status-badge>
+                            @elseif ($requestedCount > 0)
+                                <x-status-badge color="amber">{{ $requestedCount }} solicitada(s)</x-status-badge>
+                            @else
+                                <x-status-badge color="stone">Sin alquiler</x-status-badge>
+                            @endif
+                        </div>
+
+                        @if ($rentals->count() > 0)
+                            <div class="mt-3 space-y-2">
+                                @foreach ($rentals as $rental)
+                                    @php
+                                        $months = $rental->monthsElapsed();
+                                        $recovered = $rental->amountRecovered();
+                                        $pct = min(100, (int) round(($recovered / (float) $rental->unit_cost) * 100));
+                                    @endphp
+                                    <div>
+                                        <div class="flex items-center justify-between text-xs text-gray-500">
+                                            <span>Unidad #{{ $rental->company_sequence }} — desde {{ $rental->started_at->format('d/m/Y') }}</span>
+                                            <span>{{ $months }} {{ \Illuminate\Support\Str::plural('mes', $months) }}</span>
+                                        </div>
+                                        <div class="mt-1 h-1.5 rounded-full bg-gray-100">
+                                            <div class="h-1.5 rounded-full bg-emerald-500" style="width: {{ $pct }}%"></div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
         </div>
-        </div>
+
     </div>
 </div>

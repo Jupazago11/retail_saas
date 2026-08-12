@@ -7,7 +7,7 @@ El usuario trabaja este proyecto desde dos maquinas distintas, cada una con su p
 | Dispositivo | Hostname WSL | Ruta del repo | Notas |
 |---|---|---|---|
 | Laptop (actual, mas usado) | `DESKTOP-7UR4OO1` | `/home/jupazago/repos/retail_saas` | Ubuntu 26.04 LTS, Docker 29.x, ~4 cores / ~5GB RAM asignados a WSL2. |
-| PC de escritorio (mas potente) | _pendiente de completar la primera vez que se use aca_ | _pendiente_ | _pendiente (specs, ruta real del repo, etc.)_ |
+| PC de escritorio (mas potente) | `DESKTOP-0GQDL6L` | `/home/jupazago/Documentos/saas/retail_saas` | Ubuntu 24.04.4 LTS (WSL2), Docker Engine 29.6.0 corriendo directo en WSL (no Docker Desktop — el pipe `dockerDesktopLinuxEngine` de Windows no aplica aca, usar `wsl.exe -e bash -lc "..."` o una terminal WSL nativa). Node del host es 18.19.1 (igual que el laptop, insuficiente para Vite 8: usar el servicio `vite` para build/dev). PHP 8.4.22 y Docker Compose v5.1.4 disponibles en el host WSL. Este PC ya tenia contenedores y el volumen `retail_saas_postgres_data` de una sesion previa (~6 semanas de antiguedad, ultimo uso hace 4 dias) aunque nunca se documento aqui — no era realmente "primera vez". |
 
 **Como saber en cual estamos ahora mismo:** correr `hostname` en la terminal WSL y comparar con la tabla. La primera vez que se trabaje desde el PC de escritorio, completar esa fila (hostname, ruta, specs) en el mismo commit que cualquier otro cambio.
 

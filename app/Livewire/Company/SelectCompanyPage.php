@@ -4,10 +4,14 @@ namespace App\Livewire\Company;
 
 use App\Actions\Companies\CreateCompany;
 use App\Livewire\Concerns\InteractsWithToast;
+use App\Mail\NewAccountRegisteredMail;
+use App\Models\PlatformSetting;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Component;
 
 class SelectCompanyPage extends Component
@@ -52,6 +56,20 @@ class SelectCompanyPage extends Component
 
         $currentCompany->setForUser(Auth::user(), $company);
         $this->flashToast('Empresa creada y seleccionada correctamente.');
+
+        // Aviso al administrador de la plataforma, solo cuando esta es la
+        // primera empresa del usuario (recien registrado): antes de este
+        // punto no existia un plan que informar.
+        if (Auth::user()->companies()->count() === 1) {
+            $planName = $company->subscriptions()->with('plan')->latest('id')->first()?->plan?->name ?? 'Sin plan';
+
+            try {
+                Mail::to(PlatformSetting::ownerNotificationEmail())
+                    ->send(new NewAccountRegisteredMail(Auth::user(), $planName));
+            } catch (\Throwable $e) {
+                Log::error('No se pudo enviar el aviso de nueva cuenta al administrador.', ['user_id' => Auth::id(), 'error' => $e->getMessage()]);
+            }
+        }
 
         return $this->redirectRoute('dashboard', navigate: true);
     }

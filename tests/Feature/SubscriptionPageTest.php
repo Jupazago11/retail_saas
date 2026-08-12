@@ -5,8 +5,8 @@ namespace Tests\Feature;
 use App\Actions\Companies\CreateCompany;
 use App\Enums\RecordStatus;
 use App\Livewire\Admin\SubscriptionPage;
+use App\Models\PlatformSetting;
 use App\Models\RoleTemplate;
-use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,7 +17,7 @@ class SubscriptionPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_subscription_page_can_replace_direct_subscription_for_current_company(): void
+    public function test_subscription_page_shows_current_plan_and_other_plans_as_a_carousel(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
@@ -27,85 +27,31 @@ class SubscriptionPageTest extends TestCase
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
-        $proPlanId = \App\Models\Plan::query()->where('code', 'pro')->value('id');
-
         Livewire::test(SubscriptionPage::class)
+            ->assertSee('Tu plan actual')
             ->assertSee('Basic')
-            ->set('selectedPlanId', (string) $proPlanId)
-            ->set('subscriptionStatus', 'active')
-            ->set('startsAt', now()->format('Y-m-d\TH:i'))
-            ->call('saveSubscription')
-            ->assertHasNoErrors()
-            ->assertSee('Pro');
-
-        $company->refresh();
-
-        $this->assertDatabaseHas('subscriptions', [
-            'company_id' => $company->id,
-            'plan_id' => $proPlanId,
-            'status' => 'active',
-        ]);
-        $this->assertDatabaseHas('subscriptions', [
-            'company_id' => $company->id,
-            'status' => 'ended',
-        ]);
-        $this->assertDatabaseHas('audit_logs', [
-            'company_id' => $company->id,
-            'action' => 'subscription.created',
-        ]);
-        $this->assertDatabaseHas('audit_logs', [
-            'company_id' => $company->id,
-            'action' => 'subscription.ended',
-        ]);
-
-        $this->assertSame('pro', app(\App\Services\Plans\CompanyPlanResolver::class)->snapshot($company)['plan']?->code);
+            ->assertSee('Otros planes disponibles')
+            ->assertSee('Pro')
+            ->assertSee('Premium')
+            ->assertDontSee('Guardar suscripcion')
+            ->assertDontSee('Historial directo');
     }
 
-    public function test_subscription_page_can_end_and_renew_direct_subscription(): void
+    public function test_subscription_page_shows_the_whatsapp_link_for_payment_proof(): void
     {
+        PlatformSetting::set('contact_phone', '3135721225');
+
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
-            'legal_name' => 'Suscripcion Lifecycle SAS',
+            'legal_name' => 'Suscripcion WhatsApp SAS',
         ]);
 
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
-        $initialSubscription = Subscription::query()
-            ->where('company_id', $company->id)
-            ->whereNull('bundle_id')
-            ->latest('id')
-            ->firstOrFail();
-
         Livewire::test(SubscriptionPage::class)
-            ->call('endSubscription', $initialSubscription->id)
-            ->assertHasNoErrors();
-
-        $initialSubscription->refresh();
-
-        $this->assertSame('ended', $initialSubscription->status);
-        $this->assertNotNull($initialSubscription->ends_at);
-        $this->assertDatabaseHas('audit_logs', [
-            'company_id' => $company->id,
-            'action' => 'subscription.ended',
-            'auditable_id' => $initialSubscription->id,
-        ]);
-
-        Livewire::test(SubscriptionPage::class)
-            ->call('renewSubscription', $initialSubscription->id)
-            ->assertHasNoErrors()
-            ->assertSee('Basic');
-
-        $this->assertDatabaseCount('subscriptions', 2);
-        $this->assertDatabaseHas('subscriptions', [
-            'company_id' => $company->id,
-            'plan_id' => $initialSubscription->plan_id,
-            'status' => 'active',
-        ]);
-        $this->assertDatabaseHas('audit_logs', [
-            'company_id' => $company->id,
-            'action' => 'subscription.created',
-        ]);
+            ->assertSee('573135721225')
+            ->assertSee('WhatsApp');
     }
 
     public function test_subscription_page_route_is_forbidden_without_settings_manage_permission(): void

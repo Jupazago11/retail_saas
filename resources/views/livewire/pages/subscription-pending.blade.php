@@ -97,7 +97,13 @@
                                 <span class="font-semibold text-gray-900">{{ $contactEmail }}</span>
                             @endif
                             @if ($contactPhone)
-                                o al <span class="font-semibold text-gray-900">{{ $contactPhone }}</span>
+                                o al
+                                @php($whatsappUrl = \App\Models\PlatformSetting::whatsappUrl('Hola, quiero enviar el comprobante de pago de mi empresa.'))
+                                @if ($whatsappUrl !== '')
+                                    <a href="{{ $whatsappUrl }}" target="_blank" rel="noopener" class="font-semibold text-emerald-700 underline">{{ $contactPhone }} (WhatsApp)</a>
+                                @else
+                                    <span class="font-semibold text-gray-900">{{ $contactPhone }}</span>
+                                @endif
                             @endif
                             y activaremos tu cuenta en menos de 24 horas habiles.
                         </p>

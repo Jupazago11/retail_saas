@@ -12,7 +12,7 @@ class WelcomeUserMail extends Mailable
 
     /**
      * Se envia de forma sincrona (no implementa ShouldQueue) a proposito:
-     * contiene la contrasena en texto plano y encolarla la dejaria un rato
+     * contiene la contraseña en texto plano y encolarla la dejaria un rato
      * en la tabla `jobs` sin cifrar hasta que el worker la procese.
      */
     public function __construct(public User $user, public string $plainPassword)

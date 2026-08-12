@@ -43,7 +43,8 @@ class PlatformSubscriptionsPageTest extends TestCase
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, ['legal_name' => 'Toggle SAS']);
 
-        $this->assertFalse($company->fresh()->auto_renew);
+        // Las empresas nuevas quedan con auto-renovacion activada por defecto.
+        $this->assertTrue($company->fresh()->auto_renew);
 
         $this->actingAs($platformAdmin);
 
@@ -51,7 +52,7 @@ class PlatformSubscriptionsPageTest extends TestCase
             ->call('toggleAutoRenew', $company->id)
             ->assertHasNoErrors();
 
-        $this->assertTrue($company->fresh()->auto_renew);
+        $this->assertFalse($company->fresh()->auto_renew);
     }
 
     public function test_non_platform_admin_cannot_access_the_page(): void

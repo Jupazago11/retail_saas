@@ -56,6 +56,10 @@
                                                 <td style="padding:5px 0; font-size:14px; font-weight:600; color:#111827;">{{ $user->email }}</td>
                                             </tr>
                                             <tr>
+                                                <td style="padding:5px 12px 5px 0; font-size:13px; color:#6b7280; white-space:nowrap;">Plan</td>
+                                                <td style="padding:5px 0; font-size:14px; font-weight:600; color:#111827;">{{ $planName }}</td>
+                                            </tr>
+                                            <tr>
                                                 <td style="padding:5px 12px 5px 0; font-size:13px; color:#6b7280; white-space:nowrap;">Fecha</td>
                                                 <td style="padding:5px 0; font-size:14px; font-weight:600; color:#111827;">{{ $user->created_at->timezone(config('app.timezone'))->translatedFormat('d/m/Y H:i') }}</td>
                                             </tr>

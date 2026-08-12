@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\RecordStatus;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,14 @@ class AuthenticatedSessionController
 
             throw ValidationException::withMessages([
                 'username' => trans('auth.failed'),
+            ]);
+        }
+
+        if (Auth::user()->status !== RecordStatus::Active->value) {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'username' => 'Tu cuenta esta inactiva. Contacta al administrador.',
             ]);
         }
 

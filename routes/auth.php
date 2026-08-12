@@ -27,6 +27,9 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', LogoutController::class)
         ->name('logout');
 
+    Volt::route('cambiar-contrasena', 'pages.auth.force-password-change')
+        ->name('password.force-update');
+
     Volt::route('verify-email', 'pages.auth.verify-email')
         ->name('verification.notice');
 

@@ -1,61 +1,99 @@
 <?php
 
-use Illuminate\Support\Facades\Password;
+use App\Mail\PasswordRecoveredMail;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Volt\Component;
 
 new #[Layout('layouts.guest')] class extends Component
 {
-    public string $email = '';
+    public string $login = '';
 
     /**
-     * Send a password reset link to the provided email address.
+     * Genera una contraseña nueva para la cuenta encontrada (por usuario o
+     * correo) y la envia al correo registrado. Las contraseñas se guardan
+     * con hash de un solo sentido, asi que la contraseña anterior no se
+     * puede leer ni reenviar: en su lugar se reemplaza por una nueva.
      */
-    public function sendPasswordResetLink(): void
+    public function sendNewPassword(): void
     {
         $this->validate([
-            'email' => ['required', 'string', 'email'],
+            'login' => ['required', 'string', 'max:255'],
         ]);
 
-        // We will send the password reset link to this user. Once we have attempted
-        // to send the link, we will examine the response then see the message we
-        // need to show to the user. Finally, we'll send out a proper response.
-        $status = Password::sendResetLink(
-            $this->only('email')
-        );
+        $identifier = Str::lower(trim($this->login));
+        $throttleKey = Str::transliterate($identifier.'|'.request()->ip());
 
-        if ($status != Password::RESET_LINK_SENT) {
-            $this->addError('email', __($status));
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+
+            $this->addError('login', 'Demasiados intentos. Intenta de nuevo en '.ceil($seconds / 60).' minuto(s).');
 
             return;
         }
 
-        $this->reset('email');
+        RateLimiter::hit($throttleKey, 300);
 
-        session()->flash('status', __($status));
+        $user = User::query()
+            ->where('username', $identifier)
+            ->orWhere('email', $identifier)
+            ->first();
+
+        if ($user) {
+            $newPassword = Str::password(12);
+
+            $user->forceFill([
+                'password' => Hash::make($newPassword),
+                'remember_token' => Str::random(60),
+                'must_change_password' => true,
+            ])->save();
+
+            try {
+                Mail::to($user->email)->send(new PasswordRecoveredMail($user, $newPassword));
+            } catch (\Throwable $e) {
+                Log::error('No se pudo enviar el correo de recuperacion de contraseña.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
+            }
+        }
+
+        $this->reset('login');
+
+        // Mensaje generico a proposito, exista o no el usuario/correo: evita
+        // que alguien pueda usar este formulario para averiguar que cuentas existen.
+        session()->flash('status', 'Si el usuario o correo existe, enviamos una contraseña nueva a su correo registrado.');
     }
 }; ?>
 
 <div>
     <div class="mb-4 text-sm text-gray-600">
-        Ingresa tu correo electronico y te enviaremos un enlace para restablecer tu contrasena.
+        Ingresa tu usuario o correo electronico y te enviaremos una contraseña nueva al correo registrado en tu cuenta.
     </div>
 
     <!-- Session Status -->
     <x-auth-session-status class="mb-4" :status="session('status')" />
 
-    <form wire:submit="sendPasswordResetLink">
-        <!-- Email Address -->
+    <form wire:submit="sendNewPassword">
         <div>
-            <x-input-label for="email" value="Correo electronico" />
-            <x-text-input wire:model="email" id="email" class="block mt-1 w-full" type="email" name="email" required autofocus />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
+            <x-input-label for="login" value="Usuario o correo electronico" />
+            <x-text-input wire:model="login" id="login" class="block mt-1 w-full" type="text" name="login" required autofocus />
+            <x-input-error :messages="$errors->get('login')" class="mt-2" />
         </div>
 
         <div class="flex items-center justify-end mt-4">
             <x-primary-button>
-                Enviar enlace de recuperacion
+                Enviar contraseña nueva
             </x-primary-button>
         </div>
     </form>
+
+    <p class="mt-6 text-center text-sm text-gray-600">
+        ¿Ya la recordaste?
+        <a class="font-semibold text-blue-600 hover:text-blue-700" href="{{ route('login') }}" wire:navigate>
+            Iniciar sesion
+        </a>
+    </p>
 </div>

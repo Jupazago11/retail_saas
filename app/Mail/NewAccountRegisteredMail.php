@@ -17,7 +17,7 @@ class NewAccountRegisteredMail extends Mailable
      * literalmente el proposito de este correo, y un worker caido no
      * debe dejarlo atrapado en la tabla `jobs` sin que nadie se entere.
      */
-    public function __construct(public User $user)
+    public function __construct(public User $user, public string $planName)
     {
     }
 

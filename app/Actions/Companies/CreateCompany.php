@@ -37,6 +37,7 @@ class CreateCompany
                 'slug' => $this->buildUniqueSlug($attributes['display_name'] ?? $attributes['legal_name']),
                 'tax_id' => $attributes['tax_id'] ?? null,
                 'status' => RecordStatus::Active->value,
+                'auto_renew' => true,
             ]);
 
             $ownerTemplateId = RoleTemplate::query()

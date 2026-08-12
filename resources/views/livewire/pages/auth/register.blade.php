@@ -1,8 +1,6 @@
 <?php
 
-use App\Mail\NewAccountRegisteredMail;
 use App\Mail\WelcomeUserMail;
-use App\Models\PlatformSetting;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Auth;
@@ -54,13 +52,9 @@ new #[Layout('layouts.guest')] class extends Component
         event(new Registered($user = User::create($validated)));
 
         // El envio de correos nunca debe bloquear ni tumbar el registro:
-        // si el SMTP falla, solo queda en el log.
-        try {
-            Mail::to(PlatformSetting::ownerNotificationEmail())->send(new NewAccountRegisteredMail($user));
-        } catch (\Throwable $e) {
-            Log::error('No se pudo enviar el aviso de nueva cuenta al administrador.', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-        }
-
+        // si el SMTP falla, solo queda en el log. El aviso al administrador
+        // se envia despues, cuando el usuario crea su empresa y ya se sabe
+        // que plan le quedo asignado (ver SelectCompanyPage::createCompany).
         try {
             Mail::to($user->email)->send(new WelcomeUserMail($user, $plainPassword));
         } catch (\Throwable $e) {
@@ -96,7 +90,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         <!-- Password -->
         <div class="mt-4">
-            <x-input-label for="password" value="Contrasena" />
+            <x-input-label for="password" value="Contraseña" />
 
             <x-text-input wire:model="password" id="password" class="block mt-1 w-full"
                             type="password"
@@ -108,7 +102,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         <!-- Confirm Password -->
         <div class="mt-4">
-            <x-input-label for="password_confirmation" value="Confirmar contrasena" />
+            <x-input-label for="password_confirmation" value="Confirmar contraseña" />
 
             <x-text-input wire:model="password_confirmation" id="password_confirmation" class="block mt-1 w-full"
                             type="password"

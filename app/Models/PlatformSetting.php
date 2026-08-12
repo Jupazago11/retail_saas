@@ -31,4 +31,31 @@ class PlatformSetting extends Model
     {
         return static::get('owner_notification_email', 'jupazago11@gmail.com');
     }
+
+    /**
+     * Link de WhatsApp (wa.me) hacia el numero de soporte configurado en
+     * "Telefono / WhatsApp". Normaliza el numero a formato internacional
+     * (agrega el indicativo 57 de Colombia si el numero guardado son 10
+     * digitos sin el).
+     */
+    public static function whatsappUrl(?string $message = null): string
+    {
+        $digits = preg_replace('/\D+/', '', static::get('contact_phone', config('platform.contact_phone', '')));
+
+        if ($digits === '') {
+            return '';
+        }
+
+        if (strlen($digits) === 10) {
+            $digits = '57'.$digits;
+        }
+
+        $url = "https://wa.me/{$digits}";
+
+        if ($message !== null && $message !== '') {
+            $url .= '?text='.rawurlencode($message);
+        }
+
+        return $url;
+    }
 }

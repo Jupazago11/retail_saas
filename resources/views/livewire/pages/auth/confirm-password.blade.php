@@ -35,13 +35,13 @@ new #[Layout('layouts.guest')] class extends Component
 
 <div>
     <div class="mb-4 text-sm text-gray-600">
-        Esta es un area segura de la aplicacion. Confirma tu contrasena para continuar.
+        Esta es un area segura de la aplicacion. Confirma tu contraseña para continuar.
     </div>
 
     <form wire:submit="confirmPassword">
         <!-- Password -->
         <div>
-            <x-input-label for="password" value="Contrasena" />
+            <x-input-label for="password" value="Contraseña" />
 
             <x-text-input wire:model="password"
                           id="password"

@@ -60,6 +60,25 @@ return [
             'report' => false,
         ],
 
+        // Cloudflare R2 (S3-compatible): fotos de comprobantes de pago.
+        // Variables R2_* en .env — ver el comentario ahi para como llenarlas.
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => env('R2_REGION', 'auto'),
+            'bucket' => env('R2_BUCKET'),
+            'url' => env('R2_URL'),
+            'endpoint' => env('R2_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            // A diferencia del disco "s3" generico de arriba, aqui SI
+            // queremos que un fallo real lance excepcion: es donde viven
+            // los comprobantes de pago, un fallo silencioso seria peor que
+            // un error visible.
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

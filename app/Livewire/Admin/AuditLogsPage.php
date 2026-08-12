@@ -107,6 +107,7 @@ class AuditLogsPage extends Component
             'App\\Models\\InventoryTransfer' => 'Traslado',
             'App\\Models\\FrozenSale' => 'Venta congelada',
             'App\\Models\\Promotion' => 'Promocion',
+            'App\\Models\\EquipmentRental' => 'Alquiler de equipo',
             default => class_basename($type),
         };
     }

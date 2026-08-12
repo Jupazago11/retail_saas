@@ -30,6 +30,8 @@ class ChangeCompanySubscription
         $startsAt = $attributes['starts_at'] ?? now();
         $trialDays = max(1, (int) ($attributes['trial_days'] ?? 14));
         $endsAt = $attributes['ends_at'] ?? null;
+        $paidAt = $attributes['paid_at'] ?? null;
+        $paymentReference = $attributes['payment_reference'] ?? null;
 
         if (! in_array($status, ['active', 'trialing'], true)) {
             throw new InvalidArgumentException('El estado de la suscripcion no es valido.');
@@ -50,7 +52,7 @@ class ChangeCompanySubscription
             default => Carbon::parse((string) $endsAt),
         };
 
-        return DB::transaction(function () use ($company, $plan, $status, $startsAt, $endsAt, $trialDays, $actor) {
+        return DB::transaction(function () use ($company, $plan, $status, $startsAt, $endsAt, $trialDays, $paidAt, $paymentReference, $actor) {
             $activeDirectSubscription = Subscription::query()
                 ->with('plan')
                 ->where('company_id', $company->id)
@@ -105,6 +107,8 @@ class ChangeCompanySubscription
                 'trial_ends_at' => $status === 'trialing'
                     ? $startsAt->copy()->addDays($trialDays)
                     : null,
+                'paid_at' => $paidAt,
+                'payment_reference' => $paymentReference,
                 'billing_snapshot' => [
                     'plan_code' => $plan->code,
                     'billing_period' => $plan->billing_period,

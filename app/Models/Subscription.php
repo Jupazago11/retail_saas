@@ -18,6 +18,8 @@ class Subscription extends Model
         'starts_at',
         'ends_at',
         'trial_ends_at',
+        'paid_at',
+        'payment_reference',
         'billing_snapshot',
     ];
 
@@ -27,8 +29,14 @@ class Subscription extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'trial_ends_at' => 'datetime',
+            'paid_at' => 'datetime',
             'billing_snapshot' => 'array',
         ];
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->paid_at !== null;
     }
 
     public function company(): BelongsTo
@@ -49,6 +57,11 @@ class Subscription extends Model
     public function couponRedemptions(): HasMany
     {
         return $this->hasMany(CouponRedemption::class);
+    }
+
+    public function paymentAttachments(): HasMany
+    {
+        return $this->hasMany(PaymentAttachment::class);
     }
 
     public function isPastDue(): bool

@@ -51,6 +51,11 @@ class Company extends Model
         return $this->hasMany(Branch::class);
     }
 
+    public function equipmentRentals(): HasMany
+    {
+        return $this->hasMany(EquipmentRental::class);
+    }
+
     public function warehouses(): HasMany
     {
         return $this->hasMany(Warehouse::class);

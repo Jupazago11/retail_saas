@@ -20,45 +20,63 @@
                 <table class="min-w-full divide-y divide-stone-200 text-sm">
                     <thead>
                         <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                            <th class="pb-2">Usuario</th>
-                            <th class="pb-2">Email</th>
-                            <th class="pb-2 w-px whitespace-nowrap">Empresas</th>
-                            <th class="pb-2 w-px whitespace-nowrap">Registro</th>
-                            <th class="pb-2 w-px whitespace-nowrap">Rol plataforma</th>
-                            <th class="pb-2 w-px whitespace-nowrap text-right">Acción</th>
+                            <th class="py-2 pl-0 pr-4">Usuario</th>
+                            <th class="px-4 py-2">Email</th>
+                            <th class="px-4 py-2 w-px whitespace-nowrap text-center">Empresas</th>
+                            <th class="px-4 py-2 w-px whitespace-nowrap">Registro</th>
+                            <th class="px-4 py-2 w-px whitespace-nowrap">Rol plataforma</th>
+                            <th class="px-4 py-2 w-px whitespace-nowrap">Estado</th>
+                            <th class="pl-4 pr-0 py-2 w-px whitespace-nowrap text-right">Acción</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-stone-100">
                         @forelse ($users as $user)
                             <tr wire:key="user-{{ $user->id }}" class="even:bg-gray-50">
-                                <td class="py-3 align-middle">
+                                <td class="py-3 pl-0 pr-4 align-middle">
                                     <p class="font-semibold text-gray-900">{{ $user->name }}</p>
-                                    <p class="text-xs text-gray-400">@{{ $user->username }}</p>
+                                    <p class="text-xs text-gray-400">{{ '@'.$user->username }}</p>
                                 </td>
-                                <td class="py-3 align-middle text-xs text-gray-600">{{ $user->email ?? '—' }}</td>
-                                <td class="py-3 align-middle text-center text-xs text-gray-600 w-px whitespace-nowrap">
+                                <td class="px-4 py-3 align-middle text-xs text-gray-600">{{ $user->email ?? '—' }}</td>
+                                <td class="px-4 py-3 align-middle text-center text-xs text-gray-600 w-px whitespace-nowrap">
                                     {{ $user->companies_count }}
                                 </td>
-                                <td class="py-3 align-middle text-xs text-gray-400 w-px whitespace-nowrap">
+                                <td class="px-4 py-3 align-middle text-xs text-gray-400 w-px whitespace-nowrap">
                                     {{ $user->created_at->format('d/m/Y') }}
                                 </td>
-                                <td class="py-3 align-middle w-px whitespace-nowrap">
+                                <td class="px-4 py-3 align-middle w-px whitespace-nowrap">
                                     @if ($user->is_platform_admin)
                                         <x-status-badge color="amber">superadmin</x-status-badge>
                                     @else
                                         <x-status-badge color="stone">usuario</x-status-badge>
                                     @endif
                                 </td>
-                                <td class="py-3 align-middle w-px whitespace-nowrap text-right">
-                                    <button wire:click="startResetPassword({{ $user->id }})"
-                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
-                                        Restablecer contraseña
+                                <td class="px-4 py-3 align-middle w-px whitespace-nowrap">
+                                    <button type="button" wire:click="toggleStatus({{ $user->id }})"
+                                        title="Clic para {{ $user->status === 'active' ? 'desactivar' : 'activar' }}"
+                                        class="transition hover:opacity-75">
+                                        @if ($user->status === 'active')
+                                            <x-status-badge color="emerald">Activo</x-status-badge>
+                                        @else
+                                            <x-status-badge color="rose">Inactivo</x-status-badge>
+                                        @endif
                                     </button>
+                                </td>
+                                <td class="pl-4 pr-0 py-3 align-middle w-px whitespace-nowrap text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button wire:click="startEditUser({{ $user->id }})" title="Editar usuario"
+                                            class="inline-flex items-center justify-center rounded-full border border-gray-300 p-1.5 text-gray-500 transition hover:border-blue-400 hover:text-blue-700">
+                                            <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                        </button>
+                                        <button wire:click="startResetPassword({{ $user->id }})"
+                                            class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
+                                            Restablecer contraseña
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-10 text-center text-xs text-gray-400">Sin usuarios.</td>
+                                <td colspan="7" class="py-10 text-center text-xs text-gray-400">Sin usuarios.</td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -149,6 +167,52 @@
                     </div>
                 @endif
 
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal editar usuario --}}
+    @if ($showEditModal)
+        <div class="fixed inset-0 z-50 bg-black/40"></div>
+
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" wire:click="closeEditModal">
+            <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl ring-1 ring-gray-200" wire:click.stop>
+                <h3 class="text-lg font-black text-gray-900">Editar usuario</h3>
+                <p class="mt-1 text-xs text-gray-400">Actualiza nombre, usuario o correo.</p>
+
+                <div class="mt-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <input wire:model="editName" type="text"
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                        @error('editName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Usuario</label>
+                        <input wire:model="editUsername" type="text"
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                        @error('editUsername') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Correo</label>
+                        <input wire:model="editEmail" type="email"
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                        @error('editEmail') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button wire:click="closeEditModal"
+                        class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button wire:click="saveEditUser"
+                        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
+                        Guardar
+                    </button>
+                </div>
             </div>
         </div>
     @endif

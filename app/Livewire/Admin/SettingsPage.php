@@ -70,10 +70,18 @@ class SettingsPage extends Component
             'require_customer_for_credit_sale' => fn () => $hasModule('credit'),
         ];
 
+        // Personalizacion de marca (logo, color) por empresa: ocultada a
+        // proposito por ahora, todavia no se va a habilitar.
+        $hiddenKeys = ['general.logo_path', 'general.primary_color'];
+
         return collect(CompanySettingCatalog::definitions())
-            ->filter(function (array $definition) use ($hasModule, $groupModules, $posKeyGates) {
+            ->filter(function (array $definition) use ($hasModule, $groupModules, $posKeyGates, $hiddenKeys) {
                 $group = $definition['group'];
                 $key   = $definition['key'];
+
+                if (in_array("{$group}.{$key}", $hiddenKeys, true)) {
+                    return false;
+                }
 
                 if (isset($groupModules[$group])) {
                     return $hasModule($groupModules[$group]);
