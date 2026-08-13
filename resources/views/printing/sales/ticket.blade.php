@@ -31,10 +31,18 @@
             box-shadow: 0 16px 40px rgba(28, 25, 23, 0.10);
         }
 
+        {{-- El rollo mide 58mm/80mm pero el cabezal de la impresora
+        termica solo imprime dentro de un area mas angosta (48mm/72mm
+        segun el driver de Windows) — lo que quede fuera de esa franja
+        central simplemente no se imprime, cortando texto cerca del
+        borde derecho. Por eso el ancho del contenido es menor al del
+        papel; el sobrante queda como margen en blanco (centrado via
+        `margin: 0 auto` en @media print) dentro de la zona no
+        imprimible. --}}
         .sheet.thermal_58mm {
-            width: 58mm;
-            max-width: 58mm;
-            padding: 12px 8px 16px;
+            width: 48mm;
+            max-width: 48mm;
+            padding: 12px 4px 16px;
             font-size: 11px;
         }
 
@@ -47,9 +55,9 @@
         }
 
         .sheet.thermal_80mm {
-            width: 80mm;
-            max-width: 80mm;
-            padding: 16px 12px 20px;
+            width: 72mm;
+            max-width: 72mm;
+            padding: 16px 6px 20px;
         }
 
         .sheet.letter_a4 {
@@ -86,16 +94,48 @@
         }
 
         .company-line,
-        .meta-line,
         .footer-line {
             margin: 4px 0;
             color: var(--muted);
             font-size: 12px;
         }
 
+        {{-- El espaciado de este bloque lo controla solo el `gap` del
+        grid (sin margin propio) para que sea un unico numero facil de
+        ajustar, en vez de sumar margin + gap + line-height. --}}
+        .meta-line {
+            margin: 0;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
         .meta-grid {
             display: grid;
-            gap: 8px;
+            gap: 10px;
+        }
+
+        {{-- El scanner laser lee el codigo de barras directo del papel;
+        el texto debajo es respaldo por si el scanner falla o alguien
+        necesita buscar el numero a mano en el campo "Buscar" de
+        Ventas registradas. --}}
+        .barcode {
+            margin: 14px 0;
+            text-align: center;
+        }
+
+        .barcode svg {
+            display: block;
+            width: 100%;
+            max-width: 220px;
+            height: auto;
+            margin: 0 auto;
+        }
+
+        .barcode-text {
+            margin: 4px 0 0;
+            font-size: 11px;
+            letter-spacing: 0.08em;
+            color: var(--muted);
         }
 
         .items {
@@ -107,16 +147,22 @@
         .items th,
         .items td {
             text-align: left;
-            padding: 6px 0;
+            padding: 6px 4px;
             vertical-align: top;
             font-size: 12px;
             border-bottom: 1px solid #f5f5f4;
+        }
+
+        .items th:first-child,
+        .items td:first-child {
+            padding-left: 0;
         }
 
         .items th:last-child,
         .items td:last-child,
         .totals-row span:last-child {
             text-align: right;
+            padding-right: 0;
         }
 
         .items th:nth-child(2),
@@ -126,6 +172,7 @@
         .items th:nth-child(4),
         .items td:nth-child(4) {
             text-align: right;
+            white-space: nowrap;
         }
 
         .totals-row {
@@ -161,6 +208,58 @@
             letter-spacing: 0.08em;
             text-transform: uppercase;
         }
+
+        {{-- El fondo gris y la sombra son solo para la vista previa en
+        pantalla: en papel desperdician tinta y pueden confundir al
+        recortador de la impresora termica. El tamano de pagina se ajusta
+        al formato configurado para que el navegador no intente encajar
+        el ticket en una hoja carta/A4. --}}
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            .sheet {
+                margin: 0 auto;
+                box-shadow: none;
+            }
+
+            @if (in_array($ticketFormat, ['thermal_58mm', 'thermal_80mm'], true))
+                {{-- Las impresoras termicas son de 1 bit (blanco o negro,
+                sin escala de grises real): un color gris o café claro como
+                --muted/--line/--brand se convierte en un punteado disperso
+                de puntos negros ("dithering"), que es justo lo que se ve
+                borroso en el papel aunque en pantalla se vea nitido. Se
+                fuerza todo a negro solido solo para el formato termico. --}}
+                * {
+                    color: #000 !important;
+                    border-color: #000 !important;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                .header,
+                .meta,
+                .totals,
+                .footer {
+                    border-bottom-style: solid;
+                }
+
+                .brand-chip {
+                    background: #fff !important;
+                    border: 1px solid #000;
+                }
+            @endif
+        }
+
+        @page {
+            size: {{ match ($ticketFormat) {
+                'thermal_58mm' => '58mm auto',
+                'thermal_80mm' => '80mm auto',
+                default => 'auto',
+            } }};
+            margin: {{ in_array($ticketFormat, ['thermal_58mm', 'thermal_80mm'], true) ? '0' : '12mm' }};
+        }
     </style>
 </head>
 <body>
@@ -188,9 +287,16 @@
 
         <section class="meta">
             <div class="meta-grid">
-                <p class="meta-line">{{ $sale->document_number }} | {{ strtoupper($sale->sale_type) }}</p>
+                <p class="meta-line">{{ $sale->document_number }} | {{ $sale->sale_type === 'credit' ? 'CREDITO' : strtoupper($sale->sale_type) }}</p>
                 <p class="meta-line">Interno: Venta #{{ $sale->id }}</p>
-                <p class="meta-line">Estado: {{ strtoupper($sale->status) }}</p>
+                <p class="meta-line">Estado: {{ match ($sale->status) {
+                    'draft' => 'Borrador',
+                    'confirmed' => 'Confirmada',
+                    'partially_returned' => 'Parcialmente devuelta',
+                    'returned' => 'Devuelta',
+                    'cancelled' => 'Anulada',
+                    default => $sale->status,
+                } }}</p>
                 <p class="meta-line">Fecha: {{ optional($sale->sold_at)->format('Y-m-d H:i') ?? $sale->created_at->format('Y-m-d H:i') }}</p>
                 @if ($sale->branch)
                     <p class="meta-line">Sucursal: {{ $sale->branch->name }}</p>
@@ -206,6 +312,13 @@
                 @endif
             </div>
         </section>
+
+        @if ($barcodeSvg)
+            <section class="barcode">
+                {!! $barcodeSvg !!}
+                <p class="barcode-text">{{ $sale->document_number }}</p>
+            </section>
+        @endif
 
         <table class="items">
             <thead>

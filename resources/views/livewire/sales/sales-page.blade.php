@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-sales-nav />
+        <x-sales-nav active="sales.index" />
 
         {{-- Stats --}}
         <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -37,6 +37,12 @@
                             class="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
                             Ir al POS
                         </a>
+                    @endif
+                    @if ($this->canManageRules())
+                        <button type="button" wire:click="openRulesModal"
+                            class="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-700">
+                            Reglas
+                        </button>
                     @endif
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar…"
                         class="h-8 rounded-full border-gray-200 px-4 text-xs focus:border-blue-400 focus:ring-0">
@@ -207,4 +213,151 @@
             </div>
         </div>
     </div>
+
+    @if ($this->canManageRules())
+        <div x-data x-show="$wire.showRulesModal"
+            x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+            x-cloak
+            wire:click.self="closeRulesModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style="background: rgba(0,0,0,0.5);">
+                <div x-show="$wire.showRulesModal"
+                    x-transition:enter="transition ease-out duration-200 delay-75" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                    class="w-full max-w-md rounded-xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
+
+                    {{-- Header pinned --}}
+                    <div class="flex-shrink-0 flex items-center justify-between border-b border-stone-100 px-5 py-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-widest text-blue-700">Reglas</p>
+                            <h3 class="mt-0.5 text-lg font-black text-gray-900">Ventas</h3>
+                        </div>
+                        <button wire:click="closeRulesModal" class="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">&times;</button>
+                    </div>
+
+                    {{-- Form: scrollable body + pinned footer --}}
+                    <form wire:submit="saveRules" class="flex flex-col flex-1 min-h-0">
+                        <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                            @if ($ruleFeatureGates['frozen_sales'] ?? false)
+                                <label class="flex items-start gap-3">
+                                    <input wire:model="ruleFrozenSalesEnabled" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span>
+                                        <span class="block text-sm font-medium text-gray-900">Permitir ventas congeladas</span>
+                                        <span class="block text-xs text-gray-500">Deja poner en espera una venta en curso y retomarla despues.</span>
+                                    </span>
+                                </label>
+                            @endif
+
+                            @if ($ruleFeatureGates['alternative_prices'] ?? false)
+                                <label class="flex items-start gap-3">
+                                    <input wire:model="ruleAllowAlternativePrices" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span>
+                                        <span class="block text-sm font-medium text-gray-900">Permitir precios alternos</span>
+                                        <span class="block text-xs text-gray-500">El cajero puede elegir entre precio 1, 2 o 3 al vender.</span>
+                                    </span>
+                                </label>
+                            @endif
+
+                            @if ($ruleFeatureGates['manual_discounts'] ?? false)
+                                <label class="flex items-start gap-3">
+                                    <input wire:model="ruleAllowManualDiscounts" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span>
+                                        <span class="block text-sm font-medium text-gray-900">Permitir descuentos manuales</span>
+                                        <span class="block text-xs text-gray-500">El cajero puede aplicar un descuento libre en la venta.</span>
+                                    </span>
+                                </label>
+                            @endif
+
+                            @if ($ruleFeatureGates['promotion_stacking'] ?? false)
+                                <label class="flex items-start gap-3">
+                                    <input wire:model="ruleAllowPromotionStacking" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span>
+                                        <span class="block text-sm font-medium text-gray-900">Permitir apilar promociones</span>
+                                        <span class="block text-xs text-gray-500">Una misma venta puede aplicar mas de una promocion a la vez.</span>
+                                    </span>
+                                </label>
+                            @endif
+
+                            @if ($ruleFeatureGates['negative_stock'] ?? false)
+                                <label class="flex items-start gap-3">
+                                    <input wire:model="ruleAllowNegativeStock" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span>
+                                        <span class="block text-sm font-medium text-gray-900">Permitir inventario negativo</span>
+                                        <span class="block text-xs text-gray-500">Deja vender aunque el stock disponible sea cero o menor.</span>
+                                    </span>
+                                </label>
+                            @endif
+
+                            @if ($ruleFeatureGates['credit_sale'] ?? false)
+                                <label class="flex items-start gap-3">
+                                    <input wire:model="ruleRequireCustomerForCreditSale" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span>
+                                        <span class="block text-sm font-medium text-gray-900">Exigir cliente para venta a credito</span>
+                                        <span class="block text-xs text-gray-500">No deja confirmar una venta a credito sin asociar un cliente.</span>
+                                    </span>
+                                </label>
+                            @endif
+
+                            <div class="grid gap-3 sm:grid-cols-2 border-t border-stone-100 pt-4">
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">Prefijo documental interno</label>
+                                    <input wire:model="ruleSaleDocumentPrefix" type="text"
+                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                    @error('ruleSaleDocumentPrefix') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                                </div>
+                                <div>
+                                    <label class="text-sm font-medium text-gray-700">Consecutivo inicial</label>
+                                    <input wire:model="ruleSaleDocumentStartingSequence" type="number" min="1"
+                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                    @error('ruleSaleDocumentStartingSequence') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                                </div>
+                            </div>
+
+                            <div class="border-t border-stone-100 pt-4">
+                                <p class="text-sm font-semibold text-gray-900">Impresion de tickets</p>
+
+                                <div class="mt-3">
+                                    <label class="text-sm font-medium text-gray-700">Formato de ticket</label>
+                                    <select wire:model="ruleTicketFormat"
+                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                        <option value="thermal_58mm">Termica 58mm</option>
+                                        <option value="thermal_80mm">Termica 80mm</option>
+                                        <option value="letter_a4">Carta / A4</option>
+                                    </select>
+                                </div>
+
+                                <label class="mt-3 flex items-start gap-3">
+                                    <input wire:model="ruleShowLogo" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span class="block text-sm font-medium text-gray-900">Mostrar logo en el ticket</span>
+                                </label>
+
+                                <label class="mt-3 flex items-start gap-3">
+                                    <input wire:model="ruleShowSaasBranding" type="checkbox"
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                    <span class="block text-sm font-medium text-gray-900">Mostrar marca del SaaS en el ticket</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="flex-shrink-0 flex items-center justify-end gap-3 border-t border-stone-100 px-5 py-3">
+                            <button type="button" wire:click="closeRulesModal" class="text-sm font-medium text-gray-500 hover:text-gray-700">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                class="inline-flex items-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:from-blue-700 hover:to-purple-700">
+                                Guardar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+    @endif
 </div>

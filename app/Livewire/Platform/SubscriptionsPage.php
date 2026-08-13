@@ -3,11 +3,13 @@
 namespace App\Livewire\Platform;
 
 use App\Actions\Equipment\ManageEquipmentRental;
+use App\Actions\Plans\ReconcileCompanyStructureLimits;
 use App\Actions\Subscriptions\AttachPaymentProof;
 use App\Actions\Subscriptions\ChangeCompanySubscription;
 use App\Enums\EquipmentRentalStatus;
 use App\Enums\EquipmentType;
 use App\Enums\RecordStatus;
+use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\AuditLog;
 use App\Models\Company;
@@ -24,7 +26,9 @@ use Livewire\WithPagination;
 
 class SubscriptionsPage extends Component
 {
-    use InteractsWithToast, WithFileUploads, WithPagination;
+    use HasResponsivePageSize, InteractsWithToast, WithFileUploads, WithPagination;
+
+    public int $perPage = 20;
 
     public string $search   = '';
     public string $filter   = 'all';
@@ -67,7 +71,7 @@ class SubscriptionsPage extends Component
         $this->showModal  = true;
     }
 
-    public function saveEdit(): void
+    public function saveEdit(ReconcileCompanyStructureLimits $reconcileCompanyStructureLimits): void
     {
         abort_unless(auth()->user()?->is_platform_admin, 403);
 
@@ -81,6 +85,8 @@ class SubscriptionsPage extends Component
             'plan_id'  => (int) $this->editPlanId,
             'ends_at'  => $this->editEndsAt !== '' ? $this->editEndsAt : null,
         ]);
+
+        $reconcileCompanyStructureLimits->handle($sub->company, auth()->user());
 
         $this->showModal = false;
         $this->toast('Suscripción actualizada.');
@@ -491,7 +497,7 @@ class SubscriptionsPage extends Component
                     ->orWhereLike('legal_name', $s));
             })
             ->orderByDesc('id')
-            ->paginate(20);
+            ->paginate($this->perPage);
 
         $latestSubscriptionIds = Subscription::query()
             ->whereNull('bundle_id')

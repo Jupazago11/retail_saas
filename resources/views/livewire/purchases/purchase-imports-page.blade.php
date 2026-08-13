@@ -1,6 +1,6 @@
 <div class="py-10">
     <div class="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-purchases-nav />
+        <x-purchases-nav active="purchases.imports" />
 
         <div class="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
@@ -65,8 +65,7 @@
                         <div>
                             <label for="purchase-import-status" class="text-sm font-medium text-gray-700">Estado</label>
                             <select wire:model="purchaseStatus" id="purchase-import-status" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                <option value="draft">Borrador</option>
-                                <option value="confirmed">Confirmada</option>
+                                <option value="confirmed">Pendiente</option>
                                 <option value="partially_paid">Parcialmente pagada</option>
                                 <option value="paid">Pagada</option>
                             </select>

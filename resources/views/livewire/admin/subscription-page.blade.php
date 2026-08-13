@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.subscription" />
 
         {{-- Plan actual --}}
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">

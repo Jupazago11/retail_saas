@@ -8,7 +8,7 @@
         </div>
 
         {{-- Buscador --}}
-        <div class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
+        <div x-data="responsivePageSize({ rowHeight: 60, reserved: 300 })" class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
             <div class="flex items-center gap-3">
                 <input wire:model.live.debounce.300ms="search" type="text"
                     placeholder="Buscar por nombre, email o usuario..."

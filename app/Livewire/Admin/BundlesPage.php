@@ -155,8 +155,8 @@ class BundlesPage extends Component
             'availablePlans' => $this->availablePlans(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
-                'title' => 'Bundles',
-                'description' => 'Administra bundles asociados a la empresa activa y su contexto comercial actual.',
+                'title' => 'Paquetes',
+                'description' => 'Administra los paquetes asociados a la empresa activa y su contexto comercial actual.',
             ]),
         ]);
     }

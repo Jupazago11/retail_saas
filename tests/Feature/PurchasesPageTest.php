@@ -95,65 +95,47 @@ class PurchasesPageTest extends TestCase
         $this->assertSame('1500.00', (string) $purchase->balance_due);
 
         Livewire::test(PurchasesPage::class)
-            ->call('returnPurchase', $purchase->id)
+            ->call('cancelPurchase', $purchase->id)
             ->assertHasNoErrors();
 
         $purchase->refresh();
         $supplier->refresh();
 
-        $this->assertSame(PurchaseStatus::Returned->value, $purchase->status);
+        $this->assertSame(PurchaseStatus::Cancelled->value, $purchase->status);
         $this->assertSame('0.00', (string) $purchase->balance_due);
         $this->assertSame('500.00', (string) $supplier->credit_balance);
     }
 
-    public function test_purchases_page_can_edit_draft_and_confirm_it(): void
+    public function test_purchases_page_can_cancel_a_pending_purchase_without_items(): void
     {
-        [$user, $company, $branch, $warehouse, $product] = $this->fixture();
+        [$user, $company, $branch, $warehouse] = $this->fixture();
         $supplier = app(CreateSupplier::class)->handle($company, [
             'first_name' => 'Proveedor',
-            'last_name' => 'Borrador',
+            'last_name' => 'Informativo',
         ]);
 
         $purchase = app(CreatePurchase::class)->handle($company, [
             'branch_id' => $branch->id,
             'warehouse_id' => $warehouse->id,
             'supplier_id' => $supplier->id,
-            'invoice_number' => 'FAC-DRAFT-1',
-            'status' => PurchaseStatus::Draft->value,
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'quantity' => '2',
-                    'unit_cost' => '1000',
-                ],
-            ],
+            'invoice_number' => 'FAC-INFO-1',
+            'status' => PurchaseStatus::Confirmed->value,
+            'total' => '50000',
         ]);
+
+        $this->assertSame(0, $purchase->items()->count());
+        $this->assertSame('50000.00', (string) $purchase->balance_due);
 
         $this->actingAs($user);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(PurchasesPage::class)
-            ->call('editPurchase', $purchase->id)
-            ->set('purchaseStatus', PurchaseStatus::Confirmed->value)
-            ->set('invoiceNumber', 'FAC-DRAFT-EDIT-1')
-            ->set('items.0.quantity', '4')
-            ->set('items.0.unit_cost', '1200')
-            ->call('savePurchase')
-            ->assertHasNoErrors();
+            ->call('cancelPurchase', $purchase->id);
 
         $purchase->refresh();
 
-        $this->assertSame(PurchaseStatus::Confirmed->value, $purchase->status);
-        $this->assertSame('FAC-DRAFT-EDIT-1', $purchase->invoice_number);
-        $this->assertSame('4800.00', (string) $purchase->subtotal);
-        $this->assertSame('4800.00', (string) $purchase->total);
-        $this->assertSame('4800.00', (string) $purchase->balance_due);
-        $this->assertNotNull($purchase->posted_to_inventory_at);
-        $this->assertDatabaseHas('payable_movements', [
-            'purchase_id' => $purchase->id,
-            'movement_type' => 'purchase_charge',
-            'amount' => '4800.00',
-        ]);
+        $this->assertSame(PurchaseStatus::Cancelled->value, $purchase->status);
+        $this->assertSame('0.00', (string) $purchase->balance_due);
     }
 
     public function test_purchases_page_can_expand_purchase_ledger(): void

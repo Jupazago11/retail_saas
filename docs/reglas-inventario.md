@@ -79,7 +79,7 @@
 ## Ventas congeladas
 
 - La venta congelada no descuenta ni reserva stock.
-- La venta congelada expira segun `pos.frozen_sales_expiration_minutes`.
+- La venta congelada expira siempre a las 24 horas (regla fija, no configurable por empresa).
 - La conversion de una venta congelada a venta real reutiliza el snapshot guardado y solo ahi intenta la salida de inventario.
 
 ## Variantes

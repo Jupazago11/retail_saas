@@ -1,6 +1,5 @@
 <?php
 
-use App\Enums\PurchaseStatus;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -18,7 +17,7 @@ return new class extends Migration
             $table->string('supplier_name')->nullable();
             $table->string('invoice_number', 120)->nullable();
             $table->string('purchase_type', 50)->default('invoice');
-            $table->string('status')->default(PurchaseStatus::Draft->value);
+            $table->string('status')->default('draft');
             $table->text('notes')->nullable();
             $table->timestamp('purchased_at')->nullable();
             $table->timestamp('due_at')->nullable();

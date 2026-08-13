@@ -19,7 +19,6 @@ No usar una tabla de cientos de columnas ni un unico JSON opaco. La configuracio
 ### `pos`
 
 - `frozen_sales_enabled`
-- `frozen_sales_expiration_minutes`
 - `allow_alternative_prices`
 - `allow_manual_discounts`
 - `allow_promotion_stacking`
@@ -85,7 +84,7 @@ No usar una tabla de cientos de columnas ni un unico JSON opaco. La configuracio
 - Las claves validas se centralizan en `App\Support\Settings\CompanySettingCatalog`.
 - El servicio ya resuelve valores por defecto del catalogo cuando una clave aun no se ha persistido.
 - Los tipos soportados actualmente son `string`, `integer`, `decimal`, `boolean` y `json`.
-- El backend ya consume `pos.frozen_sales_enabled` y `pos.frozen_sales_expiration_minutes` al crear ventas congeladas.
+- El backend ya consume `pos.frozen_sales_enabled` al crear ventas congeladas. La expiracion es una regla fija de 24 horas (`CreateFrozenSale::EXPIRATION_MINUTES`), ya no es configurable por empresa.
 - El backend ya consume `pos.requires_open_cash_session`, `cash.opening_required`, `cash.default_opening_amount` y `cash.allow_close_with_difference` en el flujo de caja y pagos.
 - El backend ya consume `credit.credit_enabled`, `credit.default_term_days`, `credit.block_new_credit_if_overdue` y `pos.require_customer_for_credit_sale` en ventas a credito y abonos.
 - El backend ya consume `loyalty.loyalty_enabled`, `loyalty.points_rule_type` y `loyalty.points_rate` para acumulacion, redencion y reverso de puntos.

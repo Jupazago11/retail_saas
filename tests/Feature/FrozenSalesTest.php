@@ -32,7 +32,6 @@ class FrozenSalesTest extends TestCase
     public function test_it_creates_frozen_sale_with_expiration_and_without_inventory_impact(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product, $presentation, $variant] = $this->frozenSaleFixture();
-        app(CompanySettings::class)->set($company, 'pos', 'frozen_sales_expiration_minutes', 45);
         app(CompanySettings::class)->set($company, 'pos', 'allow_manual_discounts', true);
 
         $frozenSale = app(CreateFrozenSale::class)->handle($company, [
@@ -56,6 +55,7 @@ class FrozenSalesTest extends TestCase
 
         $this->assertSame(FrozenSaleStatus::Open->value, $frozenSale->status);
         $this->assertNotNull($frozenSale->expires_at);
+        $this->assertEqualsWithDelta(now()->addHours(24)->timestamp, $frozenSale->expires_at->timestamp, 5);
         $this->assertSame('15000.00', $frozenSale->payload_snapshot['totals']['subtotal']);
         $this->assertSame('500.00', $frozenSale->payload_snapshot['totals']['discount_total']);
         $this->assertSame(0, InventoryMovement::query()->count());

@@ -12,8 +12,8 @@
     </div>
 
     {{-- Filtros --}}
-    <div class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div x-data="responsivePageSize({ rowHeight: 76, reserved: 300 })" class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div class="flex items-center gap-3">
                 <input wire:model.live.debounce.300ms="search" type="text"
                     placeholder="Buscar empresa..."

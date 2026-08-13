@@ -1,19 +1,40 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
 
-        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div x-data="responsivePageSize({ rowHeight: 72, reserved: 320 })" class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Catalogo</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">Productos</h3>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por nombre o codigo de barras"
                         class="w-64 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <label class="flex items-center gap-2 text-sm text-gray-600 whitespace-nowrap">
-                        <input wire:model.live="showArchived" type="checkbox" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                        Archivados
-                    </label>
+                    <select wire:model.live="filterBrandId"
+                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                        <option value="">Todas las marcas</option>
+                        @foreach ($brands as $brand)
+                            <option value="{{ $brand->id }}">{{ $brand->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                        <button type="button" wire:click="setStatusFilter('all')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Todos
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('active')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'active' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Activos
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('inactive')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'inactive' ? 'bg-stone-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Inactivos
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('archived')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'archived' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Archivados
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -213,6 +234,17 @@
                                 @error('baseUnitId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
+                            <div>
+                                <label for="product-supplier" class="mb-1 block text-xs font-medium text-gray-700">Proveedor</label>
+                                <x-searchable-select
+                                    id="product-supplier"
+                                    model="supplierId"
+                                    placeholder="Sin proveedor"
+                                    :options="$suppliers->map(fn ($supplier) => ['id' => $supplier->id, 'label' => $supplier->person?->full_name ?: 'Sin nombre'])"
+                                />
+                                @error('supplierId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+
                         </div>
 
                         {{-- Codigo de barras + Nombre --}}
@@ -302,19 +334,44 @@
                         </div>
 
                         @if ($hasInventory)
-                        {{-- Stock minimo + inventario --}}
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <div>
-                                <label for="product-minimum-stock" class="mb-1 block text-xs font-medium text-gray-700">Stock minimo</label>
-                                <input wire:model="minimumStock" id="product-minimum-stock" type="number" min="0" step="1"
-                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('minimumStock') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            </div>
-                            <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-700">
-                                <input wire:model="tracksInventory" type="checkbox"
+                        {{-- Inventario: primero se pregunta si el producto lo lleva --}}
+                        <div class="rounded-xl border border-gray-200 p-3">
+                            <label class="flex cursor-pointer items-center gap-3 text-sm text-gray-700">
+                                <input wire:model.live="tracksInventory" type="checkbox"
                                     class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                                Controla inventario
+                                ¿Este producto lleva inventario?
                             </label>
+
+                            @if ($tracksInventory)
+                                <div class="mt-3">
+                                    <label for="product-minimum-stock" class="mb-1 block text-xs font-medium text-gray-700">Stock minimo (alerta)</label>
+                                    <input wire:model="minimumStock" id="product-minimum-stock" type="number" min="0" step="1"
+                                        class="block w-full max-w-[200px] rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                    @error('minimumStock') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                </div>
+
+                                @if ($editingProductId)
+                                    <p class="mt-3 text-xs text-gray-400">Para ajustar la cantidad de un producto existente usa el modulo de Inventario.</p>
+                                @elseif ($warehouses->isNotEmpty())
+                                    <div class="mt-3">
+                                        <p class="mb-1 text-xs font-medium text-gray-700">
+                                            Cantidad inicial{{ $warehouses->count() > 1 ? ' por bodega' : '' }}
+                                        </p>
+                                        <div class="grid gap-2 sm:grid-cols-2">
+                                            @foreach ($warehouses as $warehouse)
+                                                <div>
+                                                    @if ($warehouses->count() > 1)
+                                                        <label class="mb-1 block text-xs text-gray-500">{{ $warehouse->name }}</label>
+                                                    @endif
+                                                    <input wire:model="initialQuantities.{{ $warehouse->id }}" type="number" min="0" step="1" placeholder="0"
+                                                        class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                        @error('initialQuantities') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                    </div>
+                                @endif
+                            @endif
                         </div>
                         @endif
 

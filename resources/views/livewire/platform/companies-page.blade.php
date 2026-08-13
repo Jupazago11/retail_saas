@@ -2,8 +2,8 @@
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
 
         {{-- Filtros y buscador --}}
-        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div x-data="responsivePageSize({ rowHeight: 68, reserved: 300 })" class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Plataforma</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">

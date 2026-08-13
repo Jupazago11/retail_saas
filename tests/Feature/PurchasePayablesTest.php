@@ -125,7 +125,7 @@ class PurchasePayablesTest extends TestCase
 
         $purchase = app(ReturnPurchase::class)->handle($company, $purchase);
 
-        $this->assertSame(PurchaseStatus::Returned->value, $purchase->status);
+        $this->assertSame(PurchaseStatus::Cancelled->value, $purchase->status);
         $this->assertSame('0.00', $purchase->balance_due);
         $this->assertSame('0.00', $purchase->amount_paid);
         $this->assertDatabaseHas('payable_movements', [
@@ -164,7 +164,7 @@ class PurchasePayablesTest extends TestCase
 
         $purchase = app(ReturnPurchase::class)->handle($company, $purchase);
 
-        $this->assertSame(PurchaseStatus::Returned->value, $purchase->status);
+        $this->assertSame(PurchaseStatus::Cancelled->value, $purchase->status);
         $this->assertSame('0.00', $purchase->balance_due);
         $this->assertSame('500.00', $purchase->amount_paid);
         $this->assertSame('500.00', $purchase->supplier->fresh()->credit_balance);

@@ -10,6 +10,7 @@ use App\Models\Permission;
 use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Plans\CompanyPlanResolver;
+use App\Services\Plans\CompanyUserLimitGuard;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -172,6 +173,57 @@ class RolesPage extends Component
         $this->dispatch('toast', message: 'Asignacion actualizada correctamente.', type: 'success');
     }
 
+    public function toggleUserStatus(int $userId, CompanyUserLimitGuard $companyUserLimitGuard): void
+    {
+        $this->ensurePermission('roles.manage');
+
+        $membership = $this->membershipRecord($userId);
+
+        if (! $membership || $membership->company_role === 'owner') {
+            return;
+        }
+
+        $company = $this->currentCompany();
+
+        if ($membership->status === RecordStatus::Active->value) {
+            DB::table('company_user')
+                ->where('company_id', $company->id)
+                ->where('user_id', $userId)
+                ->update(['status' => RecordStatus::Inactive->value, 'updated_at' => now()]);
+
+            $this->dispatch('toast', message: 'Usuario desactivado correctamente.', type: 'success');
+
+            return;
+        }
+
+        try {
+            $companyUserLimitGuard->ensureCanActivateUser($company);
+        } catch (InvalidArgumentException $exception) {
+            $this->dispatch('toast', message: $exception->getMessage(), type: 'error');
+
+            return;
+        }
+
+        DB::table('company_user')
+            ->where('company_id', $company->id)
+            ->where('user_id', $userId)
+            ->update(['status' => RecordStatus::Active->value, 'updated_at' => now()]);
+
+        $this->dispatch('toast', message: 'Usuario activado correctamente.', type: 'success');
+    }
+
+    public function activeUsersCount(): int
+    {
+        return $this->currentCompany()->users()
+            ->wherePivot('status', RecordStatus::Active->value)
+            ->count();
+    }
+
+    public function maxUsers(): ?int
+    {
+        return app(CompanyPlanResolver::class)->limit($this->currentCompany(), 'max_users');
+    }
+
     public function addUserToCompany(AttachUserToCompany $attachUserToCompany): void
     {
         $this->ensurePermission('roles.manage');
@@ -323,6 +375,8 @@ class RolesPage extends Component
             'roleTemplates' => $this->roleTemplates(),
             'companyRoles' => $companyRoles,
             'permissionGroups' => $this->permissionGroups(),
+            'activeUsersCount' => $this->activeUsersCount(),
+            'maxUsers' => $this->maxUsers(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Roles y Usuarios',

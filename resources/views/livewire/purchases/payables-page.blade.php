@@ -1,7 +1,7 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
 
-        <x-purchases-nav />
+        <x-purchases-nav active="purchases.payables" />
 
         {{-- Filtros --}}
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
@@ -37,17 +37,34 @@
                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                 </div>
 
-                <div>
-                    <label for="payables-status" class="text-xs font-medium text-gray-700">Estado</label>
-                    <select wire:model.live="status" id="payables-status"
-                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="open">Abiertas</option>
-                        <option value="">Todas</option>
-                        <option value="confirmed">Confirmadas</option>
-                        <option value="partially_paid">Parcialmente pagadas</option>
-                        <option value="paid">Pagadas</option>
-                        <option value="returned">Devueltas</option>
-                    </select>
+                <div class="sm:col-span-2 lg:col-span-4">
+                    <label class="text-xs font-medium text-gray-700">Estado</label>
+                    <div class="mt-1 inline-flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                        <button type="button" wire:click="setStatus('open')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'open' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Abiertas
+                        </button>
+                        <button type="button" wire:click="setStatus('')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Todas
+                        </button>
+                        <button type="button" wire:click="setStatus('confirmed')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'confirmed' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Pendientes
+                        </button>
+                        <button type="button" wire:click="setStatus('partially_paid')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'partially_paid' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Parcialmente pagadas
+                        </button>
+                        <button type="button" wire:click="setStatus('paid')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'paid' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Pagadas
+                        </button>
+                        <button type="button" wire:click="setStatus('cancelled')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'cancelled' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Canceladas
+                        </button>
+                    </div>
                 </div>
 
                 <div>
@@ -205,7 +222,7 @@
                             @endphp
                             <tr wire:key="purchase-payable-{{ $purchase->id }}" class="even:bg-gray-50">
                                 <td class="py-3 align-middle">
-                                    <p class="font-semibold text-gray-900">{{ $purchase->invoice_number ?: 'Compra #'.$purchase->id }}</p>
+                                    <p class="font-semibold text-gray-900">{{ $purchase->invoice_number ?: 'Compra #'.$purchase->company_sequence }}</p>
                                     <p class="text-xs text-gray-400">{{ optional($purchase->purchased_at)->format('d/m/Y') ?: 'Sin fecha' }}</p>
                                 </td>
                                 <td class="py-3 align-middle">
@@ -229,12 +246,12 @@
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
                                     <x-status-badge :color="$purchase->status === 'paid' ? 'emerald' :
-                                        ($purchase->status === 'returned' ? 'rose' : 'stone')">
+                                        ($purchase->status === 'cancelled' ? 'rose' : 'stone')">
                                         {{ match($purchase->status) {
-                                            'confirmed'      => 'Confirmada',
+                                            'confirmed'      => 'Pendiente',
                                             'partially_paid' => 'Parcial',
                                             'paid'           => 'Pagada',
-                                            'returned'       => 'Devuelta',
+                                            'cancelled'      => 'Cancelada',
                                             default          => $purchase->status
                                         } }}
                                     </x-status-badge>
@@ -285,17 +302,10 @@
                                         <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                                             <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Aplicar saldo a favor · {{ $supplierLabel }}</p>
                                             <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
-                                                <div class="flex-1"
-                                                    x-data="{
-                                                        display: '',
-                                                        fmt(n) { return isNaN(n) ? '' : n.toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2}); },
-                                                        parse(s) { return parseFloat(String(s).replace(/\./g,'').replace(',','.')); }
-                                                    }"
-                                                    x-effect="display = fmt(parseFloat($wire.creditAmount))">
+                                                <div class="flex-1" x-data="digitGroupInput({ path: 'creditAmount', live: false })">
                                                     <label class="text-xs font-medium text-gray-700">Monto a aplicar</label>
-                                                    <input type="text" inputmode="decimal"
-                                                        x-model="display"
-                                                        @blur="const n = parse(display); if (!isNaN(n)) { display = fmt(n); $wire.creditAmount = n.toFixed(2); }"
+                                                    <input type="text" inputmode="numeric" @input="onInput($event)"
+                                                        value="{{ $creditAmount !== '' ? number_format((int) $creditAmount, 0, ',', '.') : '' }}"
                                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                     @error('creditAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>

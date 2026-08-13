@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Platform;
 
+use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
 use App\Models\Subscription;
@@ -12,7 +13,9 @@ use Livewire\WithPagination;
 
 class CompaniesPage extends Component
 {
-    use InteractsWithToast, WithPagination;
+    use HasResponsivePageSize, InteractsWithToast, WithPagination;
+
+    public int $perPage = 20;
 
     public string $filter = 'pending';
     public string $search = '';
@@ -87,7 +90,7 @@ class CompaniesPage extends Component
                 $sq->whereNull('bundle_id')->where('status', 'active')
             ))
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->paginate($this->perPage);
     }
 
     public function pendingCount(): int

@@ -46,10 +46,8 @@ class SettingsPage extends Component
     {
         $snapshot = app(CompanyPlanResolver::class)->snapshot($this->currentCompany());
         $modules  = $snapshot['modules'];
-        $features = $snapshot['features'];
 
-        $hasModule  = fn (string $code): bool => (bool) ($modules[$code] ?? false);
-        $hasFeature = fn (string $code): bool => (bool) ($features[$code] ?? false);
+        $hasModule = fn (string $code): bool => (bool) ($modules[$code] ?? false);
 
         // Entire groups gated by module
         $groupModules = [
@@ -59,23 +57,38 @@ class SettingsPage extends Component
             'electronic_billing' => 'electronic_billing',
         ];
 
-        // Individual POS settings gated by feature / module
-        $posKeyGates = [
-            'frozen_sales_enabled'             => fn () => $hasFeature('pos.frozen_sales'),
-            'frozen_sales_expiration_minutes'  => fn () => $hasFeature('pos.frozen_sales'),
-            'allow_alternative_prices'         => fn () => $hasFeature('products.multiple_prices'),
-            'allow_manual_discounts'           => fn () => $hasFeature('pos.manual_discounts'),
-            'allow_promotion_stacking'         => fn () => $hasModule('promotions'),
-            'allow_negative_stock'             => fn () => $hasModule('inventory'),
-            'require_customer_for_credit_sale' => fn () => $hasModule('credit'),
-        ];
-
         // Personalizacion de marca (logo, color) por empresa: ocultada a
         // proposito por ahora, todavia no se va a habilitar.
-        $hiddenKeys = ['general.logo_path', 'general.primary_color'];
+        // Grupo "cash" completo y "pos.requires_open_cash_session": se
+        // administran desde el modal de Reglas dentro del propio modulo
+        // Caja. Grupo "pos" (el resto) y grupo "printing" completos: se
+        // administran desde el modal de Reglas dentro del modulo Ventas.
+        // Duplicarlos en esta pagina general solo la haria mas grande y
+        // menos intuitiva.
+        $hiddenKeys = [
+            'general.logo_path',
+            'general.primary_color',
+            'cash.module_enabled',
+            'cash.opening_required',
+            'cash.default_opening_amount',
+            'cash.allow_close_with_difference',
+            'inventory.setup_wizard_answered',
+            'pos.frozen_sales_enabled',
+            'pos.allow_alternative_prices',
+            'pos.allow_manual_discounts',
+            'pos.allow_promotion_stacking',
+            'pos.allow_negative_stock',
+            'pos.requires_open_cash_session',
+            'pos.require_customer_for_credit_sale',
+            'pos.sale_document_prefix',
+            'pos.sale_document_starting_sequence',
+            'printing.ticket_format',
+            'printing.show_logo',
+            'printing.show_saas_branding',
+        ];
 
         return collect(CompanySettingCatalog::definitions())
-            ->filter(function (array $definition) use ($hasModule, $groupModules, $posKeyGates, $hiddenKeys) {
+            ->filter(function (array $definition) use ($hasModule, $groupModules, $hiddenKeys) {
                 $group = $definition['group'];
                 $key   = $definition['key'];
 
@@ -85,10 +98,6 @@ class SettingsPage extends Component
 
                 if (isset($groupModules[$group])) {
                     return $hasModule($groupModules[$group]);
-                }
-
-                if ($group === 'pos' && isset($posKeyGates[$key])) {
-                    return ($posKeyGates[$key])();
                 }
 
                 return true;
@@ -109,7 +118,6 @@ class SettingsPage extends Component
             'logo_path' => 'Ruta de logo',
             'primary_color' => 'Color principal',
             'frozen_sales_enabled' => 'Permitir ventas congeladas',
-            'frozen_sales_expiration_minutes' => 'Minutos para expirar ventas congeladas',
             'allow_alternative_prices' => 'Permitir precios alternos',
             'allow_manual_discounts' => 'Permitir descuentos manuales',
             'allow_promotion_stacking' => 'Permitir apilar promociones',
@@ -121,6 +129,7 @@ class SettingsPage extends Component
             'inventory_enabled' => 'Inventario activo',
             'minimum_stock_alerts_enabled' => 'Alertas de stock minimo',
             'default_cost_method' => 'Metodo de costo',
+            'module_enabled' => 'Esta empresa usa caja registradora',
             'opening_required' => 'Exigir apertura de caja',
             'default_opening_amount' => 'Monto por defecto de apertura',
             'allow_close_with_difference' => 'Permitir cierre con diferencia',
@@ -196,7 +205,7 @@ class SettingsPage extends Component
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Configuracion',
-                'description' => 'Administra parametros operativos por empresa para POS, caja, credito, impresion e inventario.',
+                'description' => 'Administra parametros operativos por empresa para credito, fidelizacion, facturacion electronica e inventario.',
             ]),
         ]);
     }
@@ -211,9 +220,27 @@ class SettingsPage extends Component
             $raw = $companySettings->group($company, $group);
 
             // Ensure booleans are strictly bool (MySQL TINYINT can return int 0/1)
+            // y los decimales llegan con 4 ceros de precision de almacenamiento
+            // (ej "120000.0000"): se recortan los ceros sobrantes para mostrar
+            // un numero limpio en el input.
             $settings[$group] = array_map(function ($value, string $key) use ($group) {
                 $def = \App\Support\Settings\CompanySettingCatalog::definition($group, $key);
-                return ($def && $def['type'] === 'boolean') ? (bool) $value : $value;
+
+                if ($def && $def['type'] === 'boolean') {
+                    return (bool) $value;
+                }
+
+                if ($def && $def['type'] === 'decimal' && $value !== null) {
+                    $stringValue = (string) $value;
+
+                    if (str_contains($stringValue, '.')) {
+                        $stringValue = rtrim(rtrim($stringValue, '0'), '.');
+                    }
+
+                    return $stringValue === '' ? '0' : $stringValue;
+                }
+
+                return $value;
             }, $raw, array_keys($raw));
 
             // Re-key after array_map (it strips string keys)

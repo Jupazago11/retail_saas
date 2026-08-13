@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-sales-nav />
+        <x-sales-nav active="sales.frozen" />
 
         <div class="grid gap-4 md:grid-cols-4">
             <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">

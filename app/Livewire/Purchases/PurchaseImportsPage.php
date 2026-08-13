@@ -106,7 +106,6 @@ class PurchaseImportsPage extends Component
             'invoiceNumber' => ['nullable', 'string', 'max:120'],
             'purchaseType' => ['required', 'string', 'max:50'],
             'purchaseStatus' => ['required', Rule::in([
-                PurchaseStatus::Draft->value,
                 PurchaseStatus::Confirmed->value,
                 PurchaseStatus::PartiallyPaid->value,
                 PurchaseStatus::Paid->value,

@@ -151,28 +151,6 @@ class PurchaseCreationTest extends TestCase
         ]);
     }
 
-    public function test_draft_purchase_does_not_post_inventory_until_explicitly_processed(): void
-    {
-        [$company, $branch, $warehouse, $product] = $this->minimalPurchaseFixture();
-
-        $purchase = app(CreatePurchase::class)->handle($company, [
-            'branch_id' => $branch->id,
-            'warehouse_id' => $warehouse->id,
-            'status' => PurchaseStatus::Draft->value,
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'quantity' => '3',
-                    'unit_cost' => '1000',
-                ],
-            ],
-        ]);
-
-        $this->assertNull($purchase->posted_to_inventory_at);
-        $this->assertSame(0, InventoryMovement::query()->count());
-        $this->assertSame(0, InventoryBalance::query()->count());
-    }
-
     public function test_posting_purchase_to_inventory_is_idempotent(): void
     {
         [$company, $branch, $warehouse, $product] = $this->minimalPurchaseFixture();
@@ -199,7 +177,7 @@ class PurchaseCreationTest extends TestCase
         $this->assertSame('3.000000', InventoryBalance::query()->firstOrFail()->quantity_on_hand);
     }
 
-    public function test_it_returns_purchase_from_inventory_and_marks_it_as_returned(): void
+    public function test_it_returns_purchase_from_inventory_and_marks_it_as_cancelled(): void
     {
         [$company, $branch, $warehouse, $product] = $this->minimalPurchaseFixture();
 
@@ -218,7 +196,7 @@ class PurchaseCreationTest extends TestCase
 
         $purchase = app(ReturnPurchase::class)->handle($company, $purchase);
 
-        $this->assertSame(PurchaseStatus::Returned->value, $purchase->status);
+        $this->assertSame(PurchaseStatus::Cancelled->value, $purchase->status);
         $this->assertNotNull($purchase->returned_from_inventory_at);
 
         $this->assertDatabaseHas('inventory_movements', [
@@ -264,7 +242,7 @@ class PurchaseCreationTest extends TestCase
         app(ReturnPurchase::class)->handle($company, $purchase->fresh());
 
         $this->assertSame(2, InventoryMovement::query()->count());
-        $this->assertSame(PurchaseStatus::Returned->value, $purchase->fresh()->status);
+        $this->assertSame(PurchaseStatus::Cancelled->value, $purchase->fresh()->status);
         $this->assertSame('0.000000', InventoryBalance::query()->firstOrFail()->quantity_on_hand);
     }
 

@@ -1,22 +1,31 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-4">
 
-        <x-purchases-nav />
+        <x-purchases-nav active="purchases.suppliers" />
 
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Maestro</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">Proveedores registrados</h3>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por nombre, documento o contacto"
                         class="w-64 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <select wire:model.live="statusFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos los estados</option>
-                        <option value="active">Activos</option>
-                        <option value="inactive">Inactivos</option>
-                    </select>
+                    <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                        <button type="button" wire:click="setStatusFilter('')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Todos
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('active')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'active' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Activos
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('inactive')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'inactive' ? 'bg-stone-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Inactivos
+                        </button>
+                    </div>
                 </div>
             </div>
 

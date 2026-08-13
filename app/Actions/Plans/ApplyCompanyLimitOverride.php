@@ -13,6 +13,7 @@ class ApplyCompanyLimitOverride
 {
     public function __construct(
         protected AuditLogger $auditLogger,
+        protected ReconcileCompanyStructureLimits $reconcileCompanyStructureLimits,
     ) {
     }
 
@@ -55,6 +56,8 @@ class ApplyCompanyLimitOverride
 
             $this->auditLogger->logUpdated($company, 'company_limit_override.updated', $before, $override->fresh(), $actor);
 
+            $this->reconcileCompanyStructureLimits->handle($company, $actor);
+
             return $override->fresh();
         }
 
@@ -67,6 +70,8 @@ class ApplyCompanyLimitOverride
         ]);
 
         $this->auditLogger->logCreated($company, 'company_limit_override.created', $created->fresh(), $actor);
+
+        $this->reconcileCompanyStructureLimits->handle($company, $actor);
 
         return $created->fresh();
     }

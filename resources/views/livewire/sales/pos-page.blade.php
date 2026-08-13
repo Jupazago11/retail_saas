@@ -31,6 +31,7 @@
         ->map(fn ($promotion) => data_get($promotion, 'promotion_name') ?? data_get($promotion, 'name'))
         ->filter()
         ->implode(' Â· ');
+    $showRegisterSelector = $cashRegisters->count() > 1;
 @endphp
 
 <div>
@@ -62,6 +63,10 @@
     @media (min-width: 1024px) {
         .pos-top {
             grid-template-columns: 210px minmax(0, 1fr);
+        }
+
+        .pos-top--with-register {
+            grid-template-columns: 210px 160px minmax(0, 1fr);
         }
     }
 
@@ -527,7 +532,7 @@
     <div class="pos-shell" data-pos-shell>
 
         {{-- â•â• TOP: Brand + Toolbar (2 filas) â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• --}}
-        <div class="pos-top">
+        <div class="pos-top {{ $showRegisterSelector ? 'pos-top--with-register' : '' }}">
 
             {{-- Marca y referencia de operacion --}}
             <div class="flex flex-col justify-end">
@@ -540,6 +545,22 @@
                     class="pos-audit h-9 w-full border border-stone-500 bg-white px-3 text-[14px] font-semibold text-gray-900"
                 >
             </div>
+
+            {{-- Selector de caja: solo si hay mas de una activa en la sucursal --}}
+            @if ($showRegisterSelector)
+                <div class="flex flex-col justify-end">
+                    <label for="pos-cash-register" class="mb-0.5 block text-[10px] font-semibold uppercase text-gray-600">Caja</label>
+                    <select
+                        id="pos-cash-register"
+                        wire:model.live="cashRegisterId"
+                        class="h-9 w-full border border-stone-500 bg-white px-2 text-[13px] font-semibold text-gray-900"
+                    >
+                        @foreach ($cashRegisters as $register)
+                            <option value="{{ $register->id }}">{{ $register->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
 
             {{-- Toolbar: 1 fila de 7 botones --}}
             <div class="pos-tools">

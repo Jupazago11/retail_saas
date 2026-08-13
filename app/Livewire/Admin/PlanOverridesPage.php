@@ -283,8 +283,8 @@ class PlanOverridesPage extends Component
             'snapshot' => $this->effectiveSnapshot(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
-                'title' => 'Overrides',
-                'description' => 'Administra overrides manuales por empresa sobre modulos, features y limites con vigencia controlada.',
+                'title' => 'Excepciones',
+                'description' => 'Administra excepciones manuales por empresa sobre modulos, funciones y limites con vigencia controlada.',
             ]),
         ]);
     }

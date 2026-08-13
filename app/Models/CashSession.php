@@ -19,6 +19,7 @@ class CashSession extends Model
         'opening_amount',
         'closing_expected_amount',
         'closing_counted_amount',
+        'closing_denomination_breakdown',
         'difference_amount',
         'opened_at',
         'closed_at',
@@ -31,6 +32,7 @@ class CashSession extends Model
             'opening_amount' => 'decimal:2',
             'closing_expected_amount' => 'decimal:2',
             'closing_counted_amount' => 'decimal:2',
+            'closing_denomination_breakdown' => 'array',
             'difference_amount' => 'decimal:2',
             'opened_at' => 'datetime',
             'closed_at' => 'datetime',
@@ -65,5 +67,15 @@ class CashSession extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(CashSessionExpense::class);
+    }
+
+    public function funds(): HasMany
+    {
+        return $this->hasMany(CashSessionFund::class);
     }
 }

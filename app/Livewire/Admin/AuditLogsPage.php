@@ -132,7 +132,7 @@ class AuditLogsPage extends Component
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Auditoria',
-                'description' => 'Consulta acciones criticas por empresa, filtra eventos y revisa snapshots before/after sin salir del backoffice.',
+                'description' => 'Consulta acciones criticas por empresa, filtra eventos y revisa capturas antes/despues sin salir del panel administrativo.',
             ]),
         ]);
     }

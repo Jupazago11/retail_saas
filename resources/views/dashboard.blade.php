@@ -54,9 +54,9 @@
             ],
             [
                 'label' => 'Inventario',
-                'description' => 'Ajustes masivos e ingresos operativos.',
-                'href' => route('inventory.imports'),
-                'visible' => ($planModules['imports'] ?? false) && ($planFeatures['imports.excel'] ?? false) && $canAccessInventory,
+                'description' => 'Existencias, ajustes y alertas de stock minimo.',
+                'href' => route('inventory.index'),
+                'visible' => ($planModules['inventory'] ?? false) && $canAccessInventory,
                 'color' => 'orange',
                 'icon' => 'inventory',
             ],
@@ -124,10 +124,10 @@
         ];
     @endphp
 
-    <div class="space-y-8">
+    <div class="-mt-3 space-y-6">
         <span class="sr-only">{{ $company->display_name }}</span>
         <section>
-            <div class="mb-4 flex items-center justify-between gap-4">
+            <div class="mb-3 flex items-center justify-between gap-4">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.3em] text-blue-700">Accesos</p>
                     <h2 class="mt-1 text-xl font-black text-gray-900 sm:text-2xl">Modulos operativos</h2>
@@ -135,11 +135,11 @@
 
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div class="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
                 @foreach ($launcherItems as $item)
                     @php($tokens = $moduleColorTokens[$item['color']])
-                    <a href="{{ $item['href'] }}" class="group block cursor-pointer rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition duration-200 hover:border-gray-300 hover:shadow-md">
-                        <div class="mb-3 inline-flex h-12 w-12 items-center justify-center rounded-xl {{ $tokens['icon'] }}">
+                    <a href="{{ $item['href'] }}" wire:navigate class="group block cursor-pointer rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition duration-200 hover:border-gray-300 hover:shadow-md">
+                        <div class="mb-2 inline-flex h-12 w-12 items-center justify-center rounded-xl {{ $tokens['icon'] }}">
                                     @switch($item['icon'])
     @case('catalog')
         <x-heroicon-o-squares-2x2 class="h-6 w-6" />
@@ -175,7 +175,7 @@
                                 </div>
 
                         <h3 class="text-xl font-black tracking-tight text-gray-900">{{ $item['label'] }}</h3>
-                        <p class="mt-2 text-sm leading-6 text-gray-500">{{ $item['description'] }}</p>
+                        <p class="mt-1 text-sm leading-6 text-gray-500">{{ $item['description'] }}</p>
                     </a>
                 @endforeach
             </div>

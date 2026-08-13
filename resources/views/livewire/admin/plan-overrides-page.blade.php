@@ -1,20 +1,20 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.overrides" />
 
         <div class="grid gap-6 lg:grid-cols-4">
         <div class="space-y-6">
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Snapshot</p>
+                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Resumen</p>
                 <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $snapshot['plan']?->name ?? 'Sin plan' }}</h3>
-                <p class="mt-2 text-sm text-gray-500">Modulos: {{ count($snapshot['modules']) }} · Features: {{ count($snapshot['features']) }} · Limites: {{ count($snapshot['limits']) }}</p>
+                <p class="mt-2 text-sm text-gray-500">Modulos: {{ count($snapshot['modules']) }} · Funciones: {{ count($snapshot['features']) }} · Limites: {{ count($snapshot['limits']) }}</p>
             </div>
 
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Modulo</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $editingModuleOverrideId ? 'Editar override' : 'Nuevo override' }}</h3>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $editingModuleOverrideId ? 'Editar excepcion' : 'Nueva excepcion' }}</h3>
                     </div>
                     @if ($editingModuleOverrideId)
                         <button type="button" wire:click="resetModuleForm" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Cancelar</button>
@@ -32,7 +32,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Estado override</label>
+                        <label class="text-sm font-medium text-gray-700">Estado de la excepcion</label>
                         <select wire:model="moduleEnabled" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="1">Habilitar</option>
                             <option value="0">Deshabilitar</option>
@@ -51,15 +51,15 @@
                     @error('moduleId') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     @error('moduleStartsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     @error('moduleEndsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar override</button>
+                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar excepcion</button>
                 </form>
             </div>
 
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <div class="flex items-start justify-between gap-4">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Feature</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $editingFeatureOverrideId ? 'Editar override' : 'Nuevo override' }}</h3>
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Funcion</p>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $editingFeatureOverrideId ? 'Editar excepcion' : 'Nueva excepcion' }}</h3>
                     </div>
                     @if ($editingFeatureOverrideId)
                         <button type="button" wire:click="resetFeatureForm" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Cancelar</button>
@@ -68,16 +68,16 @@
 
                 <form wire:submit="saveFeatureOverride" class="mt-6 space-y-4">
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Feature</label>
+                        <label class="text-sm font-medium text-gray-700">Funcion</label>
                         <select wire:model="featureId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Selecciona una feature</option>
+                            <option value="">Selecciona una funcion</option>
                             @foreach ($availableFeatures as $feature)
                                 <option value="{{ $feature->id }}">{{ $feature->name }} ({{ $feature->code }})</option>
                             @endforeach
                         </select>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Estado override</label>
+                        <label class="text-sm font-medium text-gray-700">Estado de la excepcion</label>
                         <select wire:model="featureEnabled" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="1">Habilitar</option>
                             <option value="0">Deshabilitar</option>
@@ -96,7 +96,7 @@
                     @error('featureId') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     @error('featureStartsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     @error('featureEndsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar override</button>
+                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar excepcion</button>
                 </form>
             </div>
 
@@ -104,7 +104,7 @@
                 <div class="flex items-start justify-between gap-4">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Limite</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $editingLimitOverrideId ? 'Editar override' : 'Nuevo override' }}</h3>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">{{ $editingLimitOverrideId ? 'Editar excepcion' : 'Nueva excepcion' }}</h3>
                     </div>
                     @if ($editingLimitOverrideId)
                         <button type="button" wire:click="resetLimitForm" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">Cancelar</button>
@@ -139,7 +139,7 @@
                     @error('limitValue') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     @error('limitStartsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     @error('limitEndsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar override</button>
+                    <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar excepcion</button>
                 </form>
             </div>
         </div>
@@ -149,7 +149,7 @@
                 <div class="flex items-end justify-between gap-4">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Modulos</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Overrides registrados</h3>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">Excepciones registradas</h3>
                     </div>
                     <p class="text-sm text-gray-500">{{ $moduleOverrides->count() }} registros</p>
                 </div>
@@ -174,7 +174,7 @@
                                     <td class="py-4"><button type="button" wire:click="startEditingModuleOverride({{ $override->id }})" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700">Editar</button></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin overrides de modulo.</td></tr>
+                                <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin excepciones de modulo.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -184,8 +184,8 @@
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <div class="flex items-end justify-between gap-4">
                     <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Features</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Overrides registrados</h3>
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Funciones</p>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">Excepciones registradas</h3>
                     </div>
                     <p class="text-sm text-gray-500">{{ $featureOverrides->count() }} registros</p>
                 </div>
@@ -193,7 +193,7 @@
                     <table class="min-w-full divide-y divide-stone-200 text-sm">
                         <thead>
                             <tr class="text-left text-gray-500">
-                                <th class="pb-3 font-medium">Feature</th>
+                                <th class="pb-3 font-medium">Funcion</th>
                                 <th class="pb-3 font-medium">Estado</th>
                                 <th class="pb-3 font-medium">Inicio</th>
                                 <th class="pb-3 font-medium">Fin</th>
@@ -210,7 +210,7 @@
                                     <td class="py-4"><button type="button" wire:click="startEditingFeatureOverride({{ $override->id }})" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700">Editar</button></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin overrides de feature.</td></tr>
+                                <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin excepciones de funcion.</td></tr>
                             @endforelse
                         </tbody>
                     </table>
@@ -221,7 +221,7 @@
                 <div class="flex items-end justify-between gap-4">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Limites</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Overrides registrados</h3>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">Excepciones registradas</h3>
                     </div>
                     <p class="text-sm text-gray-500">{{ $limitOverrides->count() }} registros</p>
                 </div>
@@ -246,7 +246,7 @@
                                     <td class="py-4"><button type="button" wire:click="startEditingLimitOverride({{ $override->id }})" class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700">Editar</button></td>
                                 </tr>
                             @empty
-                                <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin overrides de limite.</td></tr>
+                                <tr><td colspan="5" class="py-6 text-center text-gray-500">Sin excepciones de limite.</td></tr>
                             @endforelse
                         </tbody>
                     </table>

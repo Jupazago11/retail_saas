@@ -20,6 +20,10 @@ use InvalidArgumentException;
 
 class CreateFrozenSale
 {
+    // Regla de negocio fija: las ventas congeladas expiran a las 24 horas,
+    // ya no es configurable por empresa.
+    protected const EXPIRATION_MINUTES = 1440;
+
     public function __construct(
         protected SaleCalculator $saleCalculator,
         protected CompanySettings $companySettings,
@@ -62,8 +66,7 @@ class CreateFrozenSale
             ->all();
 
         $totals = $this->saleCalculator->calculateTotals($calculatedLines);
-        $expiresMinutes = (int) $this->companySettings->get($company, 'pos', 'frozen_sales_expiration_minutes');
-        $expiresAt = $expiresMinutes > 0 ? now()->addMinutes($expiresMinutes) : null;
+        $expiresAt = now()->addMinutes(self::EXPIRATION_MINUTES);
 
         return DB::transaction(function () use ($company, $branch, $warehouse, $cashRegister, $creator, $attributes, $calculatedLines, $totals, $expiresAt) {
             $frozenSale = FrozenSale::query()->create([

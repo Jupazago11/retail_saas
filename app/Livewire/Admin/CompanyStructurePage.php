@@ -10,6 +10,7 @@ use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\Warehouse;
+use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -228,9 +229,16 @@ class CompanyStructurePage extends Component
         $deletableWarehouseIds   = $warehouses->filter(fn ($w) => $this->recordCanBeDeleted($w, 'warehouse'))->pluck('id')->all();
         $deletableCashIds        = $cashRegisters->filter(fn ($c) => $this->recordCanBeDeleted($c, 'cash'))->pluck('id')->all();
 
+        $planResolver     = app(CompanyPlanResolver::class);
+        $company           = $this->currentCompany();
+        $maxBranches       = $planResolver->limit($company, 'max_branches');
+        $maxWarehouses     = $planResolver->limit($company, 'max_warehouses');
+        $maxCashRegisters  = $planResolver->limit($company, 'max_cash_registers');
+
         return view('livewire.admin.company-structure-page', compact(
             'branches', 'warehouses', 'cashRegisters',
             'deletableBranchIds', 'deletableWarehouseIds', 'deletableCashIds',
+            'maxBranches', 'maxWarehouses', 'maxCashRegisters',
         ))->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title'       => 'Estructura Operativa',

@@ -207,7 +207,7 @@ class CouponsPage extends Component
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Cupones',
-                'description' => 'Administra cupones comerciales, su alcance por planes o bundles y sus redenciones recientes.',
+                'description' => 'Administra cupones comerciales, su alcance por planes o paquetes y sus redenciones recientes.',
             ]),
         ]);
     }

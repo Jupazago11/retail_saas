@@ -105,7 +105,7 @@ class PayablesLedger
 
         $purchase->update([
             'balance_due' => $balanceAfter,
-            'status' => PurchaseStatus::Returned->value,
+            'status' => PurchaseStatus::Cancelled->value,
             'paid_at' => null,
         ]);
 
@@ -124,14 +124,14 @@ class PayablesLedger
             $movements[] = $this->recordPurchaseReturnAdjustment($purchase, $adjustment, $reference);
         } else {
             $purchase->update([
-                'status' => PurchaseStatus::Returned->value,
+                'status' => PurchaseStatus::Cancelled->value,
             ]);
         }
 
         if (bccomp($paidAmount, '0.00', 2) === 1) {
             $movements[] = $this->recordSupplierCreditGenerated($purchase, $paidAmount, $reference);
             $purchase->update([
-                'status' => PurchaseStatus::Returned->value,
+                'status' => PurchaseStatus::Cancelled->value,
             ]);
         }
 

@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Products;
 
+use App\Actions\Inventory\CreateInventoryAdjustment;
 use App\Enums\RecordStatus;
+use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Brand;
 use App\Models\Category;
 use App\Models\Company;
 use App\Models\Product;
+use App\Models\Supplier;
 use App\Models\Unit;
+use App\Models\Warehouse;
 use App\Services\Plans\CompanyOperationalLimitGuard;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -16,6 +20,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
@@ -24,12 +29,15 @@ use Livewire\WithPagination;
 
 class ProductsPage extends Component
 {
-    use AuthorizesRequests, InteractsWithToast, WithPagination;
+    use AuthorizesRequests, HasResponsivePageSize, InteractsWithToast, WithPagination;
+
+    public int $perPage = 10;
 
     public bool $showModal = false;
     public ?int $editingProductId = null;
     public ?int $categoryId = null;
     public ?int $brandId = null;
+    public ?int $supplierId = null;
     public ?int $baseUnitId = null;
     public string $taxId = '';
     public string $name = '';
@@ -42,8 +50,10 @@ class ProductsPage extends Component
     public string $price3 = '';
     public bool $tracksInventory = true;
     public string $minimumStock = '0';
+    public array $initialQuantities = [];
     public string $search = '';
-    public bool $showArchived = false;
+    public string $statusFilter = 'all';
+    public ?int $filterBrandId = null;
 
     public function mount(): void
     {
@@ -51,6 +61,21 @@ class ProductsPage extends Component
     }
 
     public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function setStatusFilter(string $status): void
+    {
+        if (! in_array($status, ['all', 'active', 'inactive', 'archived'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $status;
+        $this->resetPage();
+    }
+
+    public function updatedFilterBrandId(): void
     {
         $this->resetPage();
     }
@@ -72,11 +97,6 @@ class ProductsPage extends Component
         if ($this->name === '') {
             $this->name = $found;
         }
-    }
-
-    public function updatedShowArchived(): void
-    {
-        $this->resetPage();
     }
 
     public function openModal(): void
@@ -158,7 +178,7 @@ class ProductsPage extends Component
         $this->baseUnitId = $unit->id;
     }
 
-    public function saveProduct(): void
+    public function saveProduct(CreateInventoryAdjustment $createInventoryAdjustment): void
     {
         if ($this->editingProductId) {
             $this->authorize('update', $this->productsQuery()->findOrFail($this->editingProductId));
@@ -182,6 +202,10 @@ class ProductsPage extends Component
             'brandId' => [
                 'nullable',
                 Rule::exists('brands', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
+            ],
+            'supplierId' => [
+                'nullable',
+                Rule::exists('suppliers', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
             ],
             'baseUnitId' => [
                 'required',
@@ -212,6 +236,8 @@ class ProductsPage extends Component
             'price3' => ['nullable', 'numeric', 'min:0'],
             'tracksInventory' => ['required', 'boolean'],
             'minimumStock' => ['required', 'integer', 'min:0'],
+            'initialQuantities' => ['nullable', 'array'],
+            'initialQuantities.*' => ['nullable', 'numeric', 'min:0'],
         ]);
 
         $hasInventory = app(\App\Services\Plans\CompanyPlanResolver::class)->hasModule($company, 'inventory');
@@ -221,9 +247,18 @@ class ProductsPage extends Component
             $validated['minimumStock']    = 0;
         }
 
+        // La carga de existencias iniciales por bodega solo aplica al crear
+        // el producto (no al editar uno existente, para eso esta el modulo
+        // de Ajuste de inventario) y solo si va a llevar inventario.
+        $initialQuantities = (! $this->editingProductId && $hasInventory && $validated['tracksInventory'])
+            ? collect($validated['initialQuantities'] ?? [])
+                ->filter(fn ($quantity) => $quantity !== null && $quantity !== '' && (float) $quantity > 0)
+            : collect();
+
         $payload = [
             'category_id' => $validated['categoryId'],
             'brand_id' => $validated['brandId'] ?: null,
+            'supplier_id' => $validated['supplierId'] ?: null,
             'base_unit_id' => $validated['baseUnitId'],
             'tax_id' => $this->blankToNull($validated['taxId']),
             'name' => trim($validated['name']),
@@ -247,14 +282,40 @@ class ProductsPage extends Component
         } else {
             try {
                 app(CompanyOperationalLimitGuard::class)->ensureCanCreateProduct($company);
-
-                Product::query()->create([
-                    'company_id' => $company->id,
-                    'status' => RecordStatus::Active->value,
-                    ...$payload,
-                ]);
             } catch (InvalidArgumentException $exception) {
                 $this->addError('name', $exception->getMessage());
+
+                return;
+            }
+
+            try {
+                DB::transaction(function () use ($company, $payload, $initialQuantities, $createInventoryAdjustment) {
+                    $product = Product::query()->create([
+                        'company_id' => $company->id,
+                        'status' => RecordStatus::Active->value,
+                        ...$payload,
+                    ]);
+
+                    foreach ($initialQuantities as $warehouseId => $quantity) {
+                        $warehouse = Warehouse::query()
+                            ->where('company_id', $company->id)
+                            ->findOrFail((int) $warehouseId);
+
+                        $createInventoryAdjustment->handle($company, [
+                            'branch_id' => $warehouse->branch_id,
+                            'warehouse_id' => $warehouse->id,
+                            'adjustment_type' => 'increase',
+                            'reason' => 'Existencia inicial al crear el producto',
+                            'items' => [[
+                                'product_id' => $product->id,
+                                'quantity' => $quantity,
+                                'unit_cost' => $payload['cost'],
+                            ]],
+                        ]);
+                    }
+                });
+            } catch (InvalidArgumentException $exception) {
+                $this->addError('initialQuantities', $exception->getMessage());
 
                 return;
             }
@@ -273,6 +334,7 @@ class ProductsPage extends Component
         $this->editingProductId = $product->id;
         $this->categoryId = $product->category_id;
         $this->brandId = $product->brand_id;
+        $this->supplierId = $product->supplier_id;
         $this->baseUnitId = $product->base_unit_id;
         $this->taxId = $product->tax_id ?? '';
         $this->name = $product->name;
@@ -285,6 +347,7 @@ class ProductsPage extends Component
         $this->price3 = $product->price_3 !== null ? $this->moneyToString($product->price_3) : '';
         $this->tracksInventory = $product->tracks_inventory;
         $this->minimumStock = (string) (int) $product->minimum_stock;
+        $this->initializeQuantities();
     }
 
     public function toggleProductStatus(int $productId): void
@@ -344,6 +407,7 @@ class ProductsPage extends Component
             'editingProductId',
             'categoryId',
             'brandId',
+            'supplierId',
             'baseUnitId',
             'taxId',
             'name',
@@ -358,6 +422,7 @@ class ProductsPage extends Component
         $this->price1 = '0';
         $this->tracksInventory = true;
         $this->minimumStock    = '0';
+        $this->initializeQuantities();
         $this->resetValidation();
     }
 
@@ -365,7 +430,13 @@ class ProductsPage extends Component
     {
         return $this->productsQuery()
             ->with(['category', 'brand', 'baseUnit'])
-            ->when($this->showArchived, fn (Builder $query) => $query->withTrashed(), fn (Builder $query) => $query->whereNull('deleted_at'))
+            ->when(
+                $this->statusFilter === 'archived',
+                fn (Builder $query) => $query->onlyTrashed(),
+                fn (Builder $query) => $query->whereNull('deleted_at')
+            )
+            ->when($this->statusFilter === 'active', fn (Builder $query) => $query->where('status', RecordStatus::Active->value))
+            ->when($this->statusFilter === 'inactive', fn (Builder $query) => $query->where('status', RecordStatus::Inactive->value))
             ->when($this->search !== '', function (Builder $query) {
                 $search = '%'.trim($this->search).'%';
 
@@ -375,8 +446,9 @@ class ProductsPage extends Component
                         ->orWhereLike('barcode', $search);
                 });
             })
+            ->when($this->filterBrandId !== null, fn (Builder $query) => $query->where('brand_id', $this->filterBrandId))
             ->orderBy('name')
-            ->paginate(10);
+            ->paginate($this->perPage);
     }
 
     public function categories(): Collection
@@ -397,6 +469,34 @@ class ProductsPage extends Component
             ->whereNull('deleted_at')
             ->orderBy('name')
             ->get();
+    }
+
+    public function suppliers(): Collection
+    {
+        return Supplier::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->where('status', RecordStatus::Active->value)
+            ->with('person')
+            ->get()
+            ->sortBy(fn (Supplier $supplier) => $supplier->person?->full_name ?? '')
+            ->values();
+    }
+
+    public function warehouses(): Collection
+    {
+        return Warehouse::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->where('status', RecordStatus::Active->value)
+            ->whereNull('deleted_at')
+            ->orderBy('name')
+            ->get();
+    }
+
+    protected function initializeQuantities(): void
+    {
+        $this->initialQuantities = $this->warehouses()
+            ->mapWithKeys(fn (Warehouse $warehouse) => [$warehouse->id => ''])
+            ->all();
     }
 
     public function units(): Collection
@@ -421,7 +521,9 @@ class ProductsPage extends Component
             'products' => $this->products(),
             'categories' => $this->categories(),
             'brands' => $this->brands(),
+            'suppliers' => $this->suppliers(),
             'units' => $this->units(),
+            'warehouses' => $this->warehouses(),
             'canCreateProducts' => $this->canCreateProducts(),
             'hasInventory' => app(\App\Services\Plans\CompanyPlanResolver::class)->hasModule($company, 'inventory'),
         ])->layout('layouts.app', [

@@ -17,10 +17,6 @@ class ReturnPurchaseFromInventory
     {
         $purchase->loadMissing(['items.product', 'warehouse']);
 
-        if ($purchase->posted_to_inventory_at === null) {
-            throw new InvalidArgumentException('Solo se pueden devolver compras ya aplicadas a inventario.');
-        }
-
         if ($purchase->returned_from_inventory_at !== null) {
             return $purchase->fresh(['items.product', 'warehouse']);
         }
@@ -31,20 +27,22 @@ class ReturnPurchaseFromInventory
                 ->with(['items.product', 'warehouse'])
                 ->findOrFail($purchase->id);
 
-            if ($purchase->posted_to_inventory_at === null) {
-                throw new InvalidArgumentException('Solo se pueden devolver compras ya aplicadas a inventario.');
-            }
-
             if ($purchase->returned_from_inventory_at !== null) {
                 return $purchase->fresh(['items.product', 'warehouse']);
             }
 
-            foreach ($purchase->items as $item) {
-                $this->returnItem($purchase, $item);
+            // Las compras sin items (facturas informativas, sin producto ni
+            // inventario de por medio) no tienen nada que revertir aqui:
+            // cancelar solo les toca la deuda con el proveedor, via
+            // PayablesLedger, fuera de esta clase.
+            if ($purchase->posted_to_inventory_at !== null) {
+                foreach ($purchase->items as $item) {
+                    $this->returnItem($purchase, $item);
+                }
             }
 
             $purchase->update([
-                'status' => PurchaseStatus::Returned->value,
+                'status' => PurchaseStatus::Cancelled->value,
                 'returned_from_inventory_at' => now(),
             ]);
 

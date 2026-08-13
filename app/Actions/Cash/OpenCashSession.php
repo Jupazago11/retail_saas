@@ -6,6 +6,7 @@ use App\Enums\CashSessionStatus;
 use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\CashSession;
+use App\Models\CashSessionFund;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
@@ -26,9 +27,15 @@ class OpenCashSession
         $branch = $this->resolveBranch($company, (int) ($attributes['branch_id'] ?? 0));
         $cashRegister = $this->resolveCashRegister($company, $branch, (int) ($attributes['cash_register_id'] ?? 0));
         $opener = $this->resolveUser($company, (int) ($attributes['opened_by'] ?? 0));
-        $openingAmount = $this->resolveOpeningAmount($company, $attributes);
+        $funds = $this->resolveFunds($attributes);
 
-        return DB::transaction(function () use ($company, $branch, $cashRegister, $opener, $openingAmount) {
+        if ($funds === []) {
+            $funds = [['label' => 'Base inicial', 'amount' => $this->resolveOpeningAmount($company, $attributes)]];
+        }
+
+        $openingAmount = array_reduce($funds, fn (string $carry, array $fund) => bcadd($carry, $fund['amount'], 2), '0.00');
+
+        return DB::transaction(function () use ($company, $branch, $cashRegister, $opener, $openingAmount, $funds) {
             $existing = CashSession::query()
                 ->where('company_id', $company->id)
                 ->where('cash_register_id', $cashRegister->id)
@@ -57,7 +64,19 @@ class OpenCashSession
                 'opening_amount' => $openingAmount,
                 'closing_expected_amount' => $openingAmount,
                 'opened_at' => now(),
-            ])->fresh(['branch', 'cashRegister', 'opener']);
+            ]);
+
+            foreach ($funds as $fund) {
+                CashSessionFund::query()->create([
+                    'company_id' => $company->id,
+                    'cash_session_id' => $cashSession->id,
+                    'label' => $fund['label'],
+                    'amount' => $fund['amount'],
+                    'created_by' => $opener->id,
+                ]);
+            }
+
+            $cashSession = $cashSession->fresh(['branch', 'cashRegister', 'opener', 'funds']);
 
             $this->auditLogger->logCreated($company, 'cash_session.opened', $cashSession, $opener);
 
@@ -85,6 +104,28 @@ class OpenCashSession
         return User::query()
             ->whereHas('companies', fn ($query) => $query->where('companies.id', $company->id))
             ->findOrFail($userId);
+    }
+
+    protected function resolveFunds(array $attributes): array
+    {
+        if (! array_key_exists('funds', $attributes) || ! is_array($attributes['funds'])) {
+            return [];
+        }
+
+        $funds = [];
+
+        foreach ($attributes['funds'] as $fund) {
+            $label = trim((string) ($fund['label'] ?? ''));
+            $amount = $this->normalizeOpeningAmount($fund['amount'] ?? '0');
+
+            if ($label === '' || bccomp($amount, '0.00', 2) <= 0) {
+                continue;
+            }
+
+            $funds[] = ['label' => $label, 'amount' => $amount];
+        }
+
+        return $funds;
     }
 
     protected function resolveOpeningAmount(Company $company, array $attributes): string

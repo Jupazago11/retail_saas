@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.roles" />
 
         <div class="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <div class="space-y-6">
@@ -115,10 +115,22 @@
         </div>
 
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Usuarios</p>
-                <h3 class="mt-2 text-2xl font-black text-gray-900">Asignaciones operativas</h3>
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Usuarios</p>
+                    <h3 class="mt-2 text-2xl font-black text-gray-900">Asignaciones operativas</h3>
+                </div>
+                <p class="mt-2 text-sm text-gray-500">
+                    {{ $activeUsersCount }}{{ $maxUsers !== null ? ' de '.$maxUsers : '' }} usuarios activos
+                </p>
             </div>
+
+            @if ($maxUsers !== null && $activeUsersCount > $maxUsers)
+                <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                    Tienes {{ $activeUsersCount }} usuarios activos pero tu plan actual solo permite {{ $maxUsers }}.
+                    Desactiva a los usuarios que no necesites operando ahora mismo; no podras activar a nadie mas hasta quedar dentro del limite.
+                </div>
+            @endif
 
             <div class="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
                 <div class="flex items-start justify-between gap-4">
@@ -170,9 +182,22 @@
                     <div wire:key="role-user-{{ $user->id }}" class="rounded-xl border border-gray-200 bg-gray-50 p-5">
                         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div class="space-y-2">
-                                <h4 class="text-lg font-black text-gray-900">{{ $user->name }}</h4>
+                                <div class="flex items-center gap-2">
+                                    <h4 class="text-lg font-black text-gray-900">{{ $user->name }}</h4>
+                                    @if ($user->pivot->status === 'active')
+                                        <x-status-badge color="emerald">Activo</x-status-badge>
+                                    @else
+                                        <x-status-badge color="stone">Inactivo</x-status-badge>
+                                    @endif
+                                </div>
                                 <p class="text-sm text-gray-600">{{ '@'.$user->username }} · {{ $user->email }}</p>
                                 <p class="text-sm text-gray-500">Actual: <span class="font-medium text-gray-900">{{ $this->currentAssignmentLabel($user) }}</span></p>
+                                @if (($user->pivot->company_role ?? null) !== 'owner')
+                                    <button wire:click="toggleUserStatus({{ $user->id }})"
+                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
+                                        {{ $user->pivot->status === 'active' ? 'Desactivar usuario' : 'Activar usuario' }}
+                                    </button>
+                                @endif
                             </div>
 
                             <div class="min-w-[320px] space-y-3">

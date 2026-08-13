@@ -1,6 +1,6 @@
 <div class="py-10">
     <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-purchases-nav />
+        <x-purchases-nav active="purchases.suppliers.imports" />
 
         <div class="grid gap-6 lg:grid-cols-[1.02fr_0.98fr]">
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">

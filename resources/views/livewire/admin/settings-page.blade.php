@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.settings" />
 
         <div
             x-data="{ active: '{{ array_key_first($groups) }}' }"
@@ -56,7 +56,7 @@
                                     <label class="col-span-2 flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 transition hover:border-blue-300 hover:bg-blue-50/40">
                                         <span class="text-sm font-medium text-gray-700">{{ $label }}</span>
                                         <div class="relative ml-4 flex-shrink-0">
-                                            <input wire:model="{{ $path }}" type="checkbox"
+                                            <input wire:model.live="{{ $path }}" type="checkbox"
                                                 @checked((bool) $current)
                                                 class="peer sr-only">
                                             <div class="h-6 w-11 rounded-full bg-stone-300 transition peer-checked:bg-amber-600 peer-focus:ring-2 peer-focus:ring-amber-400 peer-focus:ring-offset-1"></div>

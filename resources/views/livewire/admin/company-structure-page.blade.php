@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.structure" />
 
         {{-- Sucursales --}}
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
@@ -9,7 +9,9 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Sucursales</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">
                         Estructura registrada
-                        <span class="ml-2 text-sm font-normal text-gray-400">{{ $branches->count() }} registros</span>
+                        <span class="ml-2 text-sm font-normal text-gray-400">
+                            {{ $branches->count() }}{{ $maxBranches !== null ? ' de '.$maxBranches : '' }} registros
+                        </span>
                     </h3>
                 </div>
                 <button wire:click="openModal('branch')"
@@ -82,7 +84,9 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Bodegas</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">
                         Bodegas registradas
-                        <span class="ml-2 text-sm font-normal text-gray-400">{{ $warehouses->count() }} registros</span>
+                        <span class="ml-2 text-sm font-normal text-gray-400">
+                            {{ $warehouses->count() }}{{ $maxWarehouses !== null ? ' de '.$maxWarehouses : '' }} registros
+                        </span>
                     </h3>
                 </div>
                 <button wire:click="openModal('warehouse')"
@@ -157,7 +161,9 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Cajas</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">
                         Cajas registradas
-                        <span class="ml-2 text-sm font-normal text-gray-400">{{ $cashRegisters->count() }} registros</span>
+                        <span class="ml-2 text-sm font-normal text-gray-400">
+                            {{ $cashRegisters->count() }}{{ $maxCashRegisters !== null ? ' de '.$maxCashRegisters : '' }} registros
+                        </span>
                     </h3>
                 </div>
                 <button wire:click="openModal('cash')"

@@ -4,10 +4,13 @@ namespace App\Livewire\Sales;
 
 use App\Actions\Sales\CancelSale;
 use App\Actions\Sales\ReturnSale;
+use App\Actions\Settings\UpdateCompanySettings;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\Plans\CompanyPlanResolver;
+use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -28,9 +31,108 @@ class SalesPage extends Component
     public ?int $cancellingSaleId = null;
     public string $cancellationReason = '';
 
+    public bool $showRulesModal = false;
+    public bool $ruleFrozenSalesEnabled = true;
+    public bool $ruleAllowAlternativePrices = false;
+    public bool $ruleAllowManualDiscounts = false;
+    public bool $ruleAllowPromotionStacking = false;
+    public bool $ruleAllowNegativeStock = false;
+    public bool $ruleRequireCustomerForCreditSale = true;
+    public string $ruleSaleDocumentPrefix = 'VTA-';
+    public string $ruleSaleDocumentStartingSequence = '1';
+    public string $ruleTicketFormat = 'thermal_80mm';
+    public bool $ruleShowLogo = true;
+    public bool $ruleShowSaasBranding = false;
+
     public function mount(): void
     {
         $this->ensurePermission('sales.view');
+    }
+
+    public function canManageRules(): bool
+    {
+        return auth()->user()?->hasCurrentCompanyPermission('settings.manage') ?? false;
+    }
+
+    public function openRulesModal(): void
+    {
+        $this->ensurePermission('settings.manage');
+
+        $companySettings = app(CompanySettings::class);
+        $company = $this->currentCompany();
+
+        $this->ruleFrozenSalesEnabled = (bool) $companySettings->get($company, 'pos', 'frozen_sales_enabled');
+        $this->ruleAllowAlternativePrices = (bool) $companySettings->get($company, 'pos', 'allow_alternative_prices');
+        $this->ruleAllowManualDiscounts = (bool) $companySettings->get($company, 'pos', 'allow_manual_discounts');
+        $this->ruleAllowPromotionStacking = (bool) $companySettings->get($company, 'pos', 'allow_promotion_stacking');
+        $this->ruleAllowNegativeStock = (bool) $companySettings->get($company, 'pos', 'allow_negative_stock');
+        $this->ruleRequireCustomerForCreditSale = (bool) $companySettings->get($company, 'pos', 'require_customer_for_credit_sale');
+        $this->ruleSaleDocumentPrefix = (string) $companySettings->get($company, 'pos', 'sale_document_prefix');
+        $this->ruleSaleDocumentStartingSequence = (string) $companySettings->get($company, 'pos', 'sale_document_starting_sequence');
+        $this->ruleTicketFormat = (string) $companySettings->get($company, 'printing', 'ticket_format');
+        $this->ruleShowLogo = (bool) $companySettings->get($company, 'printing', 'show_logo');
+        $this->ruleShowSaasBranding = (bool) $companySettings->get($company, 'printing', 'show_saas_branding');
+
+        $this->resetErrorBag();
+        $this->showRulesModal = true;
+    }
+
+    public function closeRulesModal(): void
+    {
+        $this->showRulesModal = false;
+        $this->resetErrorBag();
+    }
+
+    public function saveRules(UpdateCompanySettings $updateCompanySettings): void
+    {
+        $this->ensurePermission('settings.manage');
+
+        $validated = $this->validate([
+            'ruleSaleDocumentPrefix' => ['required', 'string', 'max:20'],
+            'ruleSaleDocumentStartingSequence' => ['required', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $updateCompanySettings->handle($this->currentCompany(), [
+                'pos' => [
+                    'frozen_sales_enabled' => $this->ruleFrozenSalesEnabled,
+                    'allow_alternative_prices' => $this->ruleAllowAlternativePrices,
+                    'allow_manual_discounts' => $this->ruleAllowManualDiscounts,
+                    'allow_promotion_stacking' => $this->ruleAllowPromotionStacking,
+                    'allow_negative_stock' => $this->ruleAllowNegativeStock,
+                    'require_customer_for_credit_sale' => $this->ruleRequireCustomerForCreditSale,
+                    'sale_document_prefix' => $validated['ruleSaleDocumentPrefix'],
+                    'sale_document_starting_sequence' => $validated['ruleSaleDocumentStartingSequence'],
+                ],
+                'printing' => [
+                    'ticket_format' => $this->ruleTicketFormat,
+                    'show_logo' => $this->ruleShowLogo,
+                    'show_saas_branding' => $this->ruleShowSaasBranding,
+                ],
+            ], auth()->user());
+        } catch (InvalidArgumentException $exception) {
+            $this->addError('ruleSaleDocumentPrefix', $exception->getMessage());
+
+            return;
+        }
+
+        $this->showRulesModal = false;
+        $this->toast('Reglas de ventas actualizadas correctamente.');
+    }
+
+    public function ruleFeatureGates(): array
+    {
+        $company = $this->currentCompany();
+        $resolver = app(CompanyPlanResolver::class);
+
+        return [
+            'frozen_sales' => $resolver->hasFeature($company, 'pos.frozen_sales'),
+            'alternative_prices' => $resolver->hasFeature($company, 'products.multiple_prices'),
+            'manual_discounts' => $resolver->hasFeature($company, 'pos.manual_discounts'),
+            'promotion_stacking' => $resolver->hasModule($company, 'promotions'),
+            'negative_stock' => $resolver->hasModule($company, 'inventory'),
+            'credit_sale' => $resolver->hasModule($company, 'credit'),
+        ];
     }
 
     public function sales(): Collection
@@ -90,6 +192,7 @@ class SalesPage extends Component
         return view('livewire.sales.sales-page', [
             'sales' => $this->sales(),
             'statusCards' => $this->statusCards(),
+            'ruleFeatureGates' => $this->canManageRules() ? $this->ruleFeatureGates() : [],
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Ventas',

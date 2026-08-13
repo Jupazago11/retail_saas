@@ -15,7 +15,6 @@ class ListPurchasePayables
 
         $query = Purchase::query()
             ->where('company_id', $company->id)
-            ->where('status', '!=', 'draft')
             ->with(['payableMovements', 'supplier.person']);
 
         if (isset($filters['supplier_id']) && $filters['supplier_id'] !== null && $filters['supplier_id'] !== '') {

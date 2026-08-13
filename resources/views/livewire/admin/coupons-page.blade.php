@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.coupons" />
 
         <div class="grid gap-6 lg:grid-cols-4">
         <div class="space-y-6">
@@ -87,7 +87,7 @@
                     </div>
 
                     <div class="space-y-3 rounded-lg border border-gray-200 p-4">
-                        <p class="text-sm font-semibold text-gray-900">Bundles aplicables</p>
+                        <p class="text-sm font-semibold text-gray-900">Paquetes aplicables</p>
                         <div class="space-y-2">
                             @foreach ($availableBundles as $bundle)
                                 <label class="flex items-center gap-3 text-sm text-gray-700">
@@ -161,7 +161,7 @@
                             <p class="mt-2 text-sm text-gray-600">
                                 {{ $coupon->plans->isNotEmpty() ? $coupon->plans->pluck('name')->implode(', ') : 'Sin planes asociados' }}
                             </p>
-                            <p class="mt-4 text-sm font-semibold text-gray-900">Bundles aplicables</p>
+                            <p class="mt-4 text-sm font-semibold text-gray-900">Paquetes aplicables</p>
                             <p class="mt-2 text-sm text-gray-600">
                                 {{ $coupon->bundles->isNotEmpty() ? $coupon->bundles->pluck('name')->implode(', ') : 'Sin bundles asociados' }}
                             </p>

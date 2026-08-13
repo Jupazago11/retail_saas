@@ -2,6 +2,7 @@
 
 use App\Livewire\Actions\Logout;
 use App\Services\Plans\CompanyPlanResolver;
+use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Support\Str;
 use Livewire\Volt\Component;
@@ -11,8 +12,9 @@ new class extends Component
     public ?string $currentCompanyName = null;
     public array $planModules = [];
     public array $planFeatures = [];
+    public bool $cashModuleEnabled = true;
 
-    public function mount(CurrentCompany $currentCompany, CompanyPlanResolver $companyPlanResolver): void
+    public function mount(CurrentCompany $currentCompany, CompanyPlanResolver $companyPlanResolver, CompanySettings $companySettings): void
     {
         $company = $currentCompany->company();
 
@@ -26,6 +28,7 @@ new class extends Component
 
         $this->planModules = $snapshot['modules'];
         $this->planFeatures = $snapshot['features'];
+        $this->cashModuleEnabled = (bool) $companySettings->get($company, 'cash', 'module_enabled');
     }
 
     /**
@@ -127,7 +130,7 @@ new class extends Component
             'label' => 'Caja',
             'href' => route('cash.sessions'),
             'active' => request()->routeIs('cash.*'),
-            'visible' => $hasCashModule && $canAccessCash,
+            'visible' => $hasCashModule && $canAccessCash && $cashModuleEnabled,
             'icon' => 'cash',
         ],
         [

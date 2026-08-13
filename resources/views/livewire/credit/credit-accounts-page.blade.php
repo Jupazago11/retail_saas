@@ -22,7 +22,7 @@
 
         {{-- Tabla de clientes --}}
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+            <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between mb-5">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Cartera</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">Clientes</h3>

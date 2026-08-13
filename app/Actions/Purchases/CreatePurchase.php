@@ -62,9 +62,17 @@ class CreatePurchase
         }
 
         return DB::transaction(function () use ($company, $branch, $warehouse, $supplier, $attributes, $calculatedLines, $totals, $hasItems) {
-            $requestedStatus = $attributes['status'] ?? PurchaseStatus::Draft->value;
+            $requestedStatus = $attributes['status'] ?? PurchaseStatus::Confirmed->value;
+
+            $lastSequence = (int) Purchase::query()
+                ->where('company_id', $company->id)
+                ->orderByDesc('company_sequence')
+                ->lockForUpdate()
+                ->value('company_sequence');
+
             $purchase = Purchase::query()->create([
                 'company_id' => $company->id,
+                'company_sequence' => $lastSequence + 1,
                 'branch_id' => $branch->id,
                 'warehouse_id' => $warehouse->id,
                 'supplier_id' => $supplier?->id,
@@ -95,9 +103,7 @@ class CreatePurchase
                 $purchase = $this->postPurchaseToInventory->handle($purchase);
             }
 
-            if ($purchase->status !== PurchaseStatus::Draft->value) {
-                $this->payablesLedger->recordPurchaseCharge($purchase, (string) $purchase->total, $purchase->invoice_number);
-            }
+            $this->payablesLedger->recordPurchaseCharge($purchase, (string) $purchase->total, $purchase->invoice_number);
 
             if ($requestedStatus === PurchaseStatus::PartiallyPaid->value || $requestedStatus === PurchaseStatus::Paid->value) {
                 $paidAmount = $this->resolveInitialPaidAmount($attributes['paid_amount'] ?? null, $purchase, $requestedStatus);

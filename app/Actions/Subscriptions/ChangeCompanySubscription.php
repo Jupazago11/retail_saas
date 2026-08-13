@@ -2,6 +2,7 @@
 
 namespace App\Actions\Subscriptions;
 
+use App\Actions\Plans\ReconcileCompanyStructureLimits;
 use App\Enums\RecordStatus;
 use App\Models\Company;
 use App\Models\Plan;
@@ -18,6 +19,7 @@ class ChangeCompanySubscription
     public function __construct(
         protected AuditLogger $auditLogger,
         protected PlanCatalogBootstrapper $planCatalogBootstrapper,
+        protected ReconcileCompanyStructureLimits $reconcileCompanyStructureLimits,
     ) {
     }
 
@@ -117,6 +119,8 @@ class ChangeCompanySubscription
             ]);
 
             $this->auditLogger->logCreated($company, 'subscription.created', $subscription, $actor);
+
+            $this->reconcileCompanyStructureLimits->handle($company, $actor);
 
             return $subscription->fresh('plan');
         });

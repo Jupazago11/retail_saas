@@ -15,6 +15,22 @@ class CompanyUserLimitGuard
 
     public function ensureCanAddUser(Company $company): void
     {
+        $this->ensureUnderLimit(
+            $company,
+            'El plan actual permite hasta %d usuario(s) activos en esta empresa. Debes ampliar el plan antes de agregar otro.',
+        );
+    }
+
+    public function ensureCanActivateUser(Company $company): void
+    {
+        $this->ensureUnderLimit(
+            $company,
+            'El plan actual permite hasta %d usuario(s) activos en esta empresa. Desactiva a otro usuario antes de activar este.',
+        );
+    }
+
+    protected function ensureUnderLimit(Company $company, string $message): void
+    {
         $maxUsers = $this->companyPlanResolver->limit($company, 'max_users');
 
         if ($maxUsers === null) {
@@ -26,10 +42,7 @@ class CompanyUserLimitGuard
             ->count();
 
         if ($activeUsers >= $maxUsers) {
-            throw new InvalidArgumentException(sprintf(
-                'El plan actual permite hasta %d usuario(s) activos en esta empresa. Debes ampliar el plan antes de agregar otro.',
-                $maxUsers,
-            ));
+            throw new InvalidArgumentException(sprintf($message, $maxUsers));
         }
     }
 }

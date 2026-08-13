@@ -1,6 +1,6 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-admin-nav />
+        <x-admin-nav active="admin.audit-logs" />
 
         <div class="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
         <div class="space-y-6">
@@ -128,7 +128,7 @@
                                 </div>
 
                                 <button wire:click="toggleLog({{ $log->id }})" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
-                                    {{ $expandedLogId === $log->id ? 'Ocultar snapshots' : 'Ver snapshots' }}
+                                    {{ $expandedLogId === $log->id ? 'Ocultar capturas' : 'Ver capturas' }}
                                 </button>
                             </div>
                         </div>
@@ -136,12 +136,12 @@
                         @if ($expandedLogId === $log->id)
                             <div class="mt-5 grid gap-4 lg:grid-cols-2">
                                 <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Before</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Antes</p>
                                     <pre class="mt-3 overflow-x-auto rounded-lg bg-stone-950 p-4 text-xs text-stone-100">{{ $this->snapshotJson($log->before_snapshot) }}</pre>
                                 </div>
 
                                 <div class="rounded-lg bg-white p-4 ring-1 ring-gray-200">
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">After</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Despues</p>
                                     <pre class="mt-3 overflow-x-auto rounded-lg bg-stone-950 p-4 text-xs text-stone-100">{{ $this->snapshotJson($log->after_snapshot) }}</pre>
                                 </div>
                             </div>

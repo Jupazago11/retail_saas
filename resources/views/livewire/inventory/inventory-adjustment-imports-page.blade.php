@@ -1,5 +1,8 @@
 <div class="py-10">
     <div class="mx-auto max-w-6xl space-y-6 px-4 sm:px-6 lg:px-8">
+        <a href="{{ route('inventory.index') }}" wire:navigate class="text-sm font-medium text-gray-500 hover:text-gray-700">
+            ← Volver a Inventario
+        </a>
         <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Lote operativo</p>

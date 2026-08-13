@@ -23,7 +23,6 @@ class CompanySettingsTest extends TestCase
         $settings = app(CompanySettings::class);
 
         $this->assertTrue($settings->get($company, 'pos', 'frozen_sales_enabled'));
-        $this->assertSame(120, $settings->get($company, 'pos', 'frozen_sales_expiration_minutes'));
         $this->assertSame('weighted_average', $settings->get($company, 'inventory', 'default_cost_method'));
     }
 

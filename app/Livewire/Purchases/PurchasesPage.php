@@ -5,7 +5,6 @@ namespace App\Livewire\Purchases;
 use App\Actions\Purchases\CreatePurchase;
 use App\Actions\Purchases\RegisterPurchasePayment;
 use App\Actions\Purchases\ReturnPurchase;
-use App\Actions\Purchases\UpdateDraftPurchase;
 use App\Enums\PayableMovementType;
 use App\Enums\PurchaseStatus;
 use App\Enums\RecordStatus;
@@ -29,7 +28,6 @@ class PurchasesPage extends Component
 {
     use InteractsWithToast;
 
-    public ?int $editingPurchaseId = null;
     public ?int $branchId = null;
     public ?int $warehouseId = null;
     public ?int $supplierId = null;
@@ -58,6 +56,41 @@ class PurchasesPage extends Component
     {
         $this->ensurePermission('purchases.view');
         $this->resetPurchaseForm();
+    }
+
+    public function setStatusFilter(string $status): void
+    {
+        if (! in_array($status, ['', 'confirmed', 'partially_paid', 'paid', 'cancelled', 'archived'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $status;
+    }
+
+    public function archivePurchase(int $purchaseId): void
+    {
+        $this->ensurePermission('purchases.create');
+
+        $purchase = $this->purchasesQuery()->findOrFail($purchaseId);
+
+        if ((float) $purchase->balance_due > 0) {
+            $this->toast('No puedes archivar una compra con saldo pendiente. Registra el pago o la devolucion primero.', 'warning');
+
+            return;
+        }
+
+        $purchase->delete();
+        $this->toast('Compra archivada correctamente.', 'warning');
+    }
+
+    public function restorePurchase(int $purchaseId): void
+    {
+        $this->ensurePermission('purchases.create');
+
+        $purchase = $this->purchasesQuery()->onlyTrashed()->findOrFail($purchaseId);
+        $purchase->restore();
+
+        $this->toast('Compra restaurada correctamente.');
     }
 
     public function updatedBranchId($value): void
@@ -105,7 +138,6 @@ class PurchasesPage extends Component
             'invoiceNumber' => ['nullable', 'string', 'max:120'],
             'purchaseType' => ['required', 'string', 'max:50'],
             'purchaseStatus' => ['required', Rule::in([
-                PurchaseStatus::Draft->value,
                 PurchaseStatus::Confirmed->value,
                 PurchaseStatus::PartiallyPaid->value,
                 PurchaseStatus::Paid->value,
@@ -146,17 +178,8 @@ class PurchasesPage extends Component
             $payload['paid_amount'] = (string) $validated['initialPaidAmount'];
         }
 
-        $wasEditing = $this->editingPurchaseId !== null;
-        $createPurchase = app(CreatePurchase::class);
-        $updateDraftPurchase = app(UpdateDraftPurchase::class);
-
         try {
-            if ($this->editingPurchaseId) {
-                $purchase = $this->purchasesQuery()->with(['payableMovements'])->findOrFail($this->editingPurchaseId);
-                $updateDraftPurchase->handle($company, $purchase, $payload);
-            } else {
-                $createPurchase->handle($company, $payload);
-            }
+            app(CreatePurchase::class)->handle($company, $payload);
         } catch (InvalidArgumentException $exception) {
             $this->addError('totalAmount', $exception->getMessage());
 
@@ -165,36 +188,7 @@ class PurchasesPage extends Component
 
         $this->showModal = false;
         $this->resetPurchaseForm();
-        $this->toast($wasEditing ? 'Borrador actualizado correctamente.' : 'Compra guardada correctamente.');
-    }
-
-    public function editPurchase(int $purchaseId): void
-    {
-        $this->ensurePermission('purchases.create');
-
-        $purchase = $this->purchasesQuery()->findOrFail($purchaseId);
-
-        if ($purchase->status !== PurchaseStatus::Draft->value || $purchase->posted_to_inventory_at !== null) {
-            $this->toast('Solo se pueden editar compras en borrador.', 'warning');
-
-            return;
-        }
-
-        $this->editingPurchaseId = $purchase->id;
-        $this->branchId = $purchase->branch_id;
-        $this->warehouseId = $purchase->warehouse_id;
-        $this->supplierId = $purchase->supplier_id;
-        $this->supplierName = $purchase->supplier_id ? '' : ($purchase->supplier_name ?? '');
-        $this->invoiceNumber = $purchase->invoice_number ?? '';
-        $this->purchaseType = $purchase->purchase_type;
-        $this->purchaseStatus = $purchase->status;
-        $this->purchasedAt = $purchase->purchased_at?->format('Y-m-d') ?? '';
-        $this->dueAt = $purchase->due_at?->format('Y-m-d') ?? '';
-        $this->notes = $purchase->notes ?? '';
-        $this->totalAmount = number_format((float) $purchase->total, 2, '.', '');
-        $this->initialPaidAmount = '';
-        $this->resetValidation();
-        $this->showModal = true;
+        $this->toast('Compra guardada correctamente.');
     }
 
     public function startRegisteringPayment(int $purchaseId): void
@@ -210,7 +204,7 @@ class PurchasesPage extends Component
         }
 
         $this->payingPurchaseId = $purchase->id;
-        $this->paymentAmount = (string) $purchase->balance_due;
+        $this->paymentAmount = (string) (int) round((float) $purchase->balance_due);
         $this->paymentReference = '';
         $this->resetValidation();
     }
@@ -269,7 +263,7 @@ class PurchasesPage extends Component
         $this->toast('Pago registrado correctamente.');
     }
 
-    public function returnPurchase(int $purchaseId, ReturnPurchase $returnPurchase): void
+    public function cancelPurchase(int $purchaseId, ReturnPurchase $returnPurchase): void
     {
         $this->ensurePermission('purchases.create');
 
@@ -283,7 +277,7 @@ class PurchasesPage extends Component
             return;
         }
 
-        $this->toast('Compra devuelta correctamente.', 'info');
+        $this->toast('Compra cancelada correctamente.', 'info');
     }
 
     public function branches(): Collection
@@ -333,7 +327,11 @@ class PurchasesPage extends Component
                 'supplier.person',
                 'payableMovements.supplier.person',
             ])
-            ->when($this->statusFilter !== '', fn (Builder $query) => $query->where('status', $this->statusFilter))
+            ->when($this->statusFilter === 'archived', fn (Builder $query) => $query->onlyTrashed())
+            ->when(
+                $this->statusFilter !== '' && $this->statusFilter !== 'archived',
+                fn (Builder $query) => $query->where('status', $this->statusFilter)
+            )
             ->when($this->supplierFilterId, fn (Builder $query) => $query->where('supplier_id', $this->supplierFilterId))
             ->when($this->search !== '', function (Builder $query) {
                 $search = '%' . trim($this->search) . '%';
@@ -431,7 +429,6 @@ class PurchasesPage extends Component
 
     protected function resetPurchaseForm(): void
     {
-        $this->editingPurchaseId = null;
         $branches = $this->branches();
         $this->branchId = $branches->first()?->id;
         $this->warehouseId = $this->warehouses()->first()?->id;

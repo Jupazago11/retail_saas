@@ -1,7 +1,7 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-4">
 
-        <x-purchases-nav />
+        <x-purchases-nav active="purchases.index" />
 
         @unless ($canCreatePurchases)
             <div class="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
@@ -13,7 +13,7 @@
         @endunless
 
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Compras</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">Compras registradas</h3>
@@ -21,14 +21,6 @@
                 <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por factura o proveedor"
                         class="w-52 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <select wire:model.live="statusFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos los estados</option>
-                        <option value="draft">Borrador</option>
-                        <option value="confirmed">Confirmada</option>
-                        <option value="partially_paid">Parcialmente pagada</option>
-                        <option value="paid">Pagada</option>
-                        <option value="returned">Devuelta</option>
-                    </select>
                     <select wire:model.live="supplierFilterId" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         <option value="">Todos los proveedores</option>
                         @foreach ($suppliers as $supplier)
@@ -42,6 +34,33 @@
                         @endforeach
                     </select>
                 </div>
+            </div>
+
+            <div class="mt-3 inline-flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                <button type="button" wire:click="setStatusFilter('')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Todas
+                </button>
+                <button type="button" wire:click="setStatusFilter('confirmed')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'confirmed' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Pendiente
+                </button>
+                <button type="button" wire:click="setStatusFilter('partially_paid')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'partially_paid' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Parcial
+                </button>
+                <button type="button" wire:click="setStatusFilter('paid')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'paid' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Pagada
+                </button>
+                <button type="button" wire:click="setStatusFilter('cancelled')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'cancelled' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Cancelada
+                </button>
+                <button type="button" wire:click="setStatusFilter('archived')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'archived' ? 'bg-amber-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Archivadas
+                </button>
             </div>
 
             <div class="mt-6 overflow-x-auto">
@@ -67,7 +86,7 @@
                             @endphp
                             <tr wire:key="purchase-row-{{ $purchase->id }}" class="even:bg-gray-50">
                                 <td class="py-3 align-middle">
-                                    <p class="font-semibold text-gray-900">{{ $purchase->invoice_number ?: 'Compra #'.$purchase->id }}</p>
+                                    <p class="font-semibold text-gray-900">{{ $purchase->invoice_number ?: 'Compra #'.$purchase->company_sequence }}</p>
                                     <p class="text-xs text-gray-400">{{ optional($purchase->purchased_at)->format('d/m/Y') ?: 'Sin fecha' }}</p>
                                 </td>
                                 <td class="py-3 align-middle text-gray-700">
@@ -79,14 +98,12 @@
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
                                     <x-status-badge :color="$purchase->status === 'paid' ? 'emerald' :
-                                        ($purchase->status === 'returned' ? 'rose' :
-                                        ($purchase->status === 'draft' ? 'stone' : 'amber'))">
+                                        ($purchase->status === 'cancelled' ? 'rose' : 'amber')">
                                         {{ match($purchase->status) {
-                                            'draft'          => 'Borrador',
-                                            'confirmed'      => 'Confirmada',
+                                            'confirmed'      => 'Pendiente',
                                             'partially_paid' => 'Parcial',
                                             'paid'           => 'Pagada',
-                                            'returned'       => 'Devuelta',
+                                            'cancelled'      => 'Cancelada',
                                             default          => $purchase->status
                                         } }}
                                     </x-status-badge>
@@ -103,22 +120,12 @@
                                     @endphp
                                     <div class="flex justify-end items-center gap-1">
 
-                                        @if ($purchase->status === 'draft')
-                                        <div {!! $tip !!}>
-                                            <button wire:click="editPurchase({{ $purchase->id }})"
-                                                @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2.414a2 2 0 01.586-1.415z"/>
-                                                </svg>
+                                        @if ($purchase->deleted_at)
+                                            <button wire:click="restorePurchase({{ $purchase->id }})"
+                                                class="rounded-full border border-emerald-300 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
+                                                Restaurar
                                             </button>
-                                            <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
-                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
-                                                Editar borrador
-                                                <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
-                                            </div>
-                                        </div>
-                                        @endif
+                                        @else
 
                                         <div {!! $tip !!}>
                                             <button wire:click="toggleLedger({{ $purchase->id }})"
@@ -154,8 +161,8 @@
 
                                         @if (in_array($purchase->status, ['confirmed', 'partially_paid', 'paid'], true))
                                         <div {!! $tip !!}>
-                                            <button wire:click="returnPurchase({{ $purchase->id }})"
-                                                wire:confirm="¿Devolver esta compra? Esta accion no se puede deshacer."
+                                            <button wire:click="cancelPurchase({{ $purchase->id }})"
+                                                wire:confirm="¿Cancelar esta compra? Esta accion no se puede deshacer."
                                                 @mouseenter="show($el)" @mouseleave="tip=false"
                                                 class="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -164,10 +171,28 @@
                                             </button>
                                             <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
                                                 class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
-                                                Devolver compra
+                                                Cancelar compra
                                                 <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
                                             </div>
                                         </div>
+                                        @endif
+
+                                        <div {!! $tip !!}>
+                                            <button wire:click="archivePurchase({{ $purchase->id }})"
+                                                wire:confirm="¿Archivar esta compra? Podras restaurarla despues."
+                                                @mouseenter="show($el)" @mouseleave="tip=false"
+                                                class="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                                </svg>
+                                            </button>
+                                            <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
+                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
+                                                Archivar
+                                                <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
+                                            </div>
+                                        </div>
+
                                         @endif
 
                                     </div>
@@ -178,19 +203,12 @@
                                 <tr wire:key="purchase-pay-{{ $purchase->id }}" class="even:bg-gray-50">
                                     <td colspan="6" class="pb-4 pt-1">
                                         <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                                            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar pago · {{ $purchase->invoice_number ?: 'Compra #'.$purchase->id }}</p>
+                                            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar pago · {{ $purchase->invoice_number ?: 'Compra #'.$purchase->company_sequence }}</p>
                                             <div class="flex flex-col gap-3 md:flex-row md:items-end">
-                                                <div class="flex-1"
-                                                    x-data="{
-                                                        display: '',
-                                                        fmt(n) { return isNaN(n) ? '' : n.toLocaleString('es-CO', {minimumFractionDigits: 2, maximumFractionDigits: 2}); },
-                                                        parse(s) { return parseFloat(String(s).replace(/\./g,'').replace(',','.')); }
-                                                    }"
-                                                    x-effect="display = fmt(parseFloat($wire.paymentAmount))">
+                                                <div class="flex-1" x-data="digitGroupInput({ path: 'paymentAmount', live: false })">
                                                     <label class="text-xs font-medium text-gray-700">Monto</label>
-                                                    <input type="text" inputmode="decimal"
-                                                        x-model="display"
-                                                        @blur="const n = parse(display); if (!isNaN(n)) { display = fmt(n); $wire.paymentAmount = n.toFixed(2); }"
+                                                    <input type="text" inputmode="numeric" @input="onInput($event)"
+                                                        value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
                                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                     @error('paymentAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
@@ -252,15 +270,12 @@
         <div wire:click.self="closeModal"
             class="fixed inset-0 z-50 flex items-center justify-center p-4"
             style="background: rgba(0,0,0,0.5);">
-            <div wire:key="purchase-modal-{{ $editingPurchaseId ?? 'new' }}"
-                class="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
+            <div class="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
 
                 {{-- Header --}}
                 <div class="flex-shrink-0 flex items-center justify-between border-b border-stone-100 px-5 py-3">
                     <div>
-                        <p class="text-xs font-semibold uppercase tracking-widest text-blue-700">
-                            {{ $editingPurchaseId ? 'Editar' : 'Nueva' }}
-                        </p>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-blue-700">Nueva</p>
                         <h3 class="mt-0.5 text-lg font-black text-gray-900">Compra</h3>
                     </div>
                     <button wire:click="closeModal" class="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">&times;</button>
@@ -384,8 +399,7 @@
                                 <label for="purchase-status" class="text-xs font-medium text-gray-700">Estado inicial</label>
                                 <select wire:model.live="purchaseStatus" id="purchase-status"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                    <option value="draft">Borrador</option>
-                                    <option value="confirmed">Confirmada</option>
+                                    <option value="confirmed">Pendiente</option>
                                     <option value="partially_paid">Parcialmente pagada</option>
                                     <option value="paid">Pagada</option>
                                 </select>
@@ -438,7 +452,7 @@
                         </button>
                         <button type="submit"
                             class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60">
-                            {{ $editingPurchaseId ? 'Actualizar borrador' : 'Guardar compra' }}
+                            Guardar compra
                         </button>
                     </div>
                 </form>

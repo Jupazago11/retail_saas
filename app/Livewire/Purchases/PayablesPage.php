@@ -41,6 +41,15 @@ class PayablesPage extends Component
         $this->ensurePermission('payables.view');
     }
 
+    public function setStatus(string $status): void
+    {
+        if (! in_array($status, ['open', '', 'confirmed', 'partially_paid', 'paid', 'cancelled'], true)) {
+            return;
+        }
+
+        $this->status = $status;
+    }
+
     public function startApplyingCredit(int $purchaseId): void
     {
         $this->ensurePermission('payables.manage');
@@ -55,9 +64,10 @@ class PayablesPage extends Component
         }
 
         $this->applyingPurchaseId = $purchase->id;
-        $this->creditAmount = bccomp((string) $purchase->balance_due, $supplierCredit, 2) === 1
+        $suggestedAmount = bccomp((string) $purchase->balance_due, $supplierCredit, 2) === 1
             ? $supplierCredit
             : (string) $purchase->balance_due;
+        $this->creditAmount = (string) (int) round((float) $suggestedAmount);
         $this->creditReference = '';
         $this->resetValidation();
     }

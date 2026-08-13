@@ -44,4 +44,9 @@ class Supplier extends Model
     {
         return $this->hasMany(PayableMovement::class);
     }
+
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
 }

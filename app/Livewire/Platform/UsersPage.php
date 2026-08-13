@@ -3,6 +3,7 @@
 namespace App\Livewire\Platform;
 
 use App\Enums\RecordStatus;
+use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
@@ -13,7 +14,9 @@ use Livewire\WithPagination;
 
 class UsersPage extends Component
 {
-    use InteractsWithToast, WithPagination;
+    use HasResponsivePageSize, InteractsWithToast, WithPagination;
+
+    public int $perPage = 25;
 
     public string $search = '';
 
@@ -169,7 +172,7 @@ class UsersPage extends Component
                     ->orWhereLike('username', $s));
             })
             ->orderByDesc('created_at')
-            ->paginate(25);
+            ->paginate($this->perPage);
 
         return view('livewire.platform.users-page', compact('users'))
             ->layout('layouts.platform');

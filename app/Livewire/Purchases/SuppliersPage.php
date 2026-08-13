@@ -105,6 +105,15 @@ class SuppliersPage extends Component
         $this->showModal = true;
     }
 
+    public function setStatusFilter(string $status): void
+    {
+        if (! in_array($status, ['', RecordStatus::Active->value, RecordStatus::Inactive->value], true)) {
+            return;
+        }
+
+        $this->statusFilter = $status;
+    }
+
     public function toggleSupplierStatus(int $supplierId): void
     {
         $this->ensurePermission('suppliers.manage');

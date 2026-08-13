@@ -28,6 +28,53 @@ window.addEventListener('pos-debug', (event) => {
 });
 
 document.addEventListener('alpine:init', () => {
+    // Input numerico con puntos de miles mientras se escribe (ej "200.000").
+    // No depende del detector global de campos "money" (que solo actua sobre
+    // <input type=number> por nombre): aqui se controla explicitamente que
+    // propiedad de Livewire (por path, soporta arrays: "openFunds.0.amount")
+    // recibe el valor limpio (sin puntos), y si el update es inmediato o
+    // diferido hasta el proximo request.
+    Alpine.data('digitGroupInput', ({ path, live = true } = {}) => ({
+        group(digits) {
+            return digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
+        },
+        onInput(event) {
+            const digits = event.target.value.replace(/\D+/g, '');
+            const formatted = this.group(digits);
+            event.target.value = formatted;
+            this.$wire.set(path, digits, live);
+        },
+    }));
+
+    // Ajusta cuantos registros pide el servidor por pagina segun el alto
+    // real de la ventana, para que la tabla + paginacion siempre quepan
+    // sin scroll interno ni desborde, sin importar el tamano del monitor.
+    Alpine.data('responsivePageSize', ({ rowHeight = 64, reserved = 300, min = 4, max = 50 } = {}) => ({
+        lastApplied: null,
+        init() {
+            this.apply();
+            this.onResize = () => {
+                clearTimeout(this.resizeTimer);
+                this.resizeTimer = setTimeout(() => this.apply(), 200);
+            };
+            window.addEventListener('resize', this.onResize);
+        },
+        destroy() {
+            window.removeEventListener('resize', this.onResize);
+        },
+        apply() {
+            const available = window.innerHeight - reserved;
+            const rows = Math.max(min, Math.min(max, Math.floor(available / rowHeight)));
+
+            if (rows === this.lastApplied) {
+                return;
+            }
+
+            this.lastApplied = rows;
+            this.$wire.call('setPerPage', rows);
+        },
+    }));
+
     // Combobox generico: input de texto que filtra client-side sobre una
     // lista de opciones ya cargada (categorias, marcas, unidades, ...) y se
     // sincroniza en dos vias con una propiedad Livewire via $wire.entangle.
@@ -151,7 +198,10 @@ function findPosWire(input) {
     const fromAncestor = input.closest('[wire\\:id]');
     if (fromAncestor) return window.Livewire?.find(fromAncestor.getAttribute('wire:id'));
 
-    // Buscar wire:id como hermano del <div class="space-y-3"> (raíz visual del POS)
+    // Buscar wire:id como hermano del <div class="space-y-3"> (raíz visual del POS).
+    // Sin fallback a "cualquier wire:id de la página": fuera del POS no hay
+    // carrito que proteger, y adivinar un componente ajeno (p. ej. en el
+    // dashboard o en Inventario) rompía este guard con datos que no son suyos.
     const shell = document.querySelector('[data-pos-shell]');
     const posRoot = shell?.closest('.space-y-3') ?? shell?.parentElement;
     if (posRoot) {
@@ -160,9 +210,7 @@ function findPosWire(input) {
         if (sibling) return window.Livewire?.find(sibling.getAttribute('wire:id'));
     }
 
-    // Último recurso: cualquier wire:id en la página
-    const anyWireEl = document.querySelector('[wire\\:id]');
-    return anyWireEl ? window.Livewire?.find(anyWireEl.getAttribute('wire:id')) : null;
+    return null;
 }
 
 async function submitPosProductLookup(input, source) {
@@ -252,7 +300,7 @@ document.addEventListener('click', (event) => {
     const wire = findPosWire(link);
     if (!wire) return;
 
-    const items = wire.items ?? [];
+    const items = Array.isArray(wire.items) ? wire.items : [];
     const hasProducts = items.some((item) => item?.product_id);
     if (!hasProducts) return;
 

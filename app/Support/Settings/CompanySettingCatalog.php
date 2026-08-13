@@ -16,7 +16,6 @@ class CompanySettingCatalog
             'general.primary_color' => ['group' => 'general', 'key' => 'primary_color', 'type' => 'string', 'default' => null],
 
             'pos.frozen_sales_enabled' => ['group' => 'pos', 'key' => 'frozen_sales_enabled', 'type' => 'boolean', 'default' => true],
-            'pos.frozen_sales_expiration_minutes' => ['group' => 'pos', 'key' => 'frozen_sales_expiration_minutes', 'type' => 'integer', 'default' => 120],
             'pos.allow_alternative_prices' => ['group' => 'pos', 'key' => 'allow_alternative_prices', 'type' => 'boolean', 'default' => false],
             'pos.allow_manual_discounts' => ['group' => 'pos', 'key' => 'allow_manual_discounts', 'type' => 'boolean', 'default' => false],
             'pos.allow_promotion_stacking' => ['group' => 'pos', 'key' => 'allow_promotion_stacking', 'type' => 'boolean', 'default' => false],
@@ -29,7 +28,12 @@ class CompanySettingCatalog
             'inventory.inventory_enabled' => ['group' => 'inventory', 'key' => 'inventory_enabled', 'type' => 'boolean', 'default' => true],
             'inventory.minimum_stock_alerts_enabled' => ['group' => 'inventory', 'key' => 'minimum_stock_alerts_enabled', 'type' => 'boolean', 'default' => true],
             'inventory.default_cost_method' => ['group' => 'inventory', 'key' => 'default_cost_method', 'type' => 'string', 'default' => 'weighted_average'],
+            // No se muestra en la pagina de Configuracion: es una bandera
+            // interna que marca si la empresa ya contesto la pregunta inicial
+            // de "quieres usar inventario" del asistente de carga.
+            'inventory.setup_wizard_answered' => ['group' => 'inventory', 'key' => 'setup_wizard_answered', 'type' => 'boolean', 'default' => false],
 
+            'cash.module_enabled' => ['group' => 'cash', 'key' => 'module_enabled', 'type' => 'boolean', 'default' => true],
             'cash.opening_required' => ['group' => 'cash', 'key' => 'opening_required', 'type' => 'boolean', 'default' => true],
             'cash.default_opening_amount' => ['group' => 'cash', 'key' => 'default_opening_amount', 'type' => 'decimal', 'default' => '0.0000'],
             'cash.allow_close_with_difference' => ['group' => 'cash', 'key' => 'allow_close_with_difference', 'type' => 'boolean', 'default' => false],
