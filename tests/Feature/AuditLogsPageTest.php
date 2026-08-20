@@ -88,8 +88,8 @@ class AuditLogsPageTest extends TestCase
 
         Livewire::test(AuditLogsPage::class)
             ->set('action', 'cash_session.closed')
-            ->assertSee('cash_session.closed')
-            ->assertSee('1 eventos filtrados')
+            ->assertSee('Sesion de caja cerrada')
+            ->assertSee('1 evento')
             ->call('toggleLog', $logId)
             ->assertSee('closing_counted_amount')
             ->assertSee('51800');

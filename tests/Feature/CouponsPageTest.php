@@ -8,7 +8,6 @@ use App\Livewire\Admin\CouponsPage;
 use App\Models\Coupon;
 use App\Models\CouponRedemption;
 use App\Models\Plan;
-use App\Models\RoleTemplate;
 use App\Models\Subscription;
 use App\Models\SubscriptionBundle;
 use App\Models\User;
@@ -155,8 +154,8 @@ class CouponsPageTest extends TestCase
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

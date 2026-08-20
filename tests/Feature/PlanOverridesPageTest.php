@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Actions\Companies\CreateCompany;
 use App\Enums\RecordStatus;
 use App\Livewire\Admin\PlanOverridesPage;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Tenancy\CurrentCompany;
@@ -107,8 +106,8 @@ class PlanOverridesPageTest extends TestCase
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

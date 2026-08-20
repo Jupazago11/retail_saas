@@ -15,7 +15,6 @@ use App\Models\Category;
 use App\Models\CompanyRole;
 use App\Models\Permission;
 use App\Models\Product;
-use App\Models\RoleTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Settings\CompanySettings;
@@ -38,10 +37,11 @@ class CreditAccountsPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(CreditAccountsPage::class)
-            ->assertSee('Cuentas de credito')
+            ->assertSee('Cuentas activas')
             ->assertSee($customer->person->first_name)
+            ->call('selectCustomer', $customer->id)
             ->assertSee($sale->document_number)
-            ->call('startRegisteringPayment', $sale->id)
+            ->call('startRegisteringPayment')
             ->set('cashSessionId', $cashSession->id)
             ->set('paymentAmount', '1000')
             ->set('paymentMethodCode', 'cash')
@@ -51,13 +51,33 @@ class CreditAccountsPageTest extends TestCase
 
         $this->assertDatabaseHas('payments', [
             'company_id' => $company->id,
-            'sale_id' => $sale->id,
+            'sale_id' => null,
             'credit_account_id' => $customer->creditAccount->id,
             'cash_session_id' => $cashSession->id,
             'amount' => '1000.00',
             'reference' => 'AB-UI-1',
         ]);
         $this->assertSame('2600.00', $customer->creditAccount()->firstOrFail()->fresh()->balance_due);
+    }
+
+    public function test_credit_page_filters_accounts_by_mora_status_pill(): void
+    {
+        [$owner, $company, $sale, $customer] = $this->creditUiFixture();
+
+        $sale->update(['credit_due_at' => now()->subDays(10)]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(CreditAccountsPage::class)
+            ->assertSee($customer->person->first_name)
+            ->assertSee('En mora')
+            ->call('setStatusFilter', 'current')
+            ->assertDontSee($customer->person->first_name)
+            ->call('setStatusFilter', 'overdue')
+            ->assertSee($customer->person->first_name)
+            ->call('setStatusFilter', 'all')
+            ->assertSee($customer->person->first_name);
     }
 
     public function test_credit_page_can_enable_credit_for_a_customer_without_an_account(): void
@@ -93,6 +113,45 @@ class CreditAccountsPageTest extends TestCase
 
         Livewire::test(CreditAccountsPage::class)
             ->assertSee('Nato');
+    }
+
+    public function test_credit_page_can_create_a_brand_new_customer_and_enable_credit_in_one_flow(): void
+    {
+        [$owner, $company] = $this->creditUiFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(CreditAccountsPage::class)
+            ->call('openAddCustomerModal')
+            ->call('startCreatingCustomerForCredit')
+            ->assertSet('addCustomerCreatingNew', true)
+            ->set('newCustomerFirstName', 'Camila')
+            ->set('newCustomerLastName', 'Rios')
+            ->set('newCustomerDocumentType', 'CC')
+            ->set('newCustomerDocumentNumber', '1099887766')
+            ->set('newCustomerPhone', '3011234567')
+            ->set('newCustomerEmail', 'camila@example.test')
+            ->set('addCustomerCreditLimit', '300000')
+            ->call('createCustomerForCredit')
+            ->assertHasNoErrors()
+            ->assertSet('showAddCustomerModal', false);
+
+        $customer = \App\Models\Customer::query()
+            ->where('company_id', $company->id)
+            ->whereHas('person', fn ($query) => $query->where('document_number', '1099887766'))
+            ->with(['person', 'creditAccount'])
+            ->firstOrFail();
+
+        $this->assertSame('Camila', $customer->person->first_name);
+        $this->assertSame('Rios', $customer->person->last_name);
+        $this->assertSame('3011234567', $customer->person->phone);
+        $this->assertTrue($customer->credit_enabled);
+        $this->assertNotNull($customer->creditAccount);
+        $this->assertSame('300000.00', $customer->creditAccount->credit_limit);
+
+        Livewire::test(CreditAccountsPage::class)
+            ->assertSee('Camila');
     }
 
     public function test_credit_page_customers_without_credit_options_excludes_customers_with_an_account(): void
@@ -148,8 +207,8 @@ class CreditAccountsPageTest extends TestCase
         $assistant = User::factory()->create();
 
         $company->users()->attach($assistant->id, [
-            'company_role' => 'accounting_assistant',
-            'role_template_id' => RoleTemplate::query()->where('code', 'accounting_assistant')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'accounting_assistant')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);
@@ -158,13 +217,13 @@ class CreditAccountsPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(CreditAccountsPage::class)
-            ->call('startRegisteringPayment', $sale->id)
+            ->call('startRegisteringPayment')
             ->assertForbidden();
     }
 
-    public function test_credit_page_rejects_cash_session_outside_sale_operating_context(): void
+    public function test_credit_page_accepts_cash_session_from_any_company_register(): void
     {
-        [$owner, $company, $sale, $customer] = $this->creditUiFixture();
+        [$owner, $company, , $customer] = $this->creditUiFixture();
         $branch = $company->branches()->firstOrFail();
 
         $foreignRegister = $company->cashRegisters()->create([
@@ -184,14 +243,23 @@ class CreditAccountsPageTest extends TestCase
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
+        // Los abonos ya no se enlazan a una venta puntual, asi que una
+        // sesion de caja de cualquier caja de la empresa es valida.
         Livewire::test(CreditAccountsPage::class)
             ->assertSee($customer->person->first_name)
-            ->call('startRegisteringPayment', $sale->id)
+            ->call('selectCustomer', $customer->id)
+            ->call('startRegisteringPayment')
             ->set('cashSessionId', $foreignSession->id)
             ->set('paymentAmount', '1000')
             ->set('paymentMethodCode', 'cash')
             ->call('registerPayment')
-            ->assertHasErrors(['cashSessionId']);
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('payments', [
+            'company_id' => $company->id,
+            'cash_session_id' => $foreignSession->id,
+            'amount' => '1000.00',
+        ]);
     }
 
     protected function creditUiFixture(): array

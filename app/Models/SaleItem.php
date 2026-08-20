@@ -25,6 +25,7 @@ class SaleItem extends Model
         'line_subtotal',
         'line_total',
         'cost_snapshot',
+        'product_tax_rate',
     ];
 
     protected function casts(): array
@@ -42,6 +43,7 @@ class SaleItem extends Model
             'line_subtotal' => 'decimal:2',
             'line_total' => 'decimal:2',
             'cost_snapshot' => 'decimal:4',
+            'product_tax_rate' => 'decimal:2',
         ];
     }
 

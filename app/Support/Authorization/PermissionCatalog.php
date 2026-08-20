@@ -26,6 +26,8 @@ class PermissionCatalog
             ['code' => 'suppliers.manage', 'name' => 'Gestionar proveedores', 'module_code' => 'suppliers'],
             ['code' => 'payables.view', 'name' => 'Ver cuentas por pagar', 'module_code' => 'payables'],
             ['code' => 'payables.manage', 'name' => 'Gestionar cuentas por pagar', 'module_code' => 'payables'],
+            ['code' => 'customers.view', 'name' => 'Ver clientes', 'module_code' => 'customers'],
+            ['code' => 'customers.manage', 'name' => 'Gestionar clientes', 'module_code' => 'customers'],
             ['code' => 'sales.view', 'name' => 'Ver ventas', 'module_code' => 'sales'],
             ['code' => 'sales.create', 'name' => 'Crear ventas', 'module_code' => 'sales'],
             ['code' => 'sales.freeze', 'name' => 'Congelar ventas', 'module_code' => 'sales'],
@@ -46,104 +48,6 @@ class PermissionCatalog
             ['code' => 'users.manage', 'name' => 'Gestionar usuarios', 'module_code' => 'users'],
             ['code' => 'roles.manage', 'name' => 'Gestionar roles', 'module_code' => 'roles'],
             ['code' => 'subscriptions.view', 'name' => 'Ver suscripciones', 'module_code' => 'subscriptions'],
-        ];
-    }
-
-    public static function roleTemplates(): array
-    {
-        $all = array_column(self::permissions(), 'code');
-
-        return [
-            [
-                'code' => 'owner',
-                'name' => 'Propietario',
-                'scope' => 'company',
-                'permissions' => $all,
-            ],
-            [
-                'code' => 'company_admin',
-                'name' => 'Administrador de empresa',
-                'scope' => 'company',
-                'permissions' => $all,
-            ],
-            [
-                'code' => 'cashier',
-                'name' => 'Cajero',
-                'scope' => 'company',
-                'permissions' => [
-                    'products.view',
-                    'sales.view',
-                    'sales.create',
-                    'sales.freeze',
-                    'cash.open',
-                    'cash.close',
-                    'cash.view_difference',
-                ],
-            ],
-            [
-                'code' => 'seller',
-                'name' => 'Vendedor',
-                'scope' => 'company',
-                'permissions' => [
-                    'products.view',
-                    'sales.view',
-                    'sales.create',
-                    'sales.freeze',
-                    'sales.apply_discount',
-                ],
-            ],
-            [
-                'code' => 'purchasing_manager',
-                'name' => 'Jefe de compras',
-                'scope' => 'company',
-                'permissions' => [
-                    'masters.view',
-                    'products.view',
-                    'products.create',
-                    'products.update',
-                    'purchases.view',
-                    'purchases.create',
-                    'suppliers.view',
-                    'suppliers.manage',
-                    'payables.view',
-                    'inventory.view',
-                ],
-            ],
-            [
-                'code' => 'inventory_manager',
-                'name' => 'Jefe de inventario',
-                'scope' => 'company',
-                'permissions' => [
-                    'masters.view',
-                    'masters.create',
-                    'masters.update',
-                    'masters.archive',
-                    'masters.restore',
-                    'products.view',
-                    'products.create',
-                    'products.update',
-                    'products.archive',
-                    'products.restore',
-                    'inventory.view',
-                    'inventory.adjust',
-                    'inventory.transfer',
-                ],
-            ],
-            [
-                'code' => 'accounting_assistant',
-                'name' => 'Auxiliar contable',
-                'scope' => 'company',
-                'permissions' => [
-                    'reports.view',
-                    'reports.view_costs',
-                    'credit.view',
-                    'suppliers.view',
-                    'suppliers.manage',
-                    'payables.view',
-                    'payables.manage',
-                    'subscriptions.view',
-                ],
-            ],
         ];
     }
 }

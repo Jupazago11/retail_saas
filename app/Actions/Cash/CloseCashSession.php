@@ -8,14 +8,12 @@ use App\Models\CashSession;
 use App\Models\Company;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
-use App\Services\Settings\CompanySettings;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class CloseCashSession
 {
     public function __construct(
-        protected CompanySettings $companySettings,
         protected AuditLogger $auditLogger,
     ) {
     }
@@ -57,13 +55,6 @@ class CloseCashSession
             $status = bccomp($differenceAmount, '0.00', 2) === 0
                 ? CashSessionStatus::Reconciled->value
                 : CashSessionStatus::Closed->value;
-
-            if (
-                ! $this->companySettings->get($company, 'cash', 'allow_close_with_difference')
-                && bccomp($differenceAmount, '0.00', 2) !== 0
-            ) {
-                throw new InvalidArgumentException('La empresa no permite cerrar caja con diferencia.');
-            }
 
             $cashSession->update([
                 'closed_by' => $closer->id,

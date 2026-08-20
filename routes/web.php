@@ -25,6 +25,7 @@ use App\Livewire\Loyalty\LoyaltyAccountsPage;
 use App\Livewire\Inventory\InventoryAdjustmentImportsPage;
 use App\Livewire\Inventory\InventoryAdjustmentPage;
 use App\Livewire\Company\SelectCompanyPage;
+use App\Livewire\Customers\CustomersPage;
 use App\Livewire\Masters\BrandsPage;
 use App\Livewire\Masters\CategoriesPage;
 use App\Livewire\Masters\UnitsPage;
@@ -143,6 +144,10 @@ Route::middleware('auth')->group(function () {
 
 Route::get('cash/sessions', CashSessionsPage::class)
             ->name('cash.sessions');
+
+        Route::get('customers', CustomersPage::class)
+            ->middleware('company.permission:customers.view')
+            ->name('customers.index');
 
         Route::get('credit', CreditAccountsPage::class)
             ->name('credit.index');

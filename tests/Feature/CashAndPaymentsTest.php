@@ -243,7 +243,6 @@ class CashAndPaymentsTest extends TestCase
     public function test_it_closes_cash_session_with_difference_and_marks_it_closed(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->saleAndCashFixture();
-        app(CompanySettings::class)->set($company, 'cash', 'allow_close_with_difference', true);
 
         app(CreateInventoryAdjustment::class)->handle($company, [
             'branch_id' => $branch->id,
@@ -359,7 +358,7 @@ class CashAndPaymentsTest extends TestCase
         $this->assertSame('0.00', $reconciled->difference_amount);
     }
 
-    public function test_it_rejects_closing_cash_session_with_difference_when_company_disallows_it(): void
+    public function test_it_always_allows_closing_cash_session_with_a_difference(): void
     {
         [$owner, $company, $branch, $cashRegister] = $this->cashFixture();
 
@@ -370,13 +369,13 @@ class CashAndPaymentsTest extends TestCase
             'opening_amount' => '50000',
         ]);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('La empresa no permite cerrar caja con diferencia.');
-
-        app(CloseCashSession::class)->handle($company, $session, [
+        $closed = app(CloseCashSession::class)->handle($company, $session, [
             'closed_by' => $owner->id,
             'closing_counted_amount' => '49900',
         ]);
+
+        $this->assertSame('closed', $closed->status);
+        $this->assertSame('-100.00', $closed->difference_amount);
     }
 
     protected function cashFixture(): array

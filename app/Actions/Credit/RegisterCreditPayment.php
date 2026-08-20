@@ -7,81 +7,58 @@ use App\Enums\CreditAccountStatus;
 use App\Enums\PaymentStatus;
 use App\Models\CashSession;
 use App\Models\Company;
+use App\Models\CreditAccount;
 use App\Models\Payment;
-use App\Models\Sale;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
 use App\Services\Credit\CreditLedger;
-use App\Services\Settings\CompanySettings;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class RegisterCreditPayment
 {
     public function __construct(
-        protected CompanySettings $companySettings,
         protected CreditLedger $creditLedger,
         protected AuditLogger $auditLogger,
     ) {
     }
 
-    public function handle(Company $company, Sale $sale, array $attributes): Payment
+    public function handle(Company $company, CreditAccount $account, array $attributes): Payment
     {
-        if ($sale->company_id !== $company->id) {
-            throw new InvalidArgumentException('La venta no pertenece a la empresa indicada.');
+        if ($account->company_id !== $company->id) {
+            throw new InvalidArgumentException('La cuenta de credito no pertenece a la empresa indicada.');
         }
 
-        $sale = $sale->fresh(['creditAccount', 'payments']);
-
-        if ($sale->sale_type !== 'credit') {
-            throw new InvalidArgumentException('Solo se pueden registrar abonos sobre ventas a credito.');
-        }
-
-        if (! $sale->creditAccount) {
-            throw new InvalidArgumentException('La venta no tiene una cuenta de credito asociada.');
-        }
-
-        if (! in_array($sale->creditAccount->status, [
+        if (! in_array($account->status, [
             CreditAccountStatus::Active->value,
             CreditAccountStatus::Blocked->value,
         ], true)) {
             throw new InvalidArgumentException('La cuenta de credito no permite registrar abonos.');
         }
 
-        if ($sale->status === 'cancelled') {
-            throw new InvalidArgumentException('No se pueden registrar abonos sobre una venta anulada.');
-        }
-
         $receivedBy = $this->resolveUser($company, (int) ($attributes['received_by'] ?? 0));
-        $cashSession = $this->resolveCashSession($company, $sale, $attributes['cash_session_id'] ?? null);
+        $cashSession = $this->resolveCashSession($company, $attributes['cash_session_id'] ?? null);
         $methodCode = $this->normalizeMethodCode($attributes['payment_method_code'] ?? null);
         $amount = $this->normalizeAmount($attributes['amount'] ?? null);
         $reference = $this->blankToNull($attributes['reference'] ?? null);
 
-        if ($this->companySettings->get($company, 'pos', 'requires_open_cash_session') && ! $cashSession) {
-            throw new InvalidArgumentException('La empresa requiere una sesion de caja abierta para registrar abonos.');
-        }
-
-        return DB::transaction(function () use ($company, $sale, $receivedBy, $cashSession, $methodCode, $amount, $reference) {
-            $sale = Sale::query()
+        return DB::transaction(function () use ($company, $account, $receivedBy, $cashSession, $methodCode, $amount, $reference) {
+            $account = CreditAccount::query()
                 ->lockForUpdate()
-                ->with(['creditAccount'])
-                ->findOrFail($sale->id);
+                ->findOrFail($account->id);
 
-            $outstanding = $this->creditLedger->outstandingForSale($sale);
-
-            if (bccomp($outstanding, '0.00', 2) !== 1) {
-                throw new InvalidArgumentException('La venta ya no tiene saldo pendiente.');
+            if (bccomp((string) $account->balance_due, '0.00', 2) !== 1) {
+                throw new InvalidArgumentException('La cuenta ya no tiene saldo pendiente.');
             }
 
-            if (bccomp($amount, $outstanding, 2) === 1) {
-                throw new InvalidArgumentException('El abono no puede superar el saldo pendiente de la venta.');
+            if (bccomp($amount, (string) $account->balance_due, 2) === 1) {
+                throw new InvalidArgumentException('El abono no puede superar el saldo pendiente de la cuenta.');
             }
 
             $payment = Payment::query()->create([
                 'company_id' => $company->id,
-                'sale_id' => $sale->id,
-                'credit_account_id' => $sale->creditAccount->id,
+                'sale_id' => null,
+                'credit_account_id' => $account->id,
                 'cash_session_id' => $cashSession?->id,
                 'payment_method_code' => $methodCode,
                 'status' => PaymentStatus::Confirmed->value,
@@ -91,9 +68,9 @@ class RegisterCreditPayment
                 'received_by' => $receivedBy->id,
             ]);
 
-            $this->creditLedger->recordPayment($sale->creditAccount, $sale, $amount, $reference);
+            $this->creditLedger->recordPayment($account, $amount, $reference);
 
-            $payment = $payment->fresh(['sale', 'creditAccount', 'cashSession', 'receiver']);
+            $payment = $payment->fresh(['creditAccount', 'cashSession', 'receiver']);
             $this->auditLogger->logCreated($company, 'credit.payment_registered', $payment, $receivedBy);
 
             return $payment;
@@ -107,7 +84,7 @@ class RegisterCreditPayment
             ->findOrFail($userId);
     }
 
-    protected function resolveCashSession(Company $company, Sale $sale, mixed $cashSessionId): ?CashSession
+    protected function resolveCashSession(Company $company, mixed $cashSessionId): ?CashSession
     {
         if (! $cashSessionId) {
             return null;
@@ -119,14 +96,6 @@ class RegisterCreditPayment
 
         if ($cashSession->status !== CashSessionStatus::Open->value) {
             throw new InvalidArgumentException('La sesion de caja debe estar abierta para registrar abonos.');
-        }
-
-        if ((int) $cashSession->branch_id !== (int) $sale->branch_id) {
-            throw new InvalidArgumentException('La sesion de caja debe pertenecer a la misma sucursal de la venta.');
-        }
-
-        if ($sale->cash_register_id !== null && (int) $cashSession->cash_register_id !== (int) $sale->cash_register_id) {
-            throw new InvalidArgumentException('La sesion de caja debe corresponder a la misma caja operativa de la venta.');
         }
 
         return $cashSession;

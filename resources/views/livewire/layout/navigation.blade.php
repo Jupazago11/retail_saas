@@ -55,6 +55,7 @@ new class extends Component
     $canAccessCash = (auth()->user()?->hasCurrentCompanyPermission('cash.open') ?? false)
         || (auth()->user()?->hasCurrentCompanyPermission('cash.close') ?? false)
         || (auth()->user()?->hasCurrentCompanyPermission('cash.view_difference') ?? false);
+    $canViewCustomers = auth()->user()?->hasCurrentCompanyPermission('customers.view') ?? false;
     $canAccessCredit = (auth()->user()?->hasCurrentCompanyPermission('credit.view') ?? false)
         || (auth()->user()?->hasCurrentCompanyPermission('credit.manage') ?? false);
     $canViewReports = auth()->user()?->hasCurrentCompanyPermission('reports.view') ?? false;
@@ -125,6 +126,13 @@ new class extends Component
             'active' => request()->routeIs('inventory.*'),
             'visible' => $hasInventoryModule && $canAccessInventory,
             'icon' => 'inventory',
+        ],
+        [
+            'label' => 'Clientes',
+            'href' => route('customers.index'),
+            'active' => request()->routeIs('customers.*'),
+            'visible' => $canViewCustomers,
+            'icon' => 'customers',
         ],
         [
             'label' => 'Caja',
@@ -262,6 +270,9 @@ new class extends Component
                                 @break
                             @case('cash')
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M8 14h.01M12 14h4" /></svg>
+                                @break
+                            @case('customers')
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2" /><path stroke-linecap="round" stroke-linejoin="round" d="M3.5 20a5.5 5.5 0 0111 0" /><path stroke-linecap="round" stroke-linejoin="round" d="M16 4.5a3.2 3.2 0 010 6.4M17.5 14.2a5.5 5.5 0 014 5.3" /></svg>
                                 @break
                             @case('credit')
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7H14.5a3.5 3.5 0 010 7H6" /></svg>

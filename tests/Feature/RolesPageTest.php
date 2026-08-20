@@ -6,7 +6,6 @@ use App\Actions\Companies\CreateCompany;
 use App\Enums\RecordStatus;
 use App\Livewire\Admin\RolesPage;
 use App\Models\CompanyRole;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,8 +27,8 @@ class RolesPageTest extends TestCase
         $employee = User::factory()->create();
 
         $company->users()->attach($employee->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);
@@ -56,14 +55,12 @@ class RolesPageTest extends TestCase
         );
 
         Livewire::test(RolesPage::class)
-            ->set("memberships.{$employee->id}.role_template_id", '')
             ->set("memberships.{$employee->id}.company_role_id", (string) $role->id)
             ->call('saveMembership', $employee->id)
             ->assertHasNoErrors();
 
         $membership = $company->users()->where('users.id', $employee->id)->firstOrFail()->pivot;
 
-        $this->assertNull($membership->role_template_id);
         $this->assertSame($role->id, $membership->company_role_id);
         $this->assertSame('custom', $membership->company_role);
     }
@@ -77,8 +74,8 @@ class RolesPageTest extends TestCase
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);
@@ -99,25 +96,22 @@ class RolesPageTest extends TestCase
             'username' => 'operario_ext',
             'email' => 'operario@example.com',
         ]);
+        $role = $this->companyRolePreset($company, 'seller');
 
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(RolesPage::class)
             ->set('newUserIdentifier', 'operario_ext')
-            ->set('newUserRoleTemplateId', (string) RoleTemplate::query()->where('code', 'seller')->value('id'))
-            ->set('newUserCompanyRoleId', '')
+            ->set('newUserCompanyRoleId', (string) $role->id)
             ->call('addUserToCompany')
             ->assertHasNoErrors()
             ->assertSee('operario@example.com');
 
         $membership = $company->users()->where('users.id', $candidate->id)->firstOrFail()->pivot;
 
-        $this->assertSame('template', $membership->company_role);
-        $this->assertSame(
-            RoleTemplate::query()->where('code', 'seller')->value('id'),
-            $membership->role_template_id
-        );
+        $this->assertSame('custom', $membership->company_role);
+        $this->assertSame($role->id, $membership->company_role_id);
     }
 
     public function test_roles_page_blocks_attach_when_company_reaches_max_users(): void
@@ -133,15 +127,17 @@ class RolesPageTest extends TestCase
             'email' => 'tercero@example.com',
         ]);
 
+        $sellerRole = $this->companyRolePreset($company, 'seller');
+
         $company->users()->attach($employeeOne->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $sellerRole->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);
         $company->users()->attach($employeeTwo->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $sellerRole->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);
@@ -151,8 +147,7 @@ class RolesPageTest extends TestCase
 
         Livewire::test(RolesPage::class)
             ->set('newUserIdentifier', 'tercero@example.com')
-            ->set('newUserRoleTemplateId', (string) RoleTemplate::query()->where('code', 'seller')->value('id'))
-            ->set('newUserCompanyRoleId', '')
+            ->set('newUserCompanyRoleId', (string) $sellerRole->id)
             ->call('addUserToCompany')
             ->assertHasErrors(['newUserIdentifier']);
 

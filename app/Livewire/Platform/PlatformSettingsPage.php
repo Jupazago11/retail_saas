@@ -2,14 +2,17 @@
 
 namespace App\Livewire\Platform;
 
+use App\Actions\Platform\UpdatePlatformLogo;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\PlatformSetting;
 use Illuminate\Contracts\View\View;
+use InvalidArgumentException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class PlatformSettingsPage extends Component
 {
-    use InteractsWithToast;
+    use InteractsWithToast, WithFileUploads;
 
     public string $bankName    = '';
     public string $bankAccount = '';
@@ -21,6 +24,9 @@ class PlatformSettingsPage extends Component
     public string $contactPhone = '';
     public string $appName     = '';
     public string $ownerNotificationEmail = '';
+
+    /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null */
+    public $newLogo = null;
 
     public function mount(): void
     {
@@ -75,9 +81,44 @@ class PlatformSettingsPage extends Component
         $this->toast('Parámetros guardados correctamente.');
     }
 
+    public function uploadLogo(UpdatePlatformLogo $action): void
+    {
+        abort_unless(auth()->user()?->is_platform_admin, 403);
+
+        $this->validate([
+            'newLogo' => ['required', 'image', 'max:4096'],
+        ], [], ['newLogo' => 'logo']);
+
+        try {
+            $action->handle($this->newLogo);
+        } catch (InvalidArgumentException $exception) {
+            $this->addError('newLogo', $exception->getMessage());
+
+            return;
+        }
+
+        $this->newLogo = null;
+        $this->toast('Logo actualizado correctamente.');
+    }
+
+    public function removeLogo(UpdatePlatformLogo $action): void
+    {
+        abort_unless(auth()->user()?->is_platform_admin, 403);
+
+        $action->remove();
+
+        $this->toast('Logo eliminado, se usara el logo por defecto.', 'info');
+    }
+
+    public function isLogoStorageConfigured(): bool
+    {
+        return app(UpdatePlatformLogo::class)->isStorageConfigured();
+    }
+
     public function render(): View
     {
-        return view('livewire.platform.platform-settings-page')
-            ->layout('layouts.platform');
+        return view('livewire.platform.platform-settings-page', [
+            'currentLogoUrl' => PlatformSetting::logoUrl(),
+        ])->layout('layouts.platform');
     }
 }

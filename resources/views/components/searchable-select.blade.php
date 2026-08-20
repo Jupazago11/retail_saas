@@ -3,11 +3,13 @@
     'options',
     'placeholder' => 'Selecciona',
     'id' => null,
+    'allowCreate' => false,
 ])
 
 <div
     x-data="searchableSelect({
         selected: $wire.entangle('{{ $model }}'),
+        allowCreate: {{ $allowCreate ? 'true' : 'false' }},
     })"
     data-options="{{ json_encode(collect($options)->values()) }}"
     x-on:click.outside="close()"

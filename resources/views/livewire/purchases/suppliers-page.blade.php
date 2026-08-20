@@ -185,22 +185,14 @@
                             </div>
                         </div>
 
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <div>
-                                <label for="supplier-status" class="text-xs font-medium text-gray-700">Estado</label>
-                                <select wire:model="status" id="supplier-status"
-                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                    <option value="active">Activo</option>
-                                    <option value="inactive">Inactivo</option>
-                                </select>
-                                @error('status') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            </div>
-                            <div>
-                                <label for="supplier-payment-term-days" class="text-xs font-medium text-gray-700">Plazo de pago (dias)</label>
-                                <input wire:model="paymentTermDays" id="supplier-payment-term-days" type="number" min="0"
-                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('paymentTermDays') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            </div>
+                        <div>
+                            {{-- Sin campo "Estado": todo proveedor se crea activo, y ya se
+                                 puede activar/desactivar sin abrir este modal con el pill de
+                                 la columna "Estado" en la tabla. --}}
+                            <label for="supplier-payment-term-days" class="text-xs font-medium text-gray-700">Plazo de pago (dias)</label>
+                            <input wire:model="paymentTermDays" id="supplier-payment-term-days" type="number" min="0"
+                                class="mt-1 block w-full max-w-[200px] rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                            @error('paymentTermDays') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>

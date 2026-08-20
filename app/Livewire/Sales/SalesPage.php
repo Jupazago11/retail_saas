@@ -4,7 +4,9 @@ namespace App\Livewire\Sales;
 
 use App\Actions\Sales\CancelSale;
 use App\Actions\Sales\ReturnSale;
+use App\Actions\Settings\UpdateCompanyLogo;
 use App\Actions\Settings\UpdateCompanySettings;
+use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
 use App\Models\Sale;
@@ -12,15 +14,19 @@ use App\Models\SaleItem;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
 use InvalidArgumentException;
 use Livewire\Component;
+use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 
 class SalesPage extends Component
 {
-    use InteractsWithToast;
+    use HasResponsivePageSize, InteractsWithToast, WithFileUploads, WithPagination;
+
+    public int $perPage = 10;
 
     public string $search = '';
     public string $statusFilter = '';
@@ -32,21 +38,35 @@ class SalesPage extends Component
     public string $cancellationReason = '';
 
     public bool $showRulesModal = false;
-    public bool $ruleFrozenSalesEnabled = true;
     public bool $ruleAllowAlternativePrices = false;
     public bool $ruleAllowManualDiscounts = false;
     public bool $ruleAllowPromotionStacking = false;
     public bool $ruleAllowNegativeStock = false;
     public bool $ruleRequireCustomerForCreditSale = true;
-    public string $ruleSaleDocumentPrefix = 'VTA-';
-    public string $ruleSaleDocumentStartingSequence = '1';
     public string $ruleTicketFormat = 'thermal_80mm';
     public bool $ruleShowLogo = true;
-    public bool $ruleShowSaasBranding = false;
+
+    /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null */
+    public $newLogo = null;
 
     public function mount(): void
     {
         $this->ensurePermission('sales.view');
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedStatusFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedSaleTypeFilter(): void
+    {
+        $this->resetPage();
     }
 
     public function canManageRules(): bool
@@ -61,17 +81,13 @@ class SalesPage extends Component
         $companySettings = app(CompanySettings::class);
         $company = $this->currentCompany();
 
-        $this->ruleFrozenSalesEnabled = (bool) $companySettings->get($company, 'pos', 'frozen_sales_enabled');
         $this->ruleAllowAlternativePrices = (bool) $companySettings->get($company, 'pos', 'allow_alternative_prices');
         $this->ruleAllowManualDiscounts = (bool) $companySettings->get($company, 'pos', 'allow_manual_discounts');
         $this->ruleAllowPromotionStacking = (bool) $companySettings->get($company, 'pos', 'allow_promotion_stacking');
         $this->ruleAllowNegativeStock = (bool) $companySettings->get($company, 'pos', 'allow_negative_stock');
         $this->ruleRequireCustomerForCreditSale = (bool) $companySettings->get($company, 'pos', 'require_customer_for_credit_sale');
-        $this->ruleSaleDocumentPrefix = (string) $companySettings->get($company, 'pos', 'sale_document_prefix');
-        $this->ruleSaleDocumentStartingSequence = (string) $companySettings->get($company, 'pos', 'sale_document_starting_sequence');
         $this->ruleTicketFormat = (string) $companySettings->get($company, 'printing', 'ticket_format');
         $this->ruleShowLogo = (bool) $companySettings->get($company, 'printing', 'show_logo');
-        $this->ruleShowSaasBranding = (bool) $companySettings->get($company, 'printing', 'show_saas_branding');
 
         $this->resetErrorBag();
         $this->showRulesModal = true;
@@ -83,35 +99,44 @@ class SalesPage extends Component
         $this->resetErrorBag();
     }
 
-    public function saveRules(UpdateCompanySettings $updateCompanySettings): void
+    public function saveRules(UpdateCompanySettings $updateCompanySettings, UpdateCompanyLogo $updateCompanyLogo): void
     {
         $this->ensurePermission('settings.manage');
 
-        $validated = $this->validate([
-            'ruleSaleDocumentPrefix' => ['required', 'string', 'max:20'],
-            'ruleSaleDocumentStartingSequence' => ['required', 'integer', 'min:1'],
-        ]);
+        // El cliente no siempre nota que "Guardar logo" es un boton aparte
+        // del formulario: si dejo un archivo elegido sin subir, el
+        // "Guardar" grande tambien lo sube antes de guardar el resto.
+        if ($this->newLogo) {
+            $this->validate([
+                'newLogo' => ['image', 'mimes:jpg,jpeg,png,gif,webp,bmp', 'max:4096'],
+            ], [], ['newLogo' => 'logo']);
+
+            try {
+                $updateCompanyLogo->handle($this->currentCompany(), $this->newLogo);
+                $this->newLogo = null;
+            } catch (InvalidArgumentException $exception) {
+                $this->addError('newLogo', $exception->getMessage());
+
+                return;
+            }
+        }
 
         try {
             $updateCompanySettings->handle($this->currentCompany(), [
                 'pos' => [
-                    'frozen_sales_enabled' => $this->ruleFrozenSalesEnabled,
                     'allow_alternative_prices' => $this->ruleAllowAlternativePrices,
                     'allow_manual_discounts' => $this->ruleAllowManualDiscounts,
                     'allow_promotion_stacking' => $this->ruleAllowPromotionStacking,
                     'allow_negative_stock' => $this->ruleAllowNegativeStock,
                     'require_customer_for_credit_sale' => $this->ruleRequireCustomerForCreditSale,
-                    'sale_document_prefix' => $validated['ruleSaleDocumentPrefix'],
-                    'sale_document_starting_sequence' => $validated['ruleSaleDocumentStartingSequence'],
                 ],
                 'printing' => [
                     'ticket_format' => $this->ruleTicketFormat,
                     'show_logo' => $this->ruleShowLogo,
-                    'show_saas_branding' => $this->ruleShowSaasBranding,
                 ],
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
-            $this->addError('ruleSaleDocumentPrefix', $exception->getMessage());
+            $this->toast($exception->getMessage(), 'error');
 
             return;
         }
@@ -120,13 +145,46 @@ class SalesPage extends Component
         $this->toast('Reglas de ventas actualizadas correctamente.');
     }
 
+    public function uploadLogo(UpdateCompanyLogo $action): void
+    {
+        $this->ensurePermission('settings.manage');
+
+        $this->validate([
+            'newLogo' => ['required', 'image', 'mimes:jpg,jpeg,png,gif,webp,bmp', 'max:4096'],
+        ], [], ['newLogo' => 'logo']);
+
+        try {
+            $action->handle($this->currentCompany(), $this->newLogo);
+        } catch (InvalidArgumentException $exception) {
+            $this->addError('newLogo', $exception->getMessage());
+
+            return;
+        }
+
+        $this->newLogo = null;
+        $this->toast('Logo actualizado correctamente.');
+    }
+
+    public function removeLogo(UpdateCompanyLogo $action): void
+    {
+        $this->ensurePermission('settings.manage');
+
+        $action->remove($this->currentCompany());
+
+        $this->toast('Logo eliminado.', 'info');
+    }
+
+    public function isLogoStorageConfigured(): bool
+    {
+        return app(UpdateCompanyLogo::class)->isStorageConfigured();
+    }
+
     public function ruleFeatureGates(): array
     {
         $company = $this->currentCompany();
         $resolver = app(CompanyPlanResolver::class);
 
         return [
-            'frozen_sales' => $resolver->hasFeature($company, 'pos.frozen_sales'),
             'alternative_prices' => $resolver->hasFeature($company, 'products.multiple_prices'),
             'manual_discounts' => $resolver->hasFeature($company, 'pos.manual_discounts'),
             'promotion_stacking' => $resolver->hasModule($company, 'promotions'),
@@ -135,7 +193,7 @@ class SalesPage extends Component
         ];
     }
 
-    public function sales(): Collection
+    public function sales(): LengthAwarePaginator
     {
         return $this->salesQuery()
             ->with([
@@ -155,7 +213,18 @@ class SalesPage extends Component
             ->when($this->search !== '', function (Builder $query) {
                 $search = '%' . trim($this->search) . '%';
 
-                $query->where(function (Builder $nested) use ($search) {
+                // Un lector laser manda el guion de "BAS-000007" segun el
+                // layout de teclado activo en el equipo, y en varios
+                // layouts en espanol ese scancode termina siendo un
+                // apostrofe ("BAS'000007") en vez de un guion — no es algo
+                // que se pueda arreglar desde la app (el navegador ya
+                // recibe el caracter que el SO tradujo). Lo que si se puede
+                // hacer es comparar tambien ignorando todo lo que no sea
+                // letra o numero, para que "BAS-000007" y "BAS'000007"
+                // (o "BAS 000007", "BAS_000007", etc.) matcheen igual.
+                $normalizedSearch = preg_replace('/[^A-Za-z0-9]/', '', $this->search);
+
+                $query->where(function (Builder $nested) use ($search, $normalizedSearch) {
                     $nested
                         ->whereLike('id', $search)
                         ->orWhereLike('document_number', $search)
@@ -168,31 +237,29 @@ class SalesPage extends Component
                                 ->orWhereLike('document_number', $search);
                         })
                         ->orWhereHas('user', fn (Builder $userQuery) => $userQuery->whereLike('name', $search));
+
+                    // regexp_replace es de Postgres (dev/prod); los tests
+                    // corren en SQLite, que no lo tiene — sin este guard la
+                    // suite se rompe aunque en produccion nunca pasa por sqlite.
+                    if ($normalizedSearch !== '' && $nested->getConnection()->getDriverName() === 'pgsql') {
+                        $nested->orWhereRaw(
+                            "regexp_replace(document_number, '[^A-Za-z0-9]', '', 'g') ILIKE ?",
+                            ['%' . $normalizedSearch . '%']
+                        );
+                    }
                 });
             })
             ->orderByDesc('sold_at')
             ->orderByDesc('id')
-            ->get();
-    }
-
-    public function statusCards(): array
-    {
-        $sales = $this->sales();
-
-        return [
-            'total_count' => $sales->count(),
-            'confirmed_count' => $sales->where('status', 'confirmed')->count(),
-            'credit_count' => $sales->where('sale_type', 'credit')->count(),
-            'grand_total' => \App\Support\Money::format((float) $sales->sum(fn (Sale $sale) => (float) $sale->grand_total)),
-        ];
+            ->paginate($this->perPage);
     }
 
     public function render(): View
     {
         return view('livewire.sales.sales-page', [
             'sales' => $this->sales(),
-            'statusCards' => $this->statusCards(),
             'ruleFeatureGates' => $this->canManageRules() ? $this->ruleFeatureGates() : [],
+            'currentLogoUrl' => $this->canManageRules() ? app(UpdateCompanyLogo::class)->currentUrl($this->currentCompany()) : null,
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Ventas',

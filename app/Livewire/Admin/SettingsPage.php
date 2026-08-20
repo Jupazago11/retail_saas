@@ -59,32 +59,26 @@ class SettingsPage extends Component
 
         // Personalizacion de marca (logo, color) por empresa: ocultada a
         // proposito por ahora, todavia no se va a habilitar.
-        // Grupo "cash" completo y "pos.requires_open_cash_session": se
-        // administran desde el modal de Reglas dentro del propio modulo
-        // Caja. Grupo "pos" (el resto) y grupo "printing" completos: se
-        // administran desde el modal de Reglas dentro del modulo Ventas.
-        // Duplicarlos en esta pagina general solo la haria mas grande y
-        // menos intuitiva.
+        // Grupo "cash" completo: se administra desde el modal de Reglas
+        // dentro del propio modulo Caja. Grupo "pos" y grupo "printing"
+        // completos: se administran desde el modal de Reglas dentro del
+        // modulo Ventas. Duplicarlos en esta pagina general solo la haria
+        // mas grande y menos intuitiva.
         $hiddenKeys = [
             'general.logo_path',
+            'general.logo_print_path',
             'general.primary_color',
             'cash.module_enabled',
             'cash.opening_required',
             'cash.default_opening_amount',
-            'cash.allow_close_with_difference',
             'inventory.setup_wizard_answered',
-            'pos.frozen_sales_enabled',
             'pos.allow_alternative_prices',
             'pos.allow_manual_discounts',
             'pos.allow_promotion_stacking',
             'pos.allow_negative_stock',
-            'pos.requires_open_cash_session',
             'pos.require_customer_for_credit_sale',
-            'pos.sale_document_prefix',
-            'pos.sale_document_starting_sequence',
             'printing.ticket_format',
             'printing.show_logo',
-            'printing.show_saas_branding',
         ];
 
         return collect(CompanySettingCatalog::definitions())
@@ -117,25 +111,19 @@ class SettingsPage extends Component
             'address' => 'Direccion',
             'logo_path' => 'Ruta de logo',
             'primary_color' => 'Color principal',
-            'frozen_sales_enabled' => 'Permitir ventas congeladas',
             'allow_alternative_prices' => 'Permitir precios alternos',
             'allow_manual_discounts' => 'Permitir descuentos manuales',
             'allow_promotion_stacking' => 'Permitir apilar promociones',
             'allow_negative_stock' => 'Permitir inventario negativo',
-            'requires_open_cash_session' => 'Requerir caja abierta para vender',
             'require_customer_for_credit_sale' => 'Exigir cliente para venta a credito',
-            'sale_document_prefix' => 'Prefijo documental interno',
-            'sale_document_starting_sequence' => 'Consecutivo inicial interno',
             'inventory_enabled' => 'Inventario activo',
             'minimum_stock_alerts_enabled' => 'Alertas de stock minimo',
             'default_cost_method' => 'Metodo de costo',
             'module_enabled' => 'Esta empresa usa caja registradora',
             'opening_required' => 'Exigir apertura de caja',
             'default_opening_amount' => 'Monto por defecto de apertura',
-            'allow_close_with_difference' => 'Permitir cierre con diferencia',
             'ticket_format' => 'Formato de ticket',
             'show_logo' => 'Mostrar logo',
-            'show_saas_branding' => 'Mostrar marca del SaaS',
             'credit_enabled' => 'Credito habilitado',
             'default_term_days' => 'Plazo por defecto en dias',
             'block_new_credit_if_overdue' => 'Bloquear nuevo credito si hay mora',

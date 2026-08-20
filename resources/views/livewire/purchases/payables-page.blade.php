@@ -3,21 +3,18 @@
 
         <x-purchases-nav active="purchases.payables" />
 
-        {{-- Filtros --}}
-        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex items-center justify-between">
+        {{-- Filtros: solo lo esencial a la vista (proveedor, estado, vencidas);
+             el resto queda en "Mas filtros" para no saturar la pantalla. --}}
+        <div x-data="{ showMoreFilters: false }" class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Filtros</p>
-                    <h3 class="mt-1 text-2xl font-black text-gray-900">Consulta operativa</h3>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Cuentas por pagar</p>
+                    <h3 class="mt-1 text-2xl font-black text-gray-900">Que le debo a mis proveedores</h3>
                 </div>
-                <p class="text-sm text-gray-500">{{ $supplierSummary->count() }} proveedores en el agregado</p>
-            </div>
 
-            <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div class="sm:col-span-2">
-                    <label for="payables-supplier-id" class="text-xs font-medium text-gray-700">Proveedor formal</label>
-                    <select wire:model.live="supplierId" id="payables-supplier-id"
-                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                <div class="flex flex-wrap items-center gap-3">
+                    <select wire:model.live="supplierId"
+                        class="rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         <option value="">Todos los proveedores</option>
                         @foreach ($suppliers as $supplier)
                             @php
@@ -29,54 +26,64 @@
                             <option value="{{ $supplier->id }}">{{ $fullName !== '' ? $fullName : 'Proveedor '.$supplier->id }}</option>
                         @endforeach
                     </select>
-                </div>
 
-                <div class="sm:col-span-2">
-                    <label for="payables-supplier-name" class="text-xs font-medium text-gray-700">Nombre congelado en compra</label>
-                    <input wire:model.live.debounce.300ms="supplierName" id="payables-supplier-name" type="text"
-                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                </div>
-
-                <div class="sm:col-span-2 lg:col-span-4">
-                    <label class="text-xs font-medium text-gray-700">Estado</label>
-                    <div class="mt-1 inline-flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <div class="inline-flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
                         <button type="button" wire:click="setStatus('open')"
                             class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'open' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
-                            Abiertas
+                            Pendientes
                         </button>
                         <button type="button" wire:click="setStatus('')"
                             class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
                             Todas
                         </button>
-                        <button type="button" wire:click="setStatus('confirmed')"
-                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'confirmed' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
-                            Pendientes
-                        </button>
-                        <button type="button" wire:click="setStatus('partially_paid')"
-                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'partially_paid' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
-                            Parcialmente pagadas
-                        </button>
                         <button type="button" wire:click="setStatus('paid')"
                             class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'paid' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
                             Pagadas
                         </button>
-                        <button type="button" wire:click="setStatus('cancelled')"
-                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $status === 'cancelled' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
-                            Canceladas
-                        </button>
                     </div>
+
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
+                        <input type="checkbox"
+                            :checked="$wire.overdueOnly"
+                            @change="$wire.set('overdueOnly', $event.target.checked)"
+                            class="rounded border-gray-300 text-rose-600 shadow-sm focus:ring-rose-500">
+                        Solo vencidas
+                    </label>
+
+                    <button type="button" @click="showMoreFilters = ! showMoreFilters"
+                        class="text-sm font-semibold text-blue-700 hover:underline">
+                        <span x-text="showMoreFilters ? 'Menos filtros' : 'Mas filtros'"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div x-show="showMoreFilters" x-cloak class="mt-5 grid gap-4 border-t border-stone-100 pt-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div class="sm:col-span-2">
+                    <label for="payables-supplier-name" class="text-xs font-medium text-gray-700">Nombre congelado en compra (sin proveedor formal)</label>
+                    <input wire:model.live.debounce.300ms="supplierName" id="payables-supplier-name" type="text"
+                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                 </div>
 
                 <div>
-                    <label for="payables-aging-bucket" class="text-xs font-medium text-gray-700">Bucket aging</label>
+                    <label for="payables-aging-bucket" class="text-xs font-medium text-gray-700">Antiguedad</label>
                     <select wire:model.live="agingBucket" id="payables-aging-bucket"
                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos</option>
+                        <option value="">Todas</option>
                         <option value="0_30">0-30 dias</option>
                         <option value="31_60">31-60 dias</option>
                         <option value="61_90">61-90 dias</option>
                         <option value="91_plus">91+ dias</option>
                     </select>
+                </div>
+
+                <div>
+                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer mt-5">
+                        <input type="checkbox"
+                            :checked="$wire.hasCreditOnly"
+                            @change="$wire.set('hasCreditOnly', $event.target.checked)"
+                            class="rounded border-gray-300 text-emerald-600 shadow-sm focus:ring-emerald-500">
+                        Solo con saldo a favor
+                    </label>
                 </div>
 
                 <div>
@@ -90,100 +97,91 @@
                     <input wire:model.live="dueTo" id="payables-due-to" type="date"
                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                 </div>
-
-                <div class="flex items-end gap-6 sm:col-span-2 lg:col-span-4">
-                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="checkbox"
-                            :checked="$wire.overdueOnly"
-                            @change="$wire.set('overdueOnly', $event.target.checked)"
-                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                        Solo vencidas
-                    </label>
-                    <label class="inline-flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer">
-                        <input type="checkbox"
-                            :checked="$wire.hasCreditOnly"
-                            @change="$wire.set('hasCreditOnly', $event.target.checked)"
-                            class="rounded border-gray-300 text-emerald-600 shadow-sm focus:ring-emerald-500">
-                        Solo con saldo a favor
-                    </label>
-                </div>
             </div>
         </div>
 
-        {{-- Metricas globales --}}
-        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {{-- Metricas: solo 3, en lenguaje simple (nada de "exposicion neta"). --}}
+        <div class="grid gap-4 sm:grid-cols-3">
             <div class="rounded-xl bg-blue-600 px-5 py-5 text-white">
-                <p class="text-xs uppercase tracking-[0.18em] text-stone-300">Saldo abierto</p>
+                <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Debes en total</p>
                 <p class="mt-2 text-2xl font-black">${{ \App\Support\Money::format((float) $openBalanceTotal) }}</p>
             </div>
             <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Saldo vencido</p>
+                <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Vencido</p>
                 <p class="mt-2 text-2xl font-black text-rose-700">${{ \App\Support\Money::format((float) $overdueBalanceTotal) }}</p>
             </div>
             <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-emerald-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">Saldo a favor</p>
+                <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">A tu favor</p>
                 <p class="mt-2 text-2xl font-black text-emerald-700">${{ \App\Support\Money::format((float) $availableCreditTotal) }}</p>
-            </div>
-            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-amber-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-blue-700">Exposicion neta</p>
-                <p class="mt-2 text-2xl font-black text-amber-800">${{ \App\Support\Money::format((float) $netExposureTotal) }}</p>
             </div>
         </div>
 
-        {{-- Resumen por proveedor --}}
+        {{-- Graficas: reemplazan la grilla densa de 6 columnas por proveedor
+             que habia antes — de un vistazo se ve que tan vieja es la deuda
+             y a quien se le debe mas, sin leer una tabla de numeros. --}}
+        @if ($supplierSummary->isNotEmpty())
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Por antiguedad</p>
+                    <h3 class="mt-1 text-lg font-black text-gray-900">Que tan vieja es la deuda</h3>
+                    <div class="mt-4">
+                        <x-charts.bar-chart
+                            :data="$agingChartData"
+                            :colors="['#10b981', '#f59e0b', '#f97316', '#e11d48']"
+                            :money="true"
+                            height="180"
+                            aria-label="Saldo por antiguedad" />
+                    </div>
+                </div>
+
+                @if ($topSuppliersChartData !== [])
+                    <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Top proveedores</p>
+                        <h3 class="mt-1 text-lg font-black text-gray-900">A quien le debes mas</h3>
+                        <div class="mt-4">
+                            <x-charts.bar-chart
+                                :data="$topSuppliersChartData"
+                                color="#2563eb"
+                                :money="true"
+                                height="180"
+                                aria-label="Saldo pendiente por proveedor" />
+                        </div>
+                    </div>
+                @endif
+            </div>
+        @endif
+
+        {{-- Resumen por proveedor: simplificado a nombre + saldo neto, sin la
+             grilla de 6 estadisticas por fila (ya cubierta por las graficas). --}}
         @if ($supplierSummary->isNotEmpty())
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Resumen</p>
-                <h3 class="mt-1 text-2xl font-black text-gray-900">Proveedores filtrados</h3>
+                <h3 class="mt-1 text-lg font-black text-gray-900">Proveedores filtrados</h3>
 
-                <div class="mt-5 space-y-3">
+                <div class="mt-4 divide-y divide-stone-100">
                     @foreach ($supplierSummary as $summary)
-                        <div class="rounded-lg bg-gray-50 px-4 py-4 ring-1 ring-gray-200">
-                            <div class="flex items-start justify-between gap-4">
-                                <div>
-                                    <p class="font-semibold text-gray-900">{{ $summary['supplier_name'] }}</p>
-                                    <p class="text-xs text-gray-500">
-                                        {{ $summary['document_number'] ?: 'Sin documento' }}
-                                        · {{ $summary['open_purchases_count'] }} compras abiertas
-                                        · {{ $summary['overdue_purchases_count'] }} vencidas
-                                    </p>
-                                </div>
-                                <span class="whitespace-nowrap rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
-                                    Neto ${{ \App\Support\Money::format((float) $summary['net_balance_exposure']) }}
-                                </span>
+                        <div class="flex flex-wrap items-center justify-between gap-3 py-3">
+                            <div>
+                                <p class="font-semibold text-gray-900">{{ $summary['supplier_name'] }}</p>
+                                <p class="text-xs text-gray-500">
+                                    {{ $summary['open_purchases_count'] }} compras pendientes
+                                    @if ($summary['overdue_purchases_count'] > 0)
+                                        · <span class="text-rose-600">{{ $summary['overdue_purchases_count'] }} vencidas</span>
+                                    @endif
+                                    @if ($summary['next_due_at'])
+                                        · vence {{ \Illuminate\Support\Carbon::parse($summary['next_due_at'])->format('d/m/Y') }}
+                                    @endif
+                                </p>
                             </div>
-
-                            <div class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                                <div class="rounded-lg bg-white px-3 py-3 lg:col-span-2">
-                                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Abierto / Vencido</p>
-                                    <p class="mt-1 font-semibold text-gray-900">
-                                        ${{ \App\Support\Money::format((float) $summary['open_balance_total']) }}
-                                        / ${{ \App\Support\Money::format((float) $summary['overdue_balance_total']) }}
-                                    </p>
-                                </div>
-                                <div class="rounded-lg bg-white px-3 py-3 lg:col-span-2">
-                                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Credito / Proximo venc.</p>
-                                    <p class="mt-1 font-semibold text-gray-900">
-                                        ${{ \App\Support\Money::format((float) $summary['credit_balance']) }}
-                                        / {{ $summary['next_due_at'] ? \Illuminate\Support\Carbon::parse($summary['next_due_at'])->format('d/m/Y') : '—' }}
-                                    </p>
-                                </div>
-                                <div class="rounded-lg bg-white px-3 py-3 text-center">
-                                    <p class="text-[11px] uppercase tracking-[0.16em] text-gray-500">0-30</p>
-                                    <p class="mt-1 text-sm font-semibold text-gray-900">${{ \App\Support\Money::format((float) $summary['age_0_30_balance_total']) }}</p>
-                                </div>
-                                <div class="rounded-lg bg-white px-3 py-3 text-center">
-                                    <p class="text-[11px] uppercase tracking-[0.16em] text-gray-500">31-60</p>
-                                    <p class="mt-1 text-sm font-semibold text-gray-900">${{ \App\Support\Money::format((float) $summary['age_31_60_balance_total']) }}</p>
-                                </div>
-                                <div class="rounded-lg bg-white px-3 py-3 text-center">
-                                    <p class="text-[11px] uppercase tracking-[0.16em] text-gray-500">61-90</p>
-                                    <p class="mt-1 text-sm font-semibold text-gray-900">${{ \App\Support\Money::format((float) $summary['age_61_90_balance_total']) }}</p>
-                                </div>
-                                <div class="rounded-lg bg-white px-3 py-3 text-center">
-                                    <p class="text-[11px] uppercase tracking-[0.16em] text-gray-500">91+</p>
-                                    <p class="mt-1 text-sm font-semibold text-gray-900">${{ \App\Support\Money::format((float) $summary['age_91_plus_balance_total']) }}</p>
-                                </div>
+                            <div class="flex items-center gap-2">
+                                @if ((float) $summary['credit_balance'] > 0)
+                                    <x-status-badge color="emerald">
+                                        A favor ${{ \App\Support\Money::format((float) $summary['credit_balance']) }}
+                                    </x-status-badge>
+                                @endif
+                                <x-status-badge :color="(float) $summary['overdue_balance_total'] > 0 ? 'rose' : 'blue'">
+                                    Debe ${{ \App\Support\Money::format((float) $summary['open_balance_total']) }}
+                                </x-status-badge>
                             </div>
                         </div>
                     @endforeach

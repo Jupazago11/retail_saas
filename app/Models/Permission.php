@@ -14,12 +14,6 @@ class Permission extends Model
         'status',
     ];
 
-    public function roleTemplates(): BelongsToMany
-    {
-        return $this->belongsToMany(RoleTemplate::class, 'role_template_permissions')
-            ->withTimestamps();
-    }
-
     public function companyRoles(): BelongsToMany
     {
         return $this->belongsToMany(CompanyRole::class, 'company_role_permissions')

@@ -4,12 +4,6 @@
     $canViewPurchases = auth()->user()?->hasCurrentCompanyPermission('purchases.view') ?? false;
     $canViewSuppliers = auth()->user()?->hasCurrentCompanyPermission('suppliers.view') ?? false;
     $canViewPayables = auth()->user()?->hasCurrentCompanyPermission('payables.view') ?? false;
-    $company = app(\App\Services\Tenancy\CurrentCompany::class)->company();
-    $planSnapshot = $company
-        ? app(\App\Services\Plans\CompanyPlanResolver::class)->snapshot($company)
-        : ['modules' => [], 'features' => []];
-    $canUseImports = (bool) ($planSnapshot['modules']['imports'] ?? false)
-        && (bool) ($planSnapshot['features']['imports.excel'] ?? false);
 @endphp
 
 {{--
@@ -30,16 +24,6 @@
         </a>
     @endif
 
-    @if ((auth()->user()?->hasCurrentCompanyPermission('purchases.create') ?? false) && $canUseImports)
-        <a
-            href="{{ route('purchases.imports') }}"
-            wire:navigate
-            class="{{ $active === 'purchases.imports' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
-        >
-            Importar
-        </a>
-    @endif
-
     @if ($canViewSuppliers)
         <a
             href="{{ route('purchases.suppliers') }}"
@@ -47,16 +31,6 @@
             class="{{ $active === 'purchases.suppliers' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
         >
             Proveedores
-        </a>
-    @endif
-
-    @if ((auth()->user()?->hasCurrentCompanyPermission('suppliers.manage') ?? false) && $canUseImports)
-        <a
-            href="{{ route('purchases.suppliers.imports') }}"
-            wire:navigate
-            class="{{ $active === 'purchases.suppliers.imports' ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 border border-gray-200' }} rounded-full px-4 py-2 text-sm font-semibold transition"
-        >
-            Importar proveedores
         </a>
     @endif
 

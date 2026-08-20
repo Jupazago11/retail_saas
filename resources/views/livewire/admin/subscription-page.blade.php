@@ -38,28 +38,66 @@
             @endif
         </div>
 
-        {{-- Otros planes --}}
-        @if ($otherPlans->isNotEmpty())
+        {{-- Planes disponibles: el actual y los demas, uno al lado del otro,
+        de mas basico a mas completo. Cada plan muestra sus modulos de forma
+        acumulativa: el primero lista todos los suyos, y cada siguiente dice
+        "incluye todo lo de {plan anterior}, mas" y solo lista lo nuevo que
+        suma frente a ese plan anterior. --}}
+        @if ($plans->isNotEmpty())
             <div>
-                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Otros planes disponibles</p>
+                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Planes disponibles</p>
                 <div class="mt-3 -mx-1 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
-                    @foreach ($otherPlans as $plan)
-                        <article class="w-64 shrink-0 snap-start rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">{{ $plan->code }}</p>
-                            <h4 class="mt-1 text-lg font-black text-gray-900">{{ $plan->name }}</h4>
+                    @foreach ($plans as $plan)
+                        @php
+                            $isCurrent = $snapshot['plan']?->id === $plan->id;
+                            $previousPlanName = $planModuleBreakdown[$plan->id]['previous_plan_name'];
+                            $addedModules = $planModuleBreakdown[$plan->id]['added_modules'];
+                        @endphp
+                        <article @class([
+                            'w-64 shrink-0 snap-start rounded-xl border bg-white p-5 shadow-sm',
+                            'border-blue-600 ring-1 ring-blue-600' => $isCurrent,
+                            'border-gray-200' => ! $isCurrent,
+                        ])>
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">{{ $plan->name }}</p>
+                                @if ($isCurrent)
+                                    <x-status-badge color="blue">Tu plan</x-status-badge>
+                                @endif
+                            </div>
                             <p class="mt-1 text-2xl font-black text-gray-900">
                                 ${{ $this->formatMoney($plan->base_price) }}<span class="text-xs font-normal text-gray-400">/mes</span>
                             </p>
 
-                            @if ($plan->modules->isNotEmpty())
-                                <ul class="mt-4 space-y-1.5 text-xs text-gray-600">
-                                    @foreach ($plan->modules as $module)
+                            @if ($previousPlanName)
+                                <p class="mt-4 text-xs font-semibold text-gray-500">Incluye todo lo de {{ $previousPlanName }}, mas:</p>
+                            @endif
+
+                            @if ($addedModules->isNotEmpty())
+                                <ul class="mt-2 space-y-1.5 text-xs text-gray-600">
+                                    @foreach ($addedModules as $module)
                                         <li class="flex items-center gap-1.5">
                                             <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                                             {{ $module->name }}
                                         </li>
                                     @endforeach
                                 </ul>
+                            @elseif (! $previousPlanName)
+                                <p class="mt-4 text-xs text-gray-400">Sin modulos configurados.</p>
+                            @endif
+
+                            @php
+                                $maxUsers = $plan->limits->firstWhere('limit_key', 'max_users')?->limit_value;
+                                $maxBranches = $plan->limits->firstWhere('limit_key', 'max_branches')?->limit_value;
+                            @endphp
+                            @if ($maxUsers || $maxBranches)
+                                <div class="mt-4 border-t border-gray-100 pt-3 text-xs text-gray-500 space-y-1">
+                                    @if ($maxUsers)
+                                        <p>Hasta {{ $maxUsers }} {{ \Illuminate\Support\Str::plural('usuario', $maxUsers) }}</p>
+                                    @endif
+                                    @if ($maxBranches)
+                                        <p>Hasta {{ $maxBranches }} {{ $maxBranches === 1 ? 'sucursal' : 'sucursales' }}</p>
+                                    @endif
+                                </div>
                             @endif
                         </article>
                     @endforeach

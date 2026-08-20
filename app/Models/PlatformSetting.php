@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class PlatformSetting extends Model
 {
@@ -30,6 +31,35 @@ class PlatformSetting extends Model
     public static function ownerNotificationEmail(): string
     {
         return static::get('owner_notification_email', 'jupazago11@gmail.com');
+    }
+
+    /**
+     * Ruta del logo en el disco "r2", o null si la plataforma sigue usando
+     * el logo por defecto (no se ha subido nada o se elimino).
+     */
+    public static function logoPath(): ?string
+    {
+        $path = static::get('app_logo_path', '');
+
+        return $path !== '' ? $path : null;
+    }
+
+    /**
+     * El bucket de logos es el mismo "r2" privado que los comprobantes de
+     * pago (ver PaymentAttachment) — Railway no conserva el disco local
+     * entre despliegues, asi que cualquier archivo subido por el usuario
+     * tiene que vivir en storage externo. Como no es publico, se firma una
+     * URL temporal larga en cada render en vez de guardar un link fijo.
+     */
+    public static function logoUrl(): ?string
+    {
+        $path = static::logoPath();
+
+        if ($path === null) {
+            return null;
+        }
+
+        return Storage::disk('r2')->temporaryUrl($path, now()->addDay());
     }
 
     /**

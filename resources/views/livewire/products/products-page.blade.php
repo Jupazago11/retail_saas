@@ -56,7 +56,9 @@
                                     <p class="font-semibold text-gray-900">{{ $product->name }}</p>
                                     <div class="mt-0.5 space-y-px text-xs text-gray-400">
                                         <p>{{ $product->barcode ?: '—' }}</p>
-                                        <p>{{ $product->tracks_inventory ? 'Con inventario' : 'Sin inventario' }}</p>
+                                        @if ($hasInventory)
+                                            <p>{{ $product->tracks_inventory ? 'Con inventario' : 'Sin inventario' }}</p>
+                                        @endif
                                     </div>
                                 </td>
                                 <td class="py-2 align-middle text-gray-600 text-xs">
@@ -162,88 +164,57 @@
 
                         {{-- Categoria / Marca / Unidad / Ref fiscal --}}
                         <div class="grid gap-3 sm:grid-cols-2">
-                            <div x-data="{ open: false, n: '' }">
-                                <div class="flex items-center justify-between mb-1">
-                                    <label for="product-category" class="text-xs font-medium text-gray-700">Categoria</label>
-                                    <button type="button" x-on:click="open = !open"
-                                        class="text-xs font-semibold text-blue-700 hover:underline">+ Nueva</button>
-                                </div>
+                            <div>
+                                <label for="product-category" class="mb-1 block text-xs font-medium text-gray-700">Categoria</label>
                                 <x-searchable-select
                                     id="product-category"
                                     model="categoryId"
+                                    allow-create
                                     :options="$categories->map(fn ($category) => ['id' => $category->id, 'label' => $category->name])"
                                 />
-                                <div x-show="open" x-cloak class="mt-1.5 flex gap-1.5">
-                                    <input x-model="n" type="text" placeholder="Nombre"
-                                        class="flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
-                                    <button type="button"
-                                        x-on:click="$wire.call('saveQuickCategory', n).then(function() { open = false; n = ''; })"
-                                        class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Crear</button>
-                                    <button type="button" x-on:click="open = false; n = ''"
-                                        class="text-gray-400 hover:text-gray-600 px-1">×</button>
-                                </div>
+                                <p class="mt-1 text-[11px] text-gray-400">Si escribes un nombre que no existe, se crea al guardar.</p>
                                 @error('categoryId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
-                            <div x-data="{ open: false, n: '' }">
-                                <div class="flex items-center justify-between mb-1">
-                                    <label for="product-brand" class="text-xs font-medium text-gray-700">Marca</label>
-                                    <button type="button" x-on:click="open = !open"
-                                        class="text-xs font-semibold text-blue-700 hover:underline">+ Nueva</button>
-                                </div>
+                            <div>
+                                <label for="product-brand" class="mb-1 block text-xs font-medium text-gray-700">Marca</label>
                                 <x-searchable-select
                                     id="product-brand"
                                     model="brandId"
                                     placeholder="Sin marca"
+                                    allow-create
                                     :options="$brands->map(fn ($brand) => ['id' => $brand->id, 'label' => $brand->name])"
                                 />
-                                <div x-show="open" x-cloak class="mt-1.5 flex gap-1.5">
-                                    <input x-model="n" type="text" placeholder="Nombre"
-                                        class="flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
-                                    <button type="button"
-                                        x-on:click="$wire.call('saveQuickBrand', n).then(function() { open = false; n = ''; })"
-                                        class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Crear</button>
-                                    <button type="button" x-on:click="open = false; n = ''"
-                                        class="text-gray-400 hover:text-gray-600 px-1">×</button>
-                                </div>
+                                <p class="mt-1 text-[11px] text-gray-400">Si escribes un nombre que no existe, se crea al guardar.</p>
                                 @error('brandId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
-                            <div x-data="{ open: false, n: '', c: '' }">
-                                <div class="flex items-center justify-between mb-1">
-                                    <label for="product-unit" class="text-xs font-medium text-gray-700">Unidad base</label>
-                                    <button type="button" x-on:click="open = !open"
-                                        class="text-xs font-semibold text-blue-700 hover:underline">+ Nueva</button>
+                            @if ($units->count() > 1)
+                                <div x-data="{ open: false, n: '', c: '' }">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <label for="product-unit" class="text-xs font-medium text-gray-700">Unidad base</label>
+                                        <button type="button" x-on:click="open = !open"
+                                            class="text-xs font-semibold text-blue-700 hover:underline">+ Nueva</button>
+                                    </div>
+                                    <x-searchable-select
+                                        id="product-unit"
+                                        model="baseUnitId"
+                                        :options="$units->map(fn ($unit) => ['id' => $unit->id, 'label' => $unit->name.' ('.$unit->code.')'])"
+                                    />
+                                    <div x-show="open" x-cloak class="mt-1.5 flex gap-1.5">
+                                        <input x-model="n" type="text" placeholder="Nombre (ej: Kilogramo)"
+                                            class="flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
+                                        <input x-model="c" type="text" placeholder="Cod" maxlength="10"
+                                            class="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
+                                        <button type="button"
+                                            x-on:click="$wire.call('saveQuickUnit', n, c).then(function() { open = false; n = ''; c = ''; })"
+                                            class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Crear</button>
+                                        <button type="button" x-on:click="open = false; n = ''; c = ''"
+                                            class="text-gray-400 hover:text-gray-600 px-1">×</button>
+                                    </div>
+                                    @error('baseUnitId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                 </div>
-                                <x-searchable-select
-                                    id="product-unit"
-                                    model="baseUnitId"
-                                    :options="$units->map(fn ($unit) => ['id' => $unit->id, 'label' => $unit->name.' ('.$unit->code.')'])"
-                                />
-                                <div x-show="open" x-cloak class="mt-1.5 flex gap-1.5">
-                                    <input x-model="n" type="text" placeholder="Nombre (ej: Kilogramo)"
-                                        class="flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
-                                    <input x-model="c" type="text" placeholder="Cod" maxlength="10"
-                                        class="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
-                                    <button type="button"
-                                        x-on:click="$wire.call('saveQuickUnit', n, c).then(function() { open = false; n = ''; c = ''; })"
-                                        class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Crear</button>
-                                    <button type="button" x-on:click="open = false; n = ''; c = ''"
-                                        class="text-gray-400 hover:text-gray-600 px-1">×</button>
-                                </div>
-                                @error('baseUnitId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            </div>
-
-                            <div>
-                                <label for="product-supplier" class="mb-1 block text-xs font-medium text-gray-700">Proveedor</label>
-                                <x-searchable-select
-                                    id="product-supplier"
-                                    model="supplierId"
-                                    placeholder="Sin proveedor"
-                                    :options="$suppliers->map(fn ($supplier) => ['id' => $supplier->id, 'label' => $supplier->person?->full_name ?: 'Sin nombre'])"
-                                />
-                                @error('supplierId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            </div>
+                            @endif
 
                         </div>
 
@@ -254,10 +225,17 @@
                                     <label for="product-barcode" class="block text-xs font-medium text-gray-700">Codigo de barras</label>
                                     <span wire:loading wire:target="lookupBarcode" class="text-xs text-blue-600">Buscando...</span>
                                 </div>
-                                <input wire:model="barcode"
-                                       wire:keydown.enter.prevent="lookupBarcode"
-                                       id="product-barcode" type="text"
-                                       class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                <div class="flex items-center gap-2">
+                                    <input wire:model.live.debounce.400ms="barcode"
+                                           wire:keydown.enter.prevent="lookupBarcode"
+                                           id="product-barcode" type="text"
+                                           class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                    @if ($barcodePreviewSvg)
+                                        <div class="flex-shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1" wire:key="barcode-preview">
+                                            {!! $barcodePreviewSvg !!}
+                                        </div>
+                                    @endif
+                                </div>
                                 @error('barcode') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div class="sm:col-span-2">
@@ -269,7 +247,7 @@
                         </div>
 
                         {{-- Precios --}}
-                        <div class="grid gap-3 grid-cols-2 sm:grid-cols-4"
+                        <div class="grid gap-3 grid-cols-2 sm:grid-cols-5"
                             x-data="{
                                 cost: parseFloat('{{ $cost }}') || 0,
                                 p1:   parseFloat('{{ $price1 }}') || 0,
@@ -300,6 +278,28 @@
                                     id="product-cost" type="number" min="0" step="1"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('cost') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div x-data="{
+                                step(delta) {
+                                    const current = parseFloat(String($wire.taxRate).replace(',', '.')) || 0;
+                                    const next = Math.max(0, Math.round((current + delta) * 100) / 100);
+                                    $wire.taxRate = String(next);
+                                }
+                            }">
+                                <label for="product-tax-rate" class="mb-1 block text-xs font-medium text-gray-700">IVA %</label>
+                                <div class="relative">
+                                    <input wire:model="taxRate"
+                                        id="product-tax-rate" type="text" inputmode="decimal" placeholder="0"
+                                        class="block w-full rounded-xl border-gray-300 pr-5 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                    <div class="absolute inset-y-0 right-0 flex flex-col justify-center gap-px pr-1.5">
+                                        <button type="button" x-on:click="step(1)"
+                                            class="leading-none text-gray-300 hover:text-gray-600" style="font-size: 8px;">&#9650;</button>
+                                        <button type="button" x-on:click="step(-1)"
+                                            class="leading-none text-gray-300 hover:text-gray-600" style="font-size: 8px;">&#9660;</button>
+                                    </div>
+                                </div>
+                                <p class="mt-0.5 min-h-[1rem] text-xs text-gray-400">Incluido en el costo</p>
+                                @error('taxRate') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="product-price-1" class="mb-1 block text-xs font-medium text-gray-700">Precio 1</label>

@@ -2,36 +2,16 @@
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
         <x-sales-nav active="sales.index" />
 
-        {{-- Stats --}}
-        <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-                <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Filtradas</p>
-                <p class="mt-1 text-2xl font-black text-gray-900">{{ $statusCards['total_count'] }}</p>
-            </div>
-            <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-                <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Confirmadas</p>
-                <p class="mt-1 text-2xl font-black text-emerald-600">{{ $statusCards['confirmed_count'] }}</p>
-            </div>
-            <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-                <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">A credito</p>
-                <p class="mt-1 text-2xl font-black text-blue-600">{{ $statusCards['credit_count'] }}</p>
-            </div>
-            <div class="rounded-lg bg-white p-4 shadow-sm ring-1 ring-gray-200">
-                <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Total bruto</p>
-                <p class="mt-1 text-2xl font-black text-gray-900">${{ $statusCards['grand_total'] }}</p>
-            </div>
-        </div>
-
         {{-- Panel --}}
-        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <div x-data="responsivePageSize({ rowHeight: 64, reserved: 340 })" class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
 
             {{-- Cabecera --}}
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Historial</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">Ventas registradas</h3>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex flex-wrap items-center gap-3">
                     @if ($this->canCreateSales())
                         <a href="{{ route('sales.pos') }}" wire:navigate
                             class="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
@@ -39,15 +19,18 @@
                         </a>
                     @endif
                     @if ($this->canManageRules())
-                        <button type="button" wire:click="openRulesModal"
-                            class="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-700 hover:border-blue-300 hover:text-blue-700">
-                            Reglas
+                        <button type="button" wire:click="openRulesModal" title="Reglas de ventas"
+                            class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm hover:border-blue-300 hover:text-blue-700 transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
                         </button>
                     @endif
-                    <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar…"
-                        class="h-8 rounded-full border-gray-200 px-4 text-xs focus:border-blue-400 focus:ring-0">
+                    <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por documento, cliente o vendedor"
+                        class="w-64 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                     <select wire:model.live="statusFilter"
-                        class="h-8 rounded-full border-gray-200 px-3 text-xs focus:border-blue-400 focus:ring-0">
+                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         <option value="">Todos los estados</option>
                         <option value="draft">Borrador</option>
                         <option value="confirmed">Confirmada</option>
@@ -56,7 +39,7 @@
                         <option value="cancelled">Anulada</option>
                     </select>
                     <select wire:model.live="saleTypeFilter"
-                        class="h-8 rounded-full border-gray-200 px-3 text-xs focus:border-blue-400 focus:ring-0">
+                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         <option value="">Todos los tipos</option>
                         <option value="pos">POS</option>
                         <option value="credit">Credito</option>
@@ -64,153 +47,180 @@
                 </div>
             </div>
 
-            {{-- Cards de ventas --}}
-            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                @forelse ($sales as $sale)
-                    @php
-                        $customerName = trim(implode(' ', array_filter([
-                            $sale->customer?->person?->first_name,
-                            $sale->customer?->person?->last_name,
-                        ])));
-                        [$statusBadge, $statusLabel] = match($sale->status) {
-                            'confirmed'          => ['bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20', 'Confirmada'],
-                            'cancelled'          => ['bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-600/20',    'Anulada'],
-                            'returned'           => ['bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20',       'Devuelta'],
-                            'partially_returned' => ['bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',   'Dev. parcial'],
-                            'draft'              => ['bg-gray-100 text-gray-500',   'Borrador'],
-                            default              => ['bg-gray-100 text-gray-500',   $sale->status],
-                        };
-                    @endphp
-
-                    <div wire:key="sale-card-{{ $sale->id }}"
-                        class="flex flex-col justify-between rounded-xl border border-gray-200 bg-white shadow-sm transition hover:border-gray-300 hover:shadow-md">
-
-                        <div class="flex flex-1 flex-col justify-between p-4">
-                            {{-- Top --}}
-                            <div class="space-y-2">
-                                <div class="flex flex-wrap items-center gap-1.5">
-                                    <span class="text-sm font-black text-gray-900">{{ $sale->document_number }}</span>
-                                    <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $statusBadge }}">{{ $statusLabel }}</span>
-                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">{{ strtoupper($sale->sale_type) }}</span>
-                                    @if ($sale->replacesSale)
-                                        <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 ring-1 ring-inset ring-violet-600/20">
-                                            Reemplaza a {{ $sale->replacesSale->document_number }}
-                                        </span>
-                                    @endif
-                                    @if ($sale->replacedBySale)
-                                        <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 ring-1 ring-inset ring-violet-600/20">
-                                            Reemplazada por {{ $sale->replacedBySale->document_number }}
-                                        </span>
-                                    @endif
-                                </div>
-
-                                <div class="space-y-0.5 text-xs text-gray-500">
+            {{-- Tabla de ventas --}}
+            <div class="mt-6 overflow-x-auto">
+                <table class="min-w-full divide-y divide-stone-200 text-sm">
+                    <thead>
+                        <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            <th class="pb-2">Documento</th>
+                            <th class="pb-2">Cliente</th>
+                            <th class="pb-2">Detalle</th>
+                            <th class="pb-2 w-px whitespace-nowrap">Total</th>
+                            <th class="pb-2 w-px whitespace-nowrap text-right">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-stone-100">
+                        @forelse ($sales as $sale)
+                            @php
+                                $customerName = trim(implode(' ', array_filter([
+                                    $sale->customer?->person?->first_name,
+                                    $sale->customer?->person?->last_name,
+                                ])));
+                                [$statusBadge, $statusLabel] = match($sale->status) {
+                                    'confirmed'          => ['bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20', 'Confirmada'],
+                                    'cancelled'          => ['bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-600/20',    'Anulada'],
+                                    'returned'           => ['bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-600/20',       'Devuelta'],
+                                    'partially_returned' => ['bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',   'Dev. parcial'],
+                                    'draft'              => ['bg-gray-100 text-gray-500',   'Borrador'],
+                                    default              => ['bg-gray-100 text-gray-500',   $sale->status],
+                                };
+                            @endphp
+                            <tr wire:key="sale-row-{{ $sale->id }}" class="even:bg-gray-50">
+                                <td class="py-2 align-middle">
+                                    <p class="font-semibold text-gray-900">{{ $sale->document_number }}</p>
+                                    <div class="mt-1 flex flex-wrap items-center gap-1">
+                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $statusBadge }}">{{ $statusLabel }}</span>
+                                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">{{ strtoupper($sale->sale_type) }}</span>
+                                        @if ($sale->replacesSale)
+                                            <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 ring-1 ring-inset ring-violet-600/20">
+                                                Reemplaza a {{ $sale->replacesSale->document_number }}
+                                            </span>
+                                        @endif
+                                        @if ($sale->replacedBySale)
+                                            <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 ring-1 ring-inset ring-violet-600/20">
+                                                Reemplazada por {{ $sale->replacedBySale->document_number }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
+                                <td class="py-2 align-middle text-gray-600 text-xs">
                                     <p class="font-semibold text-gray-800">{{ $customerName ?: 'Consumidor final' }}</p>
+                                </td>
+                                <td class="py-2 align-middle text-gray-500 text-xs">
                                     <p>{{ optional($sale->sold_at)->format('d/m/Y H:i') ?: $sale->created_at->format('d/m/Y H:i') }}</p>
                                     <p>{{ $sale->branch?->name ?: '—' }} · {{ $sale->user?->name ?: 'Sin vendedor' }}</p>
-                                </div>
-                            </div>
-
-                            {{-- Bottom --}}
-                            <div class="mt-4">
-                                <p class="text-2xl font-black text-gray-900">${{ \App\Support\Money::format((float) $sale->grand_total) }}</p>
-
-                                <div class="mt-3 flex items-center gap-2 border-t border-stone-100 pt-3">
-                                    <div class="flex gap-1.5">
+                                </td>
+                                <td class="py-2 align-middle w-px whitespace-nowrap font-black text-gray-900">
+                                    ${{ \App\Support\Money::format((float) $sale->grand_total) }}
+                                </td>
+                                <td class="py-2 align-middle w-px whitespace-nowrap">
+                                    <div class="flex items-center justify-end gap-3">
                                         @if ($this->canCreateSales() && $sale->status === 'draft')
-                                            <a href="{{ $this->draftEditUrl($sale->id) }}" wire:navigate
-                                                class="rounded-full border border-blue-300 px-4 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-50">
-                                                Editar
+                                            <a href="{{ $this->draftEditUrl($sale->id) }}" wire:navigate title="Editar borrador"
+                                                class="text-gray-400 hover:text-blue-600 transition">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2.414a2 2 0 01.586-1.415z"/>
+                                                </svg>
                                             </a>
                                         @endif
                                         @if ($this->canCreateSales() && $sale->status === 'confirmed' && $sale->sale_type === 'pos')
-                                            <a href="{{ $this->modifySaleUrl($sale->id) }}" wire:navigate
-                                                class="rounded-full border border-violet-300 px-4 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-50">
-                                                Modificar
+                                            <a href="{{ $this->modifySaleUrl($sale->id) }}" wire:navigate title="Modificar venta"
+                                                class="text-gray-400 hover:text-violet-600 transition">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2.414a2 2 0 01.586-1.415z"/>
+                                                </svg>
                                             </a>
                                         @endif
                                         @if ($this->canReturnSales() && in_array($sale->status, ['confirmed', 'partially_returned'], true))
-                                            <button wire:click="startReturningSale({{ $sale->id }})"
-                                                class="rounded-full border border-sky-200 px-4 py-1 text-[11px] font-medium text-sky-600 hover:bg-sky-50">
-                                                Devolver
+                                            <button wire:click="startReturningSale({{ $sale->id }})" title="Devolver"
+                                                class="text-gray-400 hover:text-sky-600 transition">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"/>
+                                                </svg>
                                             </button>
                                         @endif
                                         @if ($this->canCancelSales() && in_array($sale->status, ['draft', 'confirmed'], true))
-                                            <button wire:click="startCancellingSale({{ $sale->id }})"
-                                                class="rounded-full border border-rose-200 px-4 py-1 text-[11px] font-medium text-rose-600 hover:bg-rose-50">
-                                                Anular
+                                            <button wire:click="startCancellingSale({{ $sale->id }})" title="Anular"
+                                                class="text-gray-400 hover:text-rose-600 transition">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                                </svg>
                                             </button>
                                         @endif
+                                        <a href="{{ route('sales.ticket', $sale) }}" target="_blank" rel="noopener noreferrer" title="Ver ticket"
+                                            class="text-gray-400 hover:text-blue-600 transition">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z"/>
+                                            </svg>
+                                        </a>
                                     </div>
-                                    <a href="{{ route('sales.ticket', $sale) }}" target="_blank" rel="noopener noreferrer"
-                                        class="ml-auto rounded-full bg-blue-600 px-3 py-1 text-[11px] font-semibold text-white hover:bg-blue-700">
-                                        Ticket
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
+                                </td>
+                            </tr>
 
-                        {{-- Devolucion --}}
-                        @if ($returningSaleId === $sale->id)
-                            <div class="mt-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
-                                <div class="flex items-center justify-between">
-                                    <p class="text-[10px] font-semibold uppercase tracking-widest text-sky-600">Devolucion</p>
-                                    <button wire:click="cancelReturningSale" class="text-[11px] text-gray-400 hover:text-gray-600">Cancelar</button>
-                                </div>
-                                <div class="mt-2 space-y-2">
-                                    <div>
-                                        <label class="text-xs text-gray-600">Motivo</label>
-                                        <textarea wire:model="returnReason" rows="2"
-                                            class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-sky-400 focus:ring-0"></textarea>
-                                        @error('returnReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
-                                    </div>
-                                    @foreach ($returnItems as $index => $returnItem)
-                                        @php $saleItem = $sale->items->firstWhere('id', $returnItem['sale_item_id']); @endphp
-                                        @if ($saleItem)
-                                            <div class="rounded-lg bg-white p-2.5 ring-1 ring-sky-100">
-                                                <p class="text-xs font-medium text-gray-800">{{ $saleItem->product?->name }}</p>
-                                                <p class="mt-0.5 text-[11px] text-gray-400">Pendiente: {{ number_format((float) $returnItem['pending_quantity'], 2, '.', ',') }} {{ $saleItem->presentation?->name ?: 'u.' }}</p>
-                                                <input wire:model="returnItems.{{ $index }}.quantity" type="number" min="0.000001" step="0.000001"
-                                                    placeholder="Cantidad a devolver"
-                                                    class="mt-1.5 block w-full rounded-lg border-gray-200 text-xs focus:border-sky-400 focus:ring-0">
+                            {{-- Devolucion --}}
+                            @if ($returningSaleId === $sale->id)
+                                <tr wire:key="sale-return-{{ $sale->id }}">
+                                    <td colspan="5" class="bg-sky-50 px-4 py-4 border-b border-stone-100">
+                                        <div class="flex items-center justify-between">
+                                            <p class="text-[10px] font-semibold uppercase tracking-widest text-sky-600">Devolucion · {{ $sale->document_number }}</p>
+                                            <button wire:click="cancelReturningSale" class="text-[11px] text-gray-400 hover:text-gray-600">Cancelar</button>
+                                        </div>
+                                        <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                            <div class="sm:col-span-2 lg:col-span-3">
+                                                <label class="text-xs text-gray-600">Motivo</label>
+                                                <textarea wire:model="returnReason" rows="2"
+                                                    class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-sky-400 focus:ring-0"></textarea>
+                                                @error('returnReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
                                             </div>
-                                        @endif
-                                    @endforeach
-                                    @error('returnItems') <p class="mt-1 text-[11px] text-rose-500">{{ $message }}</p> @enderror
-                                </div>
-                                <button wire:click="registerReturn"
-                                    class="mt-2.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
-                                    Confirmar devolucion
-                                </button>
-                            </div>
-                        @endif
+                                            @foreach ($returnItems as $index => $returnItem)
+                                                @php $saleItem = $sale->items->firstWhere('id', $returnItem['sale_item_id']); @endphp
+                                                @if ($saleItem)
+                                                    <div class="rounded-lg bg-white p-2.5 ring-1 ring-sky-100">
+                                                        <p class="text-xs font-medium text-gray-800">{{ $saleItem->product?->name }}</p>
+                                                        <p class="mt-0.5 text-[11px] text-gray-400">Pendiente: {{ number_format((float) $returnItem['pending_quantity'], 2, '.', ',') }} {{ $saleItem->presentation?->name ?: 'u.' }}</p>
+                                                        <input wire:model="returnItems.{{ $index }}.quantity" type="number" min="0.000001" step="0.000001"
+                                                            placeholder="Cantidad a devolver"
+                                                            class="mt-1.5 block w-full rounded-lg border-gray-200 text-xs focus:border-sky-400 focus:ring-0">
+                                                    </div>
+                                                @endif
+                                            @endforeach
+                                            @error('returnItems') <p class="mt-1 text-[11px] text-rose-500 sm:col-span-2 lg:col-span-3">{{ $message }}</p> @enderror
+                                        </div>
+                                        <button wire:click="registerReturn"
+                                            class="mt-3 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
+                                            Confirmar devolucion
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endif
 
-                        {{-- Anulacion --}}
-                        @if ($cancellingSaleId === $sale->id)
-                            <div class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
-                                <div class="flex items-center justify-between">
-                                    <p class="text-[10px] font-semibold uppercase tracking-widest text-rose-600">Anulacion</p>
-                                    <button wire:click="cancelCancellingSale" class="text-[11px] text-gray-400 hover:text-gray-600">Cancelar</button>
-                                </div>
-                                <div class="mt-2">
-                                    <label class="text-xs text-gray-600">Motivo</label>
-                                    <textarea wire:model="cancellationReason" rows="2"
-                                        class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-rose-400 focus:ring-0"></textarea>
-                                    @error('cancellationReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
-                                </div>
-                                <button wire:click="cancelSaleDocument({{ $sale->id }})"
-                                    class="mt-2.5 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
-                                    Confirmar anulacion
-                                </button>
-                            </div>
-                        @endif
-                    </div>
-                @empty
-                    <div class="col-span-full rounded-lg border border-dashed border-gray-200 py-12 text-center text-sm text-gray-400">
-                        Sin ventas con el filtro actual.
-                    </div>
-                @endforelse
+                            {{-- Anulacion --}}
+                            @if ($cancellingSaleId === $sale->id)
+                                <tr wire:key="sale-cancel-{{ $sale->id }}">
+                                    <td colspan="5" class="bg-rose-50 px-4 py-4 border-b border-stone-100">
+                                        <div class="flex items-center justify-between">
+                                            <p class="text-[10px] font-semibold uppercase tracking-widest text-rose-600">Anulacion · {{ $sale->document_number }}</p>
+                                            <button wire:click="cancelCancellingSale" class="text-[11px] text-gray-400 hover:text-gray-600">Cancelar</button>
+                                        </div>
+                                        <div class="mt-2">
+                                            <label class="text-xs text-gray-600">Motivo</label>
+                                            <textarea wire:model="cancellationReason" rows="2"
+                                                class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-rose-400 focus:ring-0"></textarea>
+                                            @error('cancellationReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
+                                        </div>
+                                        <button wire:click="cancelSaleDocument({{ $sale->id }})"
+                                            class="mt-3 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
+                                            Confirmar anulacion
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endif
+                        @empty
+                            <tr>
+                                <td colspan="5" class="py-10 text-center text-gray-400">
+                                    Sin ventas con el filtro actual.
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
+
+            @if ($sales->hasPages())
+                <div class="mt-4 border-t border-stone-100 pt-4">
+                    {{ $sales->links() }}
+                </div>
+            @endif
         </div>
     </div>
 
@@ -239,17 +249,6 @@
                     {{-- Form: scrollable body + pinned footer --}}
                     <form wire:submit="saveRules" class="flex flex-col flex-1 min-h-0">
                         <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-                            @if ($ruleFeatureGates['frozen_sales'] ?? false)
-                                <label class="flex items-start gap-3">
-                                    <input wire:model="ruleFrozenSalesEnabled" type="checkbox"
-                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                                    <span>
-                                        <span class="block text-sm font-medium text-gray-900">Permitir ventas congeladas</span>
-                                        <span class="block text-xs text-gray-500">Deja poner en espera una venta en curso y retomarla despues.</span>
-                                    </span>
-                                </label>
-                            @endif
-
                             @if ($ruleFeatureGates['alternative_prices'] ?? false)
                                 <label class="flex items-start gap-3">
                                     <input wire:model="ruleAllowAlternativePrices" type="checkbox"
@@ -305,21 +304,6 @@
                                 </label>
                             @endif
 
-                            <div class="grid gap-3 sm:grid-cols-2 border-t border-stone-100 pt-4">
-                                <div>
-                                    <label class="text-sm font-medium text-gray-700">Prefijo documental interno</label>
-                                    <input wire:model="ruleSaleDocumentPrefix" type="text"
-                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                    @error('ruleSaleDocumentPrefix') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-                                </div>
-                                <div>
-                                    <label class="text-sm font-medium text-gray-700">Consecutivo inicial</label>
-                                    <input wire:model="ruleSaleDocumentStartingSequence" type="number" min="1"
-                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                    @error('ruleSaleDocumentStartingSequence') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-                                </div>
-                            </div>
-
                             <div class="border-t border-stone-100 pt-4">
                                 <p class="text-sm font-semibold text-gray-900">Impresion de tickets</p>
 
@@ -333,17 +317,60 @@
                                     </select>
                                 </div>
 
+                                <div class="mt-3">
+                                    <label class="text-sm font-medium text-gray-700">Logo de la empresa</label>
+
+                                    @unless ($this->isLogoStorageConfigured())
+                                        <div class="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 ring-1 ring-amber-200">
+                                            El almacenamiento de archivos todavia no esta configurado. Avisale al soporte de la plataforma.
+                                        </div>
+                                    @endunless
+
+                                    <div class="mt-2 flex items-center gap-3">
+                                        <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-200">
+                                            @if ($newLogo)
+                                                <img src="{{ $newLogo->temporaryUrl() }}" alt="Vista previa" class="h-full w-full object-contain">
+                                            @elseif ($currentLogoUrl)
+                                                <img src="{{ $currentLogoUrl }}" alt="Logo actual" class="h-full w-full object-contain">
+                                            @else
+                                                <span class="text-[10px] text-gray-400">Sin logo</span>
+                                            @endif
+                                        </div>
+
+                                        <div class="flex-1">
+                                            <input type="file" wire:model="newLogo" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp"
+                                                {{ $this->isLogoStorageConfigured() ? '' : 'disabled' }}
+                                                class="block w-full text-xs text-gray-600 file:mr-2 file:rounded-full file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50">
+                                            @error('newLogo') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+
+                                            <div class="mt-1.5 flex gap-2">
+                                                @if ($newLogo)
+                                                    <button type="button" wire:click="uploadLogo" wire:loading.attr="disabled" wire:target="uploadLogo"
+                                                        class="rounded-full bg-blue-600 px-3 py-1 text-[11px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                                                        <span wire:loading.remove wire:target="uploadLogo">Guardar logo</span>
+                                                        <span wire:loading wire:target="uploadLogo">Subiendo...</span>
+                                                    </button>
+                                                @endif
+                                                @if ($currentLogoUrl)
+                                                    <button type="button" wire:click="removeLogo" wire:confirm="¿Quitar el logo actual?"
+                                                        class="rounded-full border border-gray-300 px-3 py-1 text-[11px] font-medium text-gray-600 transition hover:border-rose-300 hover:text-rose-600">
+                                                        Quitar logo
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <label class="mt-3 flex items-start gap-3">
                                     <input wire:model="ruleShowLogo" type="checkbox"
                                         class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
                                     <span class="block text-sm font-medium text-gray-900">Mostrar logo en el ticket</span>
                                 </label>
 
-                                <label class="mt-3 flex items-start gap-3">
-                                    <input wire:model="ruleShowSaasBranding" type="checkbox"
-                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                                    <span class="block text-sm font-medium text-gray-900">Mostrar marca del SaaS en el ticket</span>
-                                </label>
+                                <p class="mt-3 text-xs text-gray-500">
+                                    La marca "Desarrollado por {{ \App\Models\PlatformSetting::appName() }}" siempre aparece en el ticket.
+                                </p>
                             </div>
                         </div>
 

@@ -15,27 +15,36 @@
                 <p class="mt-2 text-3xl font-black text-emerald-700">${{ $statusCards['available_credit_total'] }}</p>
             </div>
             <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Ventas vencidas</p>
-                <p class="mt-2 text-3xl font-black text-blue-700">{{ $statusCards['overdue_sales_count'] }}</p>
+                <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Cuentas en mora</p>
+                <p class="mt-2 text-3xl font-black text-rose-700">{{ $statusCards['overdue_accounts_count'] }}</p>
             </div>
         </div>
 
         {{-- Tabla de clientes --}}
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-            <div class="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between mb-5">
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between mb-5">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Cartera</p>
                     <h3 class="mt-1 text-2xl font-black text-gray-900">Clientes</h3>
                 </div>
-                <div class="flex gap-2 flex-wrap">
+                <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text"
                         placeholder="Buscar cliente o documento"
                         class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm w-56">
-                    <label class="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600">
-                        <input wire:model.live="overdueOnly" type="checkbox"
-                            class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                        Solo vencidas
-                    </label>
+                    <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                        <button type="button" wire:click="setStatusFilter('all')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Todos
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('current')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'current' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Al dia
+                        </button>
+                        <button type="button" wire:click="setStatusFilter('overdue')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'overdue' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            En mora
+                        </button>
+                    </div>
                     @if ($this->canManageCredit())
                         <button wire:click="openAddCustomerModal" type="button"
                             class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
@@ -52,6 +61,7 @@
                             <th class="pb-2">Cliente</th>
                             <th class="pb-2 text-right">Cupo disp.</th>
                             <th class="pb-2 text-right">Saldo pend.</th>
+                            <th class="pb-2 text-right">Mora</th>
                             <th class="pb-2 text-right">Ultimo mov.</th>
                             <th class="pb-2"></th>
                         </tr>
@@ -62,6 +72,7 @@
                                 $name = $account->customer?->person?->full_name ?: 'Cliente #'.$account->customer_id;
                                 $doc = $account->customer?->person?->document_number ?: '—';
                                 $lastMovement = $account->movements->first();
+                                $mora = $this->moraStatus($account);
                             @endphp
                             <tr wire:key="account-{{ $account->id }}"
                                 wire:click="selectCustomer({{ $account->customer_id }})"
@@ -75,6 +86,13 @@
                                 </td>
                                 <td class="py-2.5 align-middle text-right font-semibold text-sm {{ (float) $account->balance_due > 0 ? 'text-rose-700' : 'text-gray-400' }}">
                                     ${{ \App\Support\Money::format((float) $account->balance_due) }}
+                                </td>
+                                <td class="py-2.5 align-middle text-right">
+                                    @if ($mora)
+                                        <x-status-badge :color="$mora['color']">{{ $mora['label'] }}</x-status-badge>
+                                    @else
+                                        <span class="text-xs text-gray-300">—</span>
+                                    @endif
                                 </td>
                                 <td class="py-2.5 align-middle text-right text-xs text-gray-400">
                                     {{ $lastMovement?->occurred_at?->format('d/m/Y') ?? '—' }}
@@ -92,7 +110,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="py-10 text-center text-gray-400">
+                                <td colspan="6" class="py-10 text-center text-gray-400">
                                     No hay cuentas de credito con el filtro actual.
                                 </td>
                             </tr>
@@ -106,10 +124,11 @@
     {{-- Modal: detalle del cliente --}}
     @if ($showDetailModal && $selectedCustomerId)
         @php
-            $selectedAccount = $accounts->firstWhere('customer_id', $selectedCustomerId);
             $selectedName = $selectedAccount?->customer?->person?->full_name ?: 'Cliente #'.$selectedCustomerId;
             $selectedDoc  = $selectedAccount?->customer?->person?->document_number ?: '—';
             $selectedPhone = $selectedAccount?->customer?->person?->phone ?? '—';
+            $selectedMora = $selectedAccount ? $this->moraStatus($selectedAccount) : null;
+            $hasPendingBalance = $selectedAccount && bccomp((string) $selectedAccount->balance_due, '0.00', 2) === 1;
         @endphp
         <div wire:click.self="closeDetailModal"
             class="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -131,7 +150,7 @@
                                 </button>
                             @endif
                         </div>
-                        <div class="mt-1 flex flex-wrap gap-3 text-xs text-gray-400">
+                        <div class="mt-1 flex flex-wrap items-center gap-3 text-xs text-gray-400">
                             <span>{{ $selectedDoc }}</span>
                             @if ($selectedPhone !== '—')
                                 <span>{{ $selectedPhone }}</span>
@@ -139,6 +158,9 @@
                             @if ($selectedAccount)
                                 <span class="text-emerald-700 font-semibold">Cupo: ${{ \App\Support\Money::format((float) $selectedAccount->available_credit) }}</span>
                                 <span class="{{ (float) $selectedAccount->balance_due > 0 ? 'text-rose-700 font-semibold' : '' }}">Saldo: ${{ \App\Support\Money::format((float) $selectedAccount->balance_due) }}</span>
+                                @if ($selectedMora)
+                                    <x-status-badge :color="$selectedMora['color']">{{ $selectedMora['label'] }}</x-status-badge>
+                                @endif
                             @endif
                         </div>
                     </div>
@@ -146,66 +168,29 @@
                 </div>
 
                 {{-- Body scrollable --}}
-                <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
-                    @forelse ($selectedCustomerSales as $sale)
-                        @php
-                            $outstanding = $this->outstandingForSale($sale);
-                            $isOverdue = $sale->credit_due_at && $sale->credit_due_at->isPast() && bccomp($outstanding, '0.00', 2) === 1;
-                            $cashReceived = $sale->payments->whereNotIn('payment_method_code', ['credit'])->sum('amount');
-                            $creditCharged = $sale->creditMovements->where('movement_type', \App\Enums\CreditMovementType::SaleCharge->value)->sum('amount');
-                            $creditPaid = $sale->creditMovements->where('movement_type', \App\Enums\CreditMovementType::Payment->value)->sum('amount');
-                            $cashSessions = $this->openCashSessionsForSale($sale);
-                        @endphp
-                        <div wire:key="dsale-{{ $sale->id }}" class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                            <div class="flex items-start justify-between gap-2 mb-3">
-                                <div>
-                                    <p class="font-semibold text-gray-900">{{ $sale->document_number }}</p>
-                                    <p class="text-xs text-gray-400">{{ optional($sale->sold_at)->format('d/m/Y H:i') ?? '—' }}</p>
-                                </div>
-                                <x-status-badge :color="$isOverdue ? 'rose' : (bccomp($outstanding, '0.00', 2) <= 0 ? 'emerald' : 'amber')" class="flex-shrink-0">
-                                    {{ $isOverdue ? 'Vencida' : (bccomp($outstanding, '0.00', 2) <= 0 ? 'Pagada' : 'En cartera') }}
-                                </x-status-badge>
-                            </div>
-
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3">
-                                <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
-                                    <p class="text-gray-400">Total factura</p>
-                                    <p class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $sale->grand_total) }}</p>
-                                </div>
-                                <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
-                                    <p class="text-gray-400">Pendiente</p>
-                                    <p class="font-semibold {{ bccomp($outstanding, '0.00', 2) > 0 ? 'text-rose-700' : 'text-emerald-700' }}">${{ \App\Support\Money::format((float) $outstanding) }}</p>
-                                </div>
-                                @if ($cashReceived > 0)
-                                    <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
-                                        <p class="text-gray-400">Efectivo / pago</p>
-                                        <p class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $cashReceived) }}</p>
-                                    </div>
-                                @endif
-                                @if ($creditPaid > 0)
-                                    <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
-                                        <p class="text-gray-400">Abonado</p>
-                                        <p class="font-semibold text-emerald-700">${{ \App\Support\Money::format((float) $creditPaid) }}</p>
-                                    </div>
-                                @endif
-                            </div>
-
-                            <div class="flex flex-wrap gap-2">
-                                <a href="{{ route('sales.ticket', $sale) }}" target="_blank" rel="noopener noreferrer"
-                                    class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100">
-                                    Ver ticket
-                                </a>
-                                @if ($this->canManageCredit() && bccomp($outstanding, '0.00', 2) === 1 && $sale->status !== 'cancelled')
-                                    <button wire:click="startRegisteringPayment({{ $sale->id }})"
-                                        class="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700">
+                <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                    {{-- Abono sobre el saldo general de la cuenta (no sobre una venta puntual) --}}
+                    @if ($this->canManageCredit() && $hasPendingBalance)
+                        <div class="rounded-xl border border-gray-200 p-4">
+                            @if (! $showPaymentForm)
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-sm text-gray-600">Los abonos se aplican contra el saldo total de la cuenta, sin importar a cuantas facturas corresponda.</p>
+                                    <button wire:click="startRegisteringPayment"
+                                        class="flex-shrink-0 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
                                         Registrar abono
                                     </button>
-                                @endif
-                            </div>
-
-                            @if ($paymentSaleId === $sale->id)
-                                <div class="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 space-y-2">
-                                    <div class="grid grid-cols-2 gap-2">
+                                </div>
+                            @else
+                                <div class="space-y-3">
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar abono · saldo total de la cuenta</p>
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div x-data="digitGroupInput({ path: 'paymentAmount', live: false })">
+                                            <label class="text-xs font-medium text-gray-700">Monto</label>
+                                            <input type="text" inputmode="numeric" @input="onInput($event)"
+                                                value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
+                                                class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                            @error('paymentAmount') <p class="mt-0.5 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                        </div>
                                         <div>
                                             <label class="text-xs font-medium text-gray-700">Metodo</label>
                                             <select wire:model="paymentMethodCode"
@@ -215,43 +200,93 @@
                                                 <option value="transfer">Transferencia</option>
                                             </select>
                                         </div>
-                                        <div>
-                                            <label class="text-xs font-medium text-gray-700">Monto</label>
-                                            <input wire:model="paymentAmount" type="number" min="0.01" step="0.01"
-                                                class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                            @error('paymentAmount') <p class="mt-0.5 text-xs text-rose-600">{{ $message }}</p> @enderror
-                                        </div>
                                     </div>
-                                    @if ($cashSessions->isNotEmpty())
+                                    <div class="grid gap-3 sm:grid-cols-2">
                                         <div>
-                                            <label class="text-xs font-medium text-gray-700">Sesion de caja</label>
-                                            <select wire:model="cashSessionId"
+                                            <label class="text-xs font-medium text-gray-700">Referencia</label>
+                                            <input wire:model="paymentReference" type="text"
                                                 class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                                <option value="">Sin sesion</option>
-                                                @foreach ($cashSessions as $cs)
-                                                    <option value="{{ $cs->id }}">{{ $cs->cashRegister?->name ?? 'Caja' }} · {{ optional($cs->opened_at)->format('d/m H:i') }}</option>
-                                                @endforeach
-                                            </select>
                                         </div>
-                                    @endif
+                                        @if ($openCashSessions->isNotEmpty())
+                                            <div>
+                                                <label class="text-xs font-medium text-gray-700">Sesion de caja</label>
+                                                <select wire:model="cashSessionId"
+                                                    class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                                    <option value="">Sin sesion</option>
+                                                    @foreach ($openCashSessions as $cs)
+                                                        <option value="{{ $cs->id }}">{{ $cs->cashRegister?->name ?? 'Caja' }} · {{ optional($cs->opened_at)->format('d/m H:i') }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        @endif
+                                    </div>
                                     <div class="flex gap-2 pt-1">
                                         <button wire:click="registerPayment"
-                                            class="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
+                                            class="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">
                                             Confirmar abono
                                         </button>
                                         <button wire:click="cancelRegisteringPayment"
-                                            class="rounded-full border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-600">
+                                            class="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-600">
                                             Cancelar
                                         </button>
                                     </div>
                                 </div>
                             @endif
                         </div>
-                    @empty
-                        <div class="py-10 text-center text-gray-400 text-sm">
-                            Este cliente no tiene facturas a credito registradas.
-                        </div>
-                    @endforelse
+                    @endif
+
+                    <div class="space-y-3">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Facturas a credito</p>
+                        @forelse ($selectedCustomerSales as $sale)
+                            @php
+                                $cashReceived = $sale->payments->whereNotIn('payment_method_code', ['credit'])->sum('amount');
+                                $creditCharged = $sale->creditMovements->where('movement_type', \App\Enums\CreditMovementType::SaleCharge->value)->sum('amount');
+                                $saleBadge = match ($sale->status) {
+                                    'cancelled' => ['color' => 'rose', 'label' => 'Anulada'],
+                                    'returned' => ['color' => 'stone', 'label' => 'Devuelta'],
+                                    'partially_returned' => ['color' => 'amber', 'label' => 'Devolucion parcial'],
+                                    default => ['color' => 'emerald', 'label' => 'Confirmada'],
+                                };
+                            @endphp
+                            <div wire:key="dsale-{{ $sale->id }}" class="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                <div class="flex items-start justify-between gap-2 mb-3">
+                                    <div>
+                                        <p class="font-semibold text-gray-900">{{ $sale->document_number }}</p>
+                                        <p class="text-xs text-gray-400">{{ optional($sale->sold_at)->format('d/m/Y H:i') ?? '—' }}</p>
+                                    </div>
+                                    <x-status-badge :color="$saleBadge['color']" class="flex-shrink-0">{{ $saleBadge['label'] }}</x-status-badge>
+                                </div>
+
+                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                                    <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
+                                        <p class="text-gray-400">Total factura</p>
+                                        <p class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $sale->grand_total) }}</p>
+                                    </div>
+                                    <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
+                                        <p class="text-gray-400">Cargado a credito</p>
+                                        <p class="font-semibold text-rose-700">${{ \App\Support\Money::format((float) $creditCharged) }}</p>
+                                    </div>
+                                    @if ($cashReceived > 0)
+                                        <div class="rounded-lg bg-white px-2.5 py-2 ring-1 ring-gray-200">
+                                            <p class="text-gray-400">Pagado al momento</p>
+                                            <p class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $cashReceived) }}</p>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    <a href="{{ route('sales.ticket', $sale) }}" target="_blank" rel="noopener noreferrer"
+                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100">
+                                        Ver ticket
+                                    </a>
+                                </div>
+                            </div>
+                        @empty
+                            <div class="py-10 text-center text-gray-400 text-sm">
+                                Este cliente no tiene facturas a credito registradas.
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
 
                 {{-- Footer --}}
@@ -340,7 +375,63 @@
                     <button wire:click="closeAddCustomerModal" class="text-gray-400 hover:text-gray-700 text-2xl leading-none px-1">&times;</button>
                 </div>
                 <div class="px-5 py-4 space-y-3">
-                    @if (! $addCustomerSelectedId)
+                    @if ($addCustomerCreatingNew)
+                        <p class="text-xs text-gray-500">Cliente nuevo: no existe todavia en el sistema. Estos datos se pueden completar despues desde "Editar cliente".</p>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Nombre</label>
+                                <input wire:model="newCustomerFirstName" type="text"
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                @error('newCustomerFirstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Apellido</label>
+                                <input wire:model="newCustomerLastName" type="text"
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                @error('newCustomerLastName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Tipo documento</label>
+                                <input wire:model="newCustomerDocumentType" type="text" placeholder="CC, NIT..."
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                @error('newCustomerDocumentType') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Numero documento</label>
+                                <input wire:model="newCustomerDocumentNumber" type="text"
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                @error('newCustomerDocumentNumber') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Telefono</label>
+                                <input wire:model="newCustomerPhone" type="text"
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                @error('newCustomerPhone') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Email</label>
+                                <input wire:model="newCustomerEmail" type="email"
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                @error('newCustomerEmail') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito</label>
+                            <input wire:model="addCustomerCreditLimit" type="number" min="0" step="1"
+                                class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                            @error('addCustomerCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+                        <div class="flex gap-2 border-t border-stone-100 pt-3">
+                            <button wire:click="cancelCreatingCustomerForCredit"
+                                class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                                Volver
+                            </button>
+                            <button wire:click="createCustomerForCredit"
+                                class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                                Crear y habilitar credito
+                            </button>
+                        </div>
+                    @elseif (! $addCustomerSelectedId)
                         <div class="relative">
                             <label class="mb-1 block text-xs font-medium text-gray-700">Buscar cliente</label>
                             <input type="text" x-model="search" x-on:input="onInput"
@@ -362,6 +453,10 @@
                             </ul>
                         </div>
                         @error('addCustomerSelectedId') <p class="text-xs text-rose-600">{{ $message }}</p> @enderror
+                        <button type="button" wire:click="startCreatingCustomerForCredit"
+                            class="text-sm font-semibold text-blue-700 hover:text-blue-800">
+                            + Crear cliente nuevo
+                        </button>
                     @else
                         @php
                             $selectedForCredit = collect($this->customersWithoutCreditOptions())->firstWhere('id', $addCustomerSelectedId);

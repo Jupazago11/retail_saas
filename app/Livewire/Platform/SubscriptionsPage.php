@@ -3,6 +3,7 @@
 namespace App\Livewire\Platform;
 
 use App\Actions\Equipment\ManageEquipmentRental;
+use App\Actions\Plans\ReconcileCompanyInventoryTracking;
 use App\Actions\Plans\ReconcileCompanyStructureLimits;
 use App\Actions\Subscriptions\AttachPaymentProof;
 use App\Actions\Subscriptions\ChangeCompanySubscription;
@@ -60,7 +61,16 @@ class SubscriptionsPage extends Component
     }
 
     public function updatedSearch(): void { $this->resetPage(); }
-    public function updatedFilter(): void { $this->resetPage(); }
+
+    public function setFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'pending', 'active', 'trialing', 'vencida'], true)) {
+            return;
+        }
+
+        $this->filter = $filter;
+        $this->resetPage();
+    }
 
     public function startEdit(int $id): void
     {
@@ -71,7 +81,7 @@ class SubscriptionsPage extends Component
         $this->showModal  = true;
     }
 
-    public function saveEdit(ReconcileCompanyStructureLimits $reconcileCompanyStructureLimits): void
+    public function saveEdit(ReconcileCompanyStructureLimits $reconcileCompanyStructureLimits, ReconcileCompanyInventoryTracking $reconcileCompanyInventoryTracking): void
     {
         abort_unless(auth()->user()?->is_platform_admin, 403);
 
@@ -87,6 +97,7 @@ class SubscriptionsPage extends Component
         ]);
 
         $reconcileCompanyStructureLimits->handle($sub->company, auth()->user());
+        $reconcileCompanyInventoryTracking->handle($sub->company, auth()->user());
 
         $this->showModal = false;
         $this->toast('Suscripción actualizada.');

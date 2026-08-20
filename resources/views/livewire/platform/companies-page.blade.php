@@ -15,16 +15,24 @@
                         @endif
                     </h3>
                 </div>
-                <div class="flex items-center gap-3">
+                <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text"
                         placeholder="Buscar empresa..."
                         class="w-56 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <select wire:model.live="filter"
-                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="all">Todas</option>
-                        <option value="pending">Pendientes</option>
-                        <option value="active">Activas</option>
-                    </select>
+                    <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                        <button type="button" wire:click="setFilter('all')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Todas
+                        </button>
+                        <button type="button" wire:click="setFilter('pending')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'pending' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Pendientes
+                        </button>
+                        <button type="button" wire:click="setFilter('active')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'active' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            Activas
+                        </button>
+                    </div>
                 </div>
             </div>
 

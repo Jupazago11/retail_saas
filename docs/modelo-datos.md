@@ -34,9 +34,9 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 #### `company_user`
 
 - Proposito: membresia usuario-empresa.
-- Campos clave: `company_id`, `user_id`, `company_role`, `role_template_id`, `company_role_id`, `status`, `joined_at`.
+- Campos clave: `company_id`, `user_id`, `company_role`, `company_role_id`, `status`, `joined_at`.
 - Unique: `company_id + user_id`.
-- Nota de implementacion inicial: `company_role` se mantiene como etiqueta semantica y compatibilidad; la autorizacion efectiva se resuelve por `role_template_id` y/o `company_role_id`.
+- Nota de implementacion actual: `company_role` se mantiene como etiqueta semantica; el valor `'owner'` es especial y da acceso total sin depender de `company_role_id` (ver `CurrentCompanyPermissionResolver::has()`). Para el resto de usuarios, la autorizacion efectiva se resuelve por `company_role_id`. La columna `role_template_id` existio en una fase anterior y se elimino (migracion `2026_08_13_100100_drop_role_templates`).
 
 #### `branches`
 
@@ -145,22 +145,9 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 - Campos clave: `id`, `code`, `name`, `module_code`, `status`.
 - Unique: `code`.
 
-#### `role_templates`
-
-- Proposito: plantillas globales administradas por plataforma.
-- Campos clave: `id`, `code`, `name`, `scope`, `status`.
-- Unique: `code`.
-- Nota de implementacion inicial: ya existen plantillas base `owner`, `company_admin`, `cashier`, `seller`, `purchasing_manager`, `inventory_manager` y `accounting_assistant`.
-
-#### `role_template_permissions`
-
-- Proposito: permisos incluidos en plantillas.
-- Campos clave: `role_template_id`, `permission_id`.
-- Unique: `role_template_id + permission_id`.
-
 #### `company_roles`
 
-- Proposito: roles empresariales editables por tenant.
+- Proposito: unico mecanismo de rol; cada empresa arma sus propios roles desde cero, sin catalogo global de plantillas compartido entre empresas.
 - Campos clave: `id`, `company_id`, `code`, `display_name`, `status`.
 - Unique: `company_id + code`.
 

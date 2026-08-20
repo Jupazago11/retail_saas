@@ -71,7 +71,6 @@ class DemoOperationalDataSeeder extends Seeder
         $service->set($company, 'general', 'address', $settings['address']);
         $service->set($company, 'pos', 'sale_document_prefix', $settings['sale_prefix']);
         $service->set($company, 'cash', 'default_opening_amount', $settings['opening_amount']);
-        $service->set($company, 'cash', 'allow_close_with_difference', $settings['allow_close_with_difference']);
         $service->set($company, 'pos', 'allow_manual_discounts', $planCode === 'premium');
         $service->set($company, 'credit', 'credit_enabled', in_array($planCode, ['pro', 'premium'], true));
         $service->set($company, 'credit', 'default_term_days', $settings['credit_term_days']);
@@ -1386,7 +1385,6 @@ class DemoOperationalDataSeeder extends Seeder
                 'settings' => [
                     'sale_prefix' => 'BAS-',
                     'opening_amount' => '120000',
-                    'allow_close_with_difference' => false,
                     'credit_term_days' => 30,
                     'points_rate' => '1.0000',
                     'phone' => '6017001001',
@@ -1401,7 +1399,6 @@ class DemoOperationalDataSeeder extends Seeder
                 'settings' => [
                     'sale_prefix' => 'PRO-',
                     'opening_amount' => '180000',
-                    'allow_close_with_difference' => true,
                     'credit_term_days' => 21,
                     'points_rate' => '1.2500',
                     'phone' => '6047002002',
@@ -1416,7 +1413,6 @@ class DemoOperationalDataSeeder extends Seeder
                 'settings' => [
                     'sale_prefix' => 'PRM-',
                     'opening_amount' => '260000',
-                    'allow_close_with_difference' => true,
                     'credit_term_days' => 25,
                     'points_rate' => '1.5000',
                     'phone' => '6057003003',

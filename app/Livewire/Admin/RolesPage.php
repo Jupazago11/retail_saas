@@ -3,11 +3,11 @@
 namespace App\Livewire\Admin;
 
 use App\Actions\Companies\AttachUserToCompany;
+use App\Actions\Companies\CreateInternalUserForCompany;
 use App\Enums\RecordStatus;
 use App\Models\Company;
 use App\Models\CompanyRole;
 use App\Models\Permission;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Plans\CompanyUserLimitGuard;
@@ -29,8 +29,12 @@ class RolesPage extends Component
     public array $selectedPermissionCodes = [];
     public array $memberships = [];
     public string $newUserIdentifier = '';
-    public string $newUserRoleTemplateId = '';
     public string $newUserCompanyRoleId = '';
+    public string $newUserMode = 'existing';
+    public string $newInternalName = '';
+    public string $newInternalUsername = '';
+    public string $newInternalPassword = '';
+    public string $newInternalCompanyRoleId = '';
 
     public function mount(): void
     {
@@ -128,44 +132,28 @@ class RolesPage extends Component
         }
 
         $state = $this->memberships[$userId] ?? [];
-        $roleTemplateId = $this->normalizeNullableInt($state['role_template_id'] ?? null);
         $companyRoleId = $this->normalizeNullableInt($state['company_role_id'] ?? null);
 
-        if (($roleTemplateId === null) === ($companyRoleId === null)) {
-            $this->addError("memberships.{$userId}.role_template_id", 'Debes elegir una plantilla o un rol personalizado.');
+        if ($companyRoleId === null) {
+            $this->addError("memberships.{$userId}.company_role_id", 'Debes elegir un rol.');
 
             return;
         }
 
-        if ($roleTemplateId !== null) {
-            $exists = RoleTemplate::query()
-                ->where('status', RecordStatus::Active->value)
-                ->find($roleTemplateId);
+        $exists = $this->companyRoles()->find($companyRoleId);
 
-            if (! $exists) {
-                $this->addError("memberships.{$userId}.role_template_id", 'La plantilla seleccionada no existe.');
+        if (! $exists) {
+            $this->addError("memberships.{$userId}.company_role_id", 'El rol seleccionado no existe para esta empresa.');
 
-                return;
-            }
-        }
-
-        if ($companyRoleId !== null) {
-            $exists = $this->companyRoles()->find($companyRoleId);
-
-            if (! $exists) {
-                $this->addError("memberships.{$userId}.company_role_id", 'El rol seleccionado no existe para esta empresa.');
-
-                return;
-            }
+            return;
         }
 
         DB::table('company_user')
             ->where('company_id', $this->currentCompany()->id)
             ->where('user_id', $userId)
             ->update([
-                'role_template_id' => $roleTemplateId,
                 'company_role_id' => $companyRoleId,
-                'company_role' => $companyRoleId !== null ? 'custom' : 'template',
+                'company_role' => 'custom',
                 'updated_at' => now(),
             ]);
 
@@ -230,18 +218,10 @@ class RolesPage extends Component
 
         $validated = $this->validate([
             'newUserIdentifier' => ['required', 'string', 'max:255'],
-            'newUserRoleTemplateId' => ['nullable', 'integer'],
-            'newUserCompanyRoleId' => ['nullable', 'integer'],
+            'newUserCompanyRoleId' => ['required', 'integer'],
         ]);
 
-        $roleTemplateId = $this->normalizeNullableInt($validated['newUserRoleTemplateId']);
         $companyRoleId = $this->normalizeNullableInt($validated['newUserCompanyRoleId']);
-
-        if (($roleTemplateId === null) === ($companyRoleId === null)) {
-            $this->addError('newUserRoleTemplateId', 'Debes elegir una plantilla o un rol personalizado.');
-
-            return;
-        }
 
         $identifier = trim($validated['newUserIdentifier']);
         $user = User::query()
@@ -257,7 +237,6 @@ class RolesPage extends Component
 
         try {
             $attachUserToCompany->handle($this->currentCompany(), $user, [
-                'role_template_id' => $roleTemplateId,
                 'company_role_id' => $companyRoleId,
             ]);
         } catch (InvalidArgumentException $exception) {
@@ -267,25 +246,67 @@ class RolesPage extends Component
         }
 
         $this->newUserIdentifier = '';
-        $this->newUserRoleTemplateId = '';
         $this->newUserCompanyRoleId = '';
-        $this->resetValidation(['newUserIdentifier', 'newUserRoleTemplateId', 'newUserCompanyRoleId']);
+        $this->resetValidation(['newUserIdentifier', 'newUserCompanyRoleId']);
         $this->loadMemberships();
         $this->dispatch('toast', message: 'Usuario vinculado correctamente a la empresa.', type: 'success');
+    }
+
+    public function remainingUserSlots(): ?int
+    {
+        $maxUsers = $this->maxUsers();
+
+        if ($maxUsers === null) {
+            return null;
+        }
+
+        return max(0, $maxUsers - $this->activeUsersCount());
+    }
+
+    public function setNewUserMode(string $mode): void
+    {
+        $this->newUserMode = in_array($mode, ['existing', 'new'], true) ? $mode : 'existing';
+    }
+
+    public function createInternalUser(CreateInternalUserForCompany $createInternalUserForCompany): void
+    {
+        $this->ensurePermission('roles.manage');
+
+        $company = $this->currentCompany();
+
+        $validated = $this->validate([
+            'newInternalName' => ['required', 'string', 'max:255'],
+            'newInternalUsername' => ['required', 'string', 'max:255', 'alpha_dash', Rule::unique('users', 'username')],
+            'newInternalPassword' => ['required', 'string', 'min:8'],
+            'newInternalCompanyRoleId' => ['required', 'integer'],
+        ]);
+
+        try {
+            $createInternalUserForCompany->handle($company, [
+                'name' => $validated['newInternalName'],
+                'username' => $validated['newInternalUsername'],
+                'password' => $validated['newInternalPassword'],
+                'company_role_id' => $this->normalizeNullableInt($validated['newInternalCompanyRoleId']),
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            $this->addError('newInternalUsername', $exception->getMessage());
+
+            return;
+        }
+
+        $this->newInternalName = '';
+        $this->newInternalUsername = '';
+        $this->newInternalPassword = '';
+        $this->newInternalCompanyRoleId = '';
+        $this->resetValidation(['newInternalName', 'newInternalUsername', 'newInternalPassword', 'newInternalCompanyRoleId']);
+        $this->loadMemberships();
+        $this->dispatch('toast', message: 'Usuario creado y vinculado correctamente.', type: 'success');
     }
 
     public function users(): Collection
     {
         return $this->currentCompany()
             ->users()
-            ->orderBy('name')
-            ->get();
-    }
-
-    public function roleTemplates(): Collection
-    {
-        return RoleTemplate::query()
-            ->where('status', RecordStatus::Active->value)
             ->orderBy('name')
             ->get();
     }
@@ -316,6 +337,23 @@ class RolesPage extends Component
         'sales' => 'pos',
     ];
 
+    public function toggleModulePermissions(string $moduleCode): void
+    {
+        $moduleCodes = collect($this->permissionGroups()[$moduleCode] ?? [])
+            ->pluck('code')
+            ->all();
+
+        if ($moduleCodes === []) {
+            return;
+        }
+
+        $allSelected = collect($moduleCodes)->every(fn (string $code) => in_array($code, $this->selectedPermissionCodes, true));
+
+        $this->selectedPermissionCodes = $allSelected
+            ? array_values(array_diff($this->selectedPermissionCodes, $moduleCodes))
+            : array_values(array_unique([...$this->selectedPermissionCodes, ...$moduleCodes]));
+    }
+
     public function permissionGroups(): array
     {
         $company = $this->currentCompany();
@@ -344,14 +382,6 @@ class RolesPage extends Component
             return 'Propietario';
         }
 
-        if ($pivot->role_template_id) {
-            $template = $this->roleTemplates()->firstWhere('id', (int) $pivot->role_template_id);
-
-            if ($template) {
-                return 'Plantilla: ' . $template->name;
-            }
-        }
-
         if ($pivot->company_role_id) {
             $role = $this->companyRoles()->get()->firstWhere('id', (int) $pivot->company_role_id);
 
@@ -372,15 +402,15 @@ class RolesPage extends Component
 
         return view('livewire.admin.roles-page', [
             'users' => $this->users(),
-            'roleTemplates' => $this->roleTemplates(),
             'companyRoles' => $companyRoles,
             'permissionGroups' => $this->permissionGroups(),
             'activeUsersCount' => $this->activeUsersCount(),
             'maxUsers' => $this->maxUsers(),
+            'remainingUserSlots' => $this->remainingUserSlots(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Roles y Usuarios',
-                'description' => 'Crea roles por empresa, asigna permisos y actualiza la plantilla o rol operativo de cada usuario.',
+                'description' => 'Crea roles por empresa, asigna permisos y actualiza el rol operativo de cada usuario.',
             ]),
         ]);
     }
@@ -390,7 +420,6 @@ class RolesPage extends Component
         $this->memberships = $this->users()
             ->mapWithKeys(fn (User $user) => [
                 $user->id => [
-                    'role_template_id' => $user->pivot?->role_template_id ? (string) $user->pivot->role_template_id : '',
                     'company_role_id' => $user->pivot?->company_role_id ? (string) $user->pivot->company_role_id : '',
                 ],
             ])

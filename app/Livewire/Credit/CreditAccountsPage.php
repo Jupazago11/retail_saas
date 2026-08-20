@@ -3,21 +3,24 @@
 namespace App\Livewire\Credit;
 
 use App\Actions\Credit\RegisterCreditPayment;
+use App\Actions\Customers\CreateCustomer;
 use App\Actions\Customers\EnableCustomerCredit;
 use App\Enums\CashSessionStatus;
 use App\Enums\CreditMovementType;
+use App\Enums\SaleStatus;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\CashSession;
 use App\Models\Company;
 use App\Models\CreditAccount;
-use App\Models\CreditMovement;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Tenancy\CurrentCompany;
+use App\Support\Money;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use Livewire\Component;
@@ -27,7 +30,7 @@ class CreditAccountsPage extends Component
     use InteractsWithToast;
 
     public string $search = '';
-    public bool $overdueOnly = false;
+    public string $statusFilter = 'all';
     public ?int $selectedCustomerId = null;
     public bool $showDetailModal = false;
     public bool $showEditModal = false;
@@ -38,7 +41,7 @@ class CreditAccountsPage extends Component
     public string $editEmail = '';
     public string $editCreditLimit = '';
 
-    public ?int $paymentSaleId = null;
+    public bool $showPaymentForm = false;
     public ?int $cashSessionId = null;
     public string $paymentAmount = '';
     public string $paymentMethodCode = 'cash';
@@ -49,22 +52,31 @@ class CreditAccountsPage extends Component
     public ?int $addCustomerSelectedId = null;
     public string $addCustomerCreditLimit = '';
 
+    public bool $addCustomerCreatingNew = false;
+    public string $newCustomerDocumentType = '';
+    public string $newCustomerDocumentNumber = '';
+    public string $newCustomerFirstName = '';
+    public string $newCustomerLastName = '';
+    public string $newCustomerPhone = '';
+    public string $newCustomerEmail = '';
+
     public function mount(): void
     {
         $this->ensureCreditAccess();
     }
 
+    public function setStatusFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'current', 'overdue'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+    }
+
     public function accounts(): Collection
     {
-        return CreditAccount::query()
-            ->where('company_id', $this->currentCompany()->id)
-            ->with([
-                'customer.person',
-                'movements' => fn ($query) => $query
-                    ->with('sale')
-                    ->orderByDesc('occurred_at')
-                    ->orderByDesc('id'),
-            ])
+        return $this->accountsQuery()
             ->when($this->search !== '', function (Builder $query) {
                 $search = '%' . trim($this->search) . '%';
 
@@ -80,58 +92,78 @@ class CreditAccountsPage extends Component
             })
             ->orderByDesc('balance_due')
             ->orderByDesc('id')
-            ->get();
-    }
-
-    public function creditSales(): Collection
-    {
-        return Sale::query()
-            ->where('company_id', $this->currentCompany()->id)
-            ->where('sale_type', 'credit')
-            ->with([
-                'branch',
-                'cashRegister',
-                'customer.person',
-                'user',
-                'payments',
-                'creditAccount',
-                'creditMovements',
-            ])
-            ->when($this->search !== '', function (Builder $query) {
-                $search = '%' . trim($this->search) . '%';
-
-                $query->where(function (Builder $nested) use ($search) {
-                    $nested
-                        ->whereLike('id', $search)
-                        ->orWhereLike('document_number', $search)
-                        ->orWhereHas('customer.person', function (Builder $personQuery) use ($search) {
-                            $personQuery
-                                ->whereLike('first_name', $search)
-                                ->orWhereLike('last_name', $search)
-                                ->orWhereLike('document_number', $search);
-                        })
-                        ->orWhereHas('user', fn (Builder $userQuery) => $userQuery->whereLike('name', $search));
-                });
-            })
-            ->when($this->overdueOnly, fn (Builder $query) => $query->whereNotNull('credit_due_at')->where('credit_due_at', '<', now()))
-            ->orderByRaw("case when credit_due_at is null then 1 else 0 end")
-            ->orderBy('credit_due_at')
-            ->orderByDesc('id')
             ->get()
-            ->filter(fn (Sale $sale) => ! $this->overdueOnly || bccomp($this->outstandingForSale($sale), '0.00', 2) === 1)
+            ->filter(function (CreditAccount $account) {
+                if ($this->statusFilter === 'all') {
+                    return true;
+                }
+
+                $mora = $this->moraStatus($account);
+                $isOverdue = $mora !== null && $mora['color'] !== 'emerald';
+
+                return $this->statusFilter === 'overdue' ? $isOverdue : ! $isOverdue;
+            })
             ->values();
     }
 
     public function summaryCards(): array
     {
-        $accounts = $this->accounts();
-        $sales = $this->creditSales();
+        $accounts = $this->accountsQuery()->get();
 
         return [
             'accounts_count' => $accounts->count(),
-            'balance_due_total' => \App\Support\Money::format((float) $accounts->sum(fn (CreditAccount $account) => (float) $account->balance_due)),
-            'available_credit_total' => \App\Support\Money::format((float) $accounts->sum(fn (CreditAccount $account) => (float) $account->available_credit)),
-            'overdue_sales_count' => $sales->filter(fn (Sale $sale) => $sale->credit_due_at && $sale->credit_due_at->isPast() && bccomp($this->outstandingForSale($sale), '0.00', 2) === 1)->count(),
+            'balance_due_total' => Money::format((float) $accounts->sum(fn (CreditAccount $account) => (float) $account->balance_due)),
+            'available_credit_total' => Money::format((float) $accounts->sum(fn (CreditAccount $account) => (float) $account->available_credit)),
+            'overdue_accounts_count' => $accounts->filter(function (CreditAccount $account) {
+                $mora = $this->moraStatus($account);
+
+                return $mora !== null && $mora['color'] !== 'emerald';
+            })->count(),
+        ];
+    }
+
+    /**
+     * Semaforo por tiempo de mora de la cuenta: verde = al dia (sin saldo o
+     * sin facturas vencidas), amarillo = mora reciente (<=30 dias), rojo =
+     * mora prolongada (>30 dias). Se ancla a la factura vencida mas antigua
+     * de la cuenta porque los abonos ya no se enlazan a una venta puntual
+     * (se aplican contra el saldo general), asi que no hay forma exacta de
+     * saber cual factura especifica sigue sin pagar.
+     *
+     * @return array{color: string, label: string}|null
+     */
+    public function moraStatus(CreditAccount $account): ?array
+    {
+        if (bccomp((string) $account->balance_due, '0.00', 2) <= 0) {
+            return null;
+        }
+
+        $oldestDueAt = Sale::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->where('credit_account_id', $account->id)
+            ->where('sale_type', 'credit')
+            ->where('status', '!=', SaleStatus::Cancelled->value)
+            ->whereNotNull('credit_due_at')
+            ->orderBy('credit_due_at')
+            ->value('credit_due_at');
+
+        if ($oldestDueAt === null) {
+            return ['color' => 'emerald', 'label' => 'Al dia'];
+        }
+
+        $today = now()->startOfDay();
+        $dueDate = $oldestDueAt->copy()->startOfDay();
+        $daysUntilDue = (int) $today->diffInDays($dueDate);
+
+        if ($daysUntilDue >= 0) {
+            return ['color' => 'emerald', 'label' => 'Al dia'];
+        }
+
+        $daysOverdue = abs($daysUntilDue);
+
+        return [
+            'color' => $daysOverdue <= 30 ? 'amber' : 'rose',
+            'label' => 'En mora '.$daysOverdue.' '.Str::plural('dia', $daysOverdue),
         ];
     }
 
@@ -169,6 +201,7 @@ class CreditAccountsPage extends Component
         $this->addCustomerSearch = '';
         $this->addCustomerSelectedId = null;
         $this->addCustomerCreditLimit = '';
+        $this->cancelCreatingCustomerForCredit();
         $this->resetValidation();
     }
 
@@ -178,6 +211,7 @@ class CreditAccountsPage extends Component
         $this->addCustomerSearch = '';
         $this->addCustomerSelectedId = null;
         $this->addCustomerCreditLimit = '';
+        $this->cancelCreatingCustomerForCredit();
         $this->resetValidation();
     }
 
@@ -212,6 +246,76 @@ class CreditAccountsPage extends Component
 
         $this->closeAddCustomerModal();
         $this->toast('Credito habilitado correctamente.');
+    }
+
+    /**
+     * El buscador de "Agregar cliente a credito" solo ofrece clientes que ya
+     * existen en el sistema (por ejemplo, creados al vuelo desde una venta).
+     * Este flujo cubre el caso de un cliente que todavia no existe: crea el
+     * registro completo (con mas datos de los que pide la venta rapida) y de
+     * una vez le habilita cupo de credito.
+     */
+    public function startCreatingCustomerForCredit(): void
+    {
+        $this->ensurePermission('credit.manage');
+
+        $this->addCustomerCreatingNew = true;
+        $this->addCustomerSelectedId = null;
+        $this->newCustomerDocumentType = '';
+        $this->newCustomerDocumentNumber = '';
+        $this->newCustomerFirstName = '';
+        $this->newCustomerLastName = '';
+        $this->newCustomerPhone = '';
+        $this->newCustomerEmail = '';
+        $this->addCustomerCreditLimit = '';
+        $this->resetValidation();
+    }
+
+    public function cancelCreatingCustomerForCredit(): void
+    {
+        $this->addCustomerCreatingNew = false;
+        $this->newCustomerDocumentType = '';
+        $this->newCustomerDocumentNumber = '';
+        $this->newCustomerFirstName = '';
+        $this->newCustomerLastName = '';
+        $this->newCustomerPhone = '';
+        $this->newCustomerEmail = '';
+        $this->resetValidation();
+    }
+
+    public function createCustomerForCredit(CreateCustomer $createCustomer): void
+    {
+        $this->ensurePermission('credit.manage');
+
+        $validated = $this->validate([
+            'newCustomerFirstName' => ['required', 'string', 'max:100'],
+            'newCustomerLastName' => ['nullable', 'string', 'max:100'],
+            'newCustomerDocumentType' => ['nullable', 'string', 'max:30'],
+            'newCustomerDocumentNumber' => ['nullable', 'string', 'max:50'],
+            'newCustomerPhone' => ['nullable', 'string', 'max:30'],
+            'newCustomerEmail' => ['nullable', 'email', 'max:150'],
+            'addCustomerCreditLimit' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        try {
+            $createCustomer->handle($this->currentCompany(), [
+                'first_name' => trim($validated['newCustomerFirstName']),
+                'last_name' => $this->blankToNull($validated['newCustomerLastName']),
+                'document_type' => $this->blankToNull($validated['newCustomerDocumentType']),
+                'document_number' => $this->blankToNull($validated['newCustomerDocumentNumber']),
+                'phone' => $this->blankToNull($validated['newCustomerPhone']),
+                'email' => $this->blankToNull($validated['newCustomerEmail']),
+                'credit_enabled' => true,
+                'credit_limit' => $validated['addCustomerCreditLimit'],
+            ]);
+        } catch (InvalidArgumentException $exception) {
+            $this->toast($exception->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->closeAddCustomerModal();
+        $this->toast('Cliente creado y credito habilitado correctamente.');
     }
 
     public function selectCustomer(int $customerId): void
@@ -313,33 +417,29 @@ class CreditAccountsPage extends Component
             ->get();
     }
 
-    public function startRegisteringPayment(int $saleId): void
+    public function startRegisteringPayment(): void
     {
         $this->ensurePermission('credit.manage');
 
-        $sale = $this->creditSalesQuery()
-            ->with(['creditMovements'])
-            ->findOrFail($saleId);
+        $account = $this->selectedAccount();
 
-        $outstanding = $this->outstandingForSale($sale);
-
-        if (bccomp($outstanding, '0.00', 2) !== 1) {
-            $this->toast('La venta ya no tiene saldo pendiente.', 'warning');
+        if (! $account || bccomp((string) $account->balance_due, '0.00', 2) !== 1) {
+            $this->toast('Este cliente ya no tiene saldo pendiente.', 'warning');
 
             return;
         }
 
-        $this->paymentSaleId = $sale->id;
-        $this->paymentAmount = $outstanding;
+        $this->showPaymentForm = true;
+        $this->paymentAmount = (string) (int) round((float) $account->balance_due);
         $this->paymentMethodCode = 'cash';
         $this->paymentReference = '';
-        $this->cashSessionId = $this->openCashSessionsForSale($sale)->first()?->id;
+        $this->cashSessionId = $this->openCashSessions()->first()?->id;
         $this->resetValidation();
     }
 
     public function cancelRegisteringPayment(): void
     {
-        $this->paymentSaleId = null;
+        $this->showPaymentForm = false;
         $this->cashSessionId = null;
         $this->paymentAmount = '';
         $this->paymentMethodCode = 'cash';
@@ -352,10 +452,6 @@ class CreditAccountsPage extends Component
         $this->ensurePermission('credit.manage');
 
         $validated = $this->validate([
-            'paymentSaleId' => [
-                'required',
-                Rule::exists('sales', 'id')->where(fn ($query) => $query->where('company_id', $this->currentCompany()->id)->where('sale_type', 'credit')),
-            ],
             'cashSessionId' => [
                 'nullable',
                 Rule::exists('cash_sessions', 'id')->where(fn ($query) => $query
@@ -367,25 +463,14 @@ class CreditAccountsPage extends Component
             'paymentReference' => ['nullable', 'string', 'max:120'],
         ]);
 
-        $sale = $this->creditSalesQuery()
-            ->with(['creditMovements'])
-            ->findOrFail((int) $validated['paymentSaleId']);
+        $account = $this->selectedAccount();
 
-        if ($validated['cashSessionId']) {
-            $allowedCashSessionIds = $this->openCashSessionsForSale($sale)
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            if (! in_array((int) $validated['cashSessionId'], $allowedCashSessionIds, true)) {
-                $this->addError('cashSessionId', 'La sesion de caja no corresponde al contexto operativo de la venta.');
-
-                return;
-            }
+        if (! $account) {
+            return;
         }
 
         try {
-            $registerCreditPayment->handle($this->currentCompany(), $sale, [
+            $registerCreditPayment->handle($this->currentCompany(), $account, [
                 'cash_session_id' => $validated['cashSessionId'] ? (int) $validated['cashSessionId'] : null,
                 'received_by' => auth()->id(),
                 'payment_method_code' => trim($validated['paymentMethodCode']),
@@ -402,27 +487,14 @@ class CreditAccountsPage extends Component
         $this->toast('Abono registrado correctamente.');
     }
 
-    public function openCashSessionsForSale(Sale $sale): Collection
+    public function openCashSessions(): Collection
     {
         return CashSession::query()
             ->where('company_id', $this->currentCompany()->id)
-            ->where('branch_id', $sale->branch_id)
             ->where('status', CashSessionStatus::Open->value)
-            ->when($sale->cash_register_id, fn ($query) => $query->where('cash_register_id', $sale->cash_register_id))
             ->with(['cashRegister', 'opener'])
             ->orderByDesc('opened_at')
             ->get();
-    }
-
-    public function outstandingForSale(Sale $sale): string
-    {
-        $sale->loadMissing('creditMovements');
-
-        return $sale->creditMovements->reduce(function (string $carry, CreditMovement $movement) {
-            return $this->movementDirection($movement->movement_type) === 1
-                ? bcadd($carry, (string) $movement->amount, 2)
-                : bcsub($carry, (string) $movement->amount, 2);
-        }, '0.00');
     }
 
     public function movementLabel(string $movementType): string
@@ -440,7 +512,9 @@ class CreditAccountsPage extends Component
     {
         return view('livewire.credit.credit-accounts-page', [
             'accounts'             => $this->accounts(),
+            'selectedAccount'      => $this->selectedAccount(),
             'selectedCustomerSales' => $this->selectedCustomerSales(),
+            'openCashSessions'     => $this->showPaymentForm ? $this->openCashSessions() : new Collection(),
             'statusCards'          => $this->summaryCards(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
@@ -461,6 +535,31 @@ class CreditAccountsPage extends Component
         return Sale::query()
             ->where('company_id', $this->currentCompany()->id)
             ->where('sale_type', 'credit');
+    }
+
+    protected function accountsQuery(): Builder
+    {
+        return CreditAccount::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->with([
+                'customer.person',
+                'movements' => fn ($query) => $query
+                    ->with('sale')
+                    ->orderByDesc('occurred_at')
+                    ->orderByDesc('id'),
+            ]);
+    }
+
+    protected function selectedAccount(): ?CreditAccount
+    {
+        if (! $this->selectedCustomerId) {
+            return null;
+        }
+
+        return CreditAccount::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->where('customer_id', $this->selectedCustomerId)
+            ->first();
     }
 
     protected function ensureCreditAccess(): void
@@ -486,17 +585,6 @@ class CreditAccountsPage extends Component
             403,
             'No tienes permiso para acceder a este modulo.'
         );
-    }
-
-    protected function movementDirection(string $movementType): int
-    {
-        return match ($movementType) {
-            CreditMovementType::SaleCharge->value => 1,
-            CreditMovementType::Payment->value,
-            CreditMovementType::SaleReturnAdjustment->value,
-            CreditMovementType::SaleCancellationAdjustment->value => -1,
-            default => 0,
-        };
     }
 
     protected function blankToNull(mixed $value): ?string

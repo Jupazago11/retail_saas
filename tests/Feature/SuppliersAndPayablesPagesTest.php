@@ -229,7 +229,7 @@ class SuppliersAndPayablesPagesTest extends TestCase
 
         Livewire::test(PayablesPage::class)
             ->call('toggleLedger', $purchase->id)
-            ->assertSee('Cargo inicial')
+            ->assertSee('Factura')
             ->assertSee('FAC-PXP-1');
     }
 
@@ -301,13 +301,11 @@ class SuppliersAndPayablesPagesTest extends TestCase
 
         Livewire::test(PayablesPage::class)
             ->assertSee('Proveedores filtrados')
-            ->assertSee('Exposicion neta')
             ->assertSee('31-60')
             ->assertSee('Proveedor Alpha')
             ->assertSee('Proveedor Beta')
             ->set('hasCreditOnly', true)
             ->assertSee('Proveedor Beta')
-            ->assertSee('1 proveedores en el agregado')
             ->set('agingBucket', '0_30')
             ->assertSee('FAC-BETA-AGE')
             ->assertDontSee('FAC-ALPHA-AGE');

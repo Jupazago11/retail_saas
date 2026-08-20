@@ -77,7 +77,7 @@ class SalesCreationTest extends TestCase
         $this->assertSame('855.00', $sale->tax_total);
         $this->assertSame('5355.00', $sale->grand_total);
         $this->assertSame(1, $sale->document_sequence);
-        $this->assertSame('VTA-000001', $sale->document_number);
+        $this->assertSame('000001', $sale->document_number);
         $this->assertNotNull($sale->posted_to_inventory_at);
         $this->assertCount(1, $sale->items);
         $this->assertSame('12.000000', $sale->items->first()->base_quantity);
@@ -105,6 +105,37 @@ class SalesCreationTest extends TestCase
         ]);
     }
 
+    public function test_it_snapshots_product_tax_rate_and_ticket_shows_included_tax(): void
+    {
+        [, $company, $branch, $warehouse, $product] = $this->saleFixtureWithoutVariant();
+        $product->update(['tax_rate' => '19']);
+        app(CompanySettings::class)->set($company, 'pos', 'allow_negative_stock', true);
+
+        $sale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'status' => SaleStatus::Confirmed->value,
+            'sold_at' => now(),
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => '2',
+                    'unit_price' => '1190',
+                ],
+            ],
+        ]);
+
+        $this->assertSame('19.00', $sale->items->first()->product_tax_rate);
+        // El IVA incluido es informativo: no debe alterar subtotal/total, que
+        // se siguen calculando igual que siempre (aditivo, hoy siempre 0).
+        $this->assertSame('2380.00', $sale->grand_total);
+        $this->assertSame('0.00', $sale->tax_total);
+
+        $ticketData = app(\App\Services\Printing\BuildSaleTicketViewData::class)->handle($company, $sale);
+
+        $this->assertSame('380', $ticketData['taxIncludedTotal']);
+    }
+
     public function test_draft_sale_does_not_post_inventory_until_explicitly_processed(): void
     {
         [, $company, $branch, $warehouse, $product] = $this->saleFixtureWithoutVariant();
@@ -123,7 +154,7 @@ class SalesCreationTest extends TestCase
         ]);
 
         $this->assertNull($sale->posted_to_inventory_at);
-        $this->assertSame('VTA-000001', $sale->document_number);
+        $this->assertSame('000001', $sale->document_number);
         $this->assertSame(0, InventoryMovement::query()->count());
         $this->assertSame(0, InventoryBalance::query()->count());
     }
@@ -161,72 +192,8 @@ class SalesCreationTest extends TestCase
             ],
         ]);
 
-        $this->assertSame('VTA-000001', $firstSale->document_number);
-        $this->assertSame('VTA-000002', $secondSale->document_number);
-    }
-
-    public function test_it_can_use_company_settings_for_internal_document_prefix_and_starting_sequence(): void
-    {
-        [$owner, $company, $branch, $warehouse, $product] = $this->saleFixtureWithoutVariant();
-        app(CompanySettings::class)->set($company, 'pos', 'sale_document_prefix', 'POS-');
-        app(CompanySettings::class)->set($company, 'pos', 'sale_document_starting_sequence', 1001);
-
-        $sale = app(CreateSale::class)->handle($company, [
-            'branch_id' => $branch->id,
-            'warehouse_id' => $warehouse->id,
-            'user_id' => $owner->id,
-            'status' => SaleStatus::Draft->value,
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'quantity' => '1',
-                    'unit_price' => '1800',
-                ],
-            ],
-        ]);
-
-        $this->assertSame(1001, $sale->document_sequence);
-        $this->assertSame('POS-001001', $sale->document_number);
-    }
-
-    public function test_it_does_not_roll_back_internal_sequence_if_setting_is_lower_than_existing_history(): void
-    {
-        [$owner, $company, $branch, $warehouse, $product] = $this->saleFixtureWithoutVariant();
-
-        $firstSale = app(CreateSale::class)->handle($company, [
-            'branch_id' => $branch->id,
-            'warehouse_id' => $warehouse->id,
-            'user_id' => $owner->id,
-            'status' => SaleStatus::Draft->value,
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'quantity' => '1',
-                    'unit_price' => '1800',
-                ],
-            ],
-        ]);
-
-        app(CompanySettings::class)->set($company, 'pos', 'sale_document_starting_sequence', 1);
-        app(CompanySettings::class)->set($company, 'pos', 'sale_document_prefix', 'POS-');
-
-        $secondSale = app(CreateSale::class)->handle($company, [
-            'branch_id' => $branch->id,
-            'warehouse_id' => $warehouse->id,
-            'user_id' => $owner->id,
-            'status' => SaleStatus::Draft->value,
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'quantity' => '1',
-                    'unit_price' => '1800',
-                ],
-            ],
-        ]);
-
-        $this->assertSame('VTA-000001', $firstSale->document_number);
-        $this->assertSame(2, $secondSale->document_sequence);
-        $this->assertSame('POS-000002', $secondSale->document_number);
+        $this->assertSame('000001', $firstSale->document_number);
+        $this->assertSame('000002', $secondSale->document_number);
     }
 
     public function test_posting_sale_to_inventory_is_idempotent(): void

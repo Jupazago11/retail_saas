@@ -58,7 +58,7 @@ El sistema sera un monolito modular en Laravel con Livewire para interaccion ric
 - Usuarios empresariales solo operan dentro de empresas vinculadas.
 - La empresa activa se cambia de forma explicita y auditable.
 - La autorizacion operativa se resuelve contra la empresa activa mediante middleware y policies.
-- El owner de la empresa conserva acceso total; los demas usuarios dependen de permisos tecnicos asociados a su plantilla o rol empresarial.
+- El owner de la empresa conserva acceso total; los demas usuarios dependen de permisos tecnicos asociados a su rol empresarial (`company_roles`, personalizado por tenant — no existe un catalogo global de plantillas).
 
 ## Modulos esperados
 

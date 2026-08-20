@@ -18,6 +18,7 @@ class Product extends Model
         'supplier_id',
         'base_unit_id',
         'tax_id',
+        'tax_rate',
         'name',
         'sku',
         'barcode',
@@ -38,6 +39,7 @@ class Product extends Model
     {
         return [
             'cost' => 'decimal:2',
+            'tax_rate' => 'decimal:2',
             'price_1' => 'decimal:2',
             'price_2' => 'decimal:2',
             'price_3' => 'decimal:2',

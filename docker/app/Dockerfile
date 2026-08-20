@@ -5,13 +5,18 @@ RUN apt-get update \
         curl \
         git \
         libicu-dev \
+        libjpeg62-turbo-dev \
         libonig-dev \
+        libpng-dev \
         libpq-dev \
+        libwebp-dev \
         libxml2-dev \
         libzip-dev \
         unzip \
+    && docker-php-ext-configure gd --with-jpeg --with-webp \
     && docker-php-ext-install \
         bcmath \
+        gd \
         intl \
         pcntl \
         pdo_pgsql \

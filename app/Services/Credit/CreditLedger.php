@@ -18,9 +18,9 @@ class CreditLedger
         return $this->apply($account, $sale, CreditMovementType::SaleCharge, $amount, $notes);
     }
 
-    public function recordPayment(CreditAccount $account, Sale $sale, string $amount, ?string $notes = null): CreditMovement
+    public function recordPayment(CreditAccount $account, string $amount, ?string $notes = null): CreditMovement
     {
-        return $this->apply($account, $sale, CreditMovementType::Payment, $amount, $notes);
+        return $this->apply($account, null, CreditMovementType::Payment, $amount, $notes);
     }
 
     public function recordSaleReturnAdjustment(CreditAccount $account, Sale $sale, string $amount, ?string $notes = null): CreditMovement
@@ -68,7 +68,7 @@ class CreditLedger
 
     protected function apply(
         CreditAccount $account,
-        Sale $sale,
+        ?Sale $sale,
         CreditMovementType $movementType,
         string $amount,
         ?string $notes = null,
@@ -80,12 +80,14 @@ class CreditLedger
                 ->lockForUpdate()
                 ->findOrFail($account->id);
 
-            if ($account->company_id !== $sale->company_id) {
-                throw new InvalidArgumentException('La cuenta de credito no pertenece a la empresa de la venta.');
-            }
+            if ($sale !== null) {
+                if ($account->company_id !== $sale->company_id) {
+                    throw new InvalidArgumentException('La cuenta de credito no pertenece a la empresa de la venta.');
+                }
 
-            if ($sale->credit_account_id && $sale->credit_account_id !== $account->id) {
-                throw new InvalidArgumentException('La venta no pertenece a la cuenta de credito indicada.');
+                if ($sale->credit_account_id && $sale->credit_account_id !== $account->id) {
+                    throw new InvalidArgumentException('La venta no pertenece a la cuenta de credito indicada.');
+                }
             }
 
             if ($movementType === CreditMovementType::SaleCharge && $account->status !== CreditAccountStatus::Active->value) {
@@ -96,7 +98,7 @@ class CreditLedger
                 throw new InvalidArgumentException('El cliente no tiene cupo disponible suficiente.');
             }
 
-            if ($this->direction($movementType->value) === -1) {
+            if ($sale !== null && $this->direction($movementType->value) === -1) {
                 $outstanding = $this->outstandingForSale($sale);
 
                 if (bccomp($outstanding, $amount, 2) === -1) {
@@ -121,7 +123,7 @@ class CreditLedger
             return CreditMovement::query()->create([
                 'company_id' => $account->company_id,
                 'credit_account_id' => $account->id,
-                'sale_id' => $sale->id,
+                'sale_id' => $sale?->id,
                 'movement_type' => $movementType->value,
                 'amount' => $amount,
                 'balance_after' => $newBalance,

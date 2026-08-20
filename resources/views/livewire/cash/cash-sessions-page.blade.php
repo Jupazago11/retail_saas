@@ -302,16 +302,106 @@
                         <div class="mt-2 grid grid-cols-7 gap-1.5">
                             @foreach ($calendarCells as $cell)
                                 @if ($cell['date'] === null)
-                                    <div></div>
-                                @else
-                                    <button type="button" wire:click="selectHistoryDate('{{ $cell['date'] }}')"
-                                        class="flex aspect-square flex-col items-center justify-center rounded-xl text-base transition
-                                            {{ $cell['hasSessions']
-                                                ? 'bg-gradient-to-br from-blue-600 to-purple-600 font-bold text-white shadow-sm hover:from-blue-700 hover:to-purple-700'
-                                                : 'bg-gray-50 text-gray-600 hover:bg-gray-100' }}
-                                            {{ $cell['isToday'] && ! $cell['hasSessions'] ? 'ring-2 ring-inset ring-blue-400' : '' }}">
+                                    <div wire:key="calendar-pad-{{ $loop->index }}"></div>
+                                @elseif (! $cell['hasSessions'])
+                                    {{-- wire:key por fecha: sin esto, Livewire hace matching posicional
+                                         entre renders y puede confundir esta celda con la de abajo (que
+                                         alterna entre <div>, <button> y el <div x-data=... > del popover
+                                         segun hasSessions) — eso es lo que dejaba el hover roto despues
+                                         de cerrar una caja y volver a entrar al calendario. --}}
+                                    <button type="button" wire:key="calendar-day-{{ $cell['date'] }}" wire:click="selectHistoryDate('{{ $cell['date'] }}')"
+                                        class="flex aspect-square flex-col items-center justify-center rounded-xl text-base transition bg-gray-50 text-gray-600 hover:bg-gray-100
+                                            {{ $cell['isToday'] ? 'ring-2 ring-inset ring-blue-400' : '' }}">
                                         {{ $cell['day'] }}
                                     </button>
+                                @else
+                                    {{-- Popover flotante en vez de title=: reutiliza el mismo patron de
+                                         posicionamiento (getBoundingClientRect + position:fixed) que usan
+                                         los tooltips de purchases-page.blade.php, pero como card blanca
+                                         porque aqui el contenido es una lista, no una sola palabra — y a
+                                         diferencia de esos, este es interactivo (tiene el boton de editar),
+                                         asi que usa un pequeno delay al esconderse (en vez de solo
+                                         mouseleave del boton) para que de tiempo de mover el mouse hasta
+                                         el icono sin que el popover desaparezca en el camino. --}}
+                                    <div wire:key="calendar-day-{{ $cell['date'] }}" x-data="{
+                                            show: false,
+                                            hideTimer: null,
+                                            p: {},
+                                            open(e) {
+                                                clearTimeout(this.hideTimer);
+                                                const r = e.currentTarget.getBoundingClientRect();
+                                                this.p = { t: r.bottom + 8, l: r.left + r.width / 2 };
+                                                this.show = true;
+                                            },
+                                            scheduleHide() {
+                                                this.hideTimer = setTimeout(() => { this.show = false; }, 200);
+                                            },
+                                        }" class="relative">
+                                        <button type="button" wire:click="selectHistoryDate('{{ $cell['date'] }}')"
+                                            @mouseenter="open($event)" @mouseleave="scheduleHide()"
+                                            class="flex aspect-square w-full flex-col items-center justify-center rounded-xl text-base font-bold text-white shadow-sm transition bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                                            {{ $cell['day'] }}
+                                        </button>
+
+                                        <div x-show="show" x-cloak
+                                            @mouseenter="clearTimeout(hideTimer)" @mouseleave="scheduleHide()"
+                                            x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+                                            :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
+                                            class="w-56 rounded-xl bg-white p-3 text-left shadow-xl ring-1 ring-gray-200">
+                                            <div class="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white ring-1 ring-gray-200"></div>
+
+                                            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                                                {{ ucfirst(\Illuminate\Support\Carbon::parse($cell['date'])->translatedFormat('d \d\e F')) }}
+                                            </p>
+                                            <div class="relative mt-1.5 space-y-1.5">
+                                                @foreach ($cell['registers'] as $register)
+                                                    <div>
+                                                        <div class="flex items-start justify-between gap-2">
+                                                            <span class="pt-1 text-xs font-medium text-gray-700">{{ $register['name'] }}</span>
+                                                            @if ($register['status'] === 'open')
+                                                                <x-status-badge color="amber">sin cerrar</x-status-badge>
+                                                            @else
+                                                                {{-- 'reconciled' solo pasa cuando contado == esperado (ver
+                                                                     CloseCashSession::handle) — o sea que el color de la
+                                                                     pill YA es la señal positivo/negativo: verde = cuadro
+                                                                     perfecto, rojo = quedo con diferencia. --}}
+                                                                <div class="flex items-start gap-1">
+                                                                    <span class="text-right">
+                                                                        <x-status-badge :color="$register['status'] === 'reconciled' ? 'emerald' : 'rose'">
+                                                                            {{ \App\Support\Money::format($register['closingCounted']) }}
+                                                                        </x-status-badge>
+                                                                        @if ($register['difference'] !== null && ! $register['negativeExpected'])
+                                                                            <span class="mt-0.5 block text-[10px] font-semibold text-rose-600">
+                                                                                {{ $register['difference'] > 0 ? 'sobra' : 'falta' }}
+                                                                                {{ \App\Support\Money::format(abs($register['difference'])) }}
+                                                                            </span>
+                                                                        @endif
+                                                                    </span>
+                                                                    @if ($register['status'] !== 'reconciled' && $this->canEditHistoricalCuadres())
+                                                                        <button type="button" wire:click="openCuadre({{ $register['sessionId'] }})"
+                                                                            title="Editar este cuadre"
+                                                                            class="mt-0.5 shrink-0 text-gray-400 transition hover:text-blue-600">
+                                                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    @endif
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                        @if ($register['negativeExpected'])
+                                                            {{-- El "esperado" mismo salio negativo: los pagos registrados
+                                                                 superaron bases + ventas del dia. No es un "sobrante" de
+                                                                 caja (eso sugeriria que todo esta bien y hay plata de
+                                                                 mas) — el problema real esta en los pagos/bases
+                                                                 registrados, hay que revisarlos. --}}
+                                                            <p class="mt-0.5 text-[10px] font-semibold text-rose-600">
+                                                                Recaudo negativo: los pagos superaron las bases + ventas del dia.
+                                                            </p>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 @endif
                             @endforeach
                         </div>
@@ -351,15 +441,6 @@
                 <form wire:submit="saveRules" class="flex flex-col flex-1 min-h-0">
                     <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                         <label class="flex items-start gap-3">
-                            <input wire:model="ruleRequiresOpenCashSession" type="checkbox"
-                                class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                            <span>
-                                <span class="block text-sm font-medium text-gray-900">Exigir caja abierta para vender</span>
-                                <span class="block text-xs text-gray-500">Si esta activo, el POS bloquea el cobro sin una sesion de caja abierta.</span>
-                            </span>
-                        </label>
-
-                        <label class="flex items-start gap-3">
                             <input wire:model="ruleOpeningRequired" type="checkbox"
                                 class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
                             <span>
@@ -376,15 +457,6 @@
                             @error('ruleDefaultOpeningAmount') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
-                        <label class="flex items-start gap-3">
-                            <input wire:model="ruleAllowCloseWithDifference" type="checkbox"
-                                class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
-                            <span>
-                                <span class="block text-sm font-medium text-gray-900">Permitir cierre con diferencia</span>
-                                <span class="block text-xs text-gray-500">Si esta desactivado, no se puede cerrar caja hasta que el conteo cuadre con lo esperado.</span>
-                            </span>
-                        </label>
-
                         @if ($cashRegisterPlanLimit === null || $cashRegisterPlanLimit > 1)
                             <div class="border-t border-stone-100 pt-4">
                                 <p class="text-sm font-medium text-gray-900">Cajas habilitadas</p>
@@ -393,7 +465,7 @@
                                 </p>
                                 <div class="mt-2 space-y-1.5">
                                     @foreach ($companyCashRegisters as $register)
-                                        <label class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                                        <label wire:key="cash-register-{{ $register->id }}" class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
                                             <span class="text-sm text-gray-700">
                                                 {{ $register->name }}
                                                 @if ($register->is_primary)
@@ -408,18 +480,25 @@
                                 </div>
 
                                 @if ($this->canCreateMoreCashRegisters())
-                                    <form wire:submit="addCashRegister" class="mt-2 flex items-start gap-2">
+                                    {{-- Div, no <form>: ya estamos dentro del <form wire:submit="saveRules">
+                                         de todo el modal, y un <form> anidado es HTML invalido — el navegador
+                                         lo "arregla" cerrando el de afuera antes de tiempo, lo que desincroniza
+                                         el DOM real del que Livewire cree que renderizo y corrompe el morphing
+                                         (el input pierde lo escrito/pegado y el boton termina disparando
+                                         "saveRules" en vez de "addCashRegister"). --}}
+                                    <div class="mt-2 flex items-start gap-2">
                                         <div class="flex-1">
-                                            <input wire:model="newCashRegisterName" type="text" placeholder="Nombre de la nueva caja (ej: Caja 2)"
+                                            <input wire:model="newRegisterName" type="text" placeholder="Nombre de la nueva caja (ej: Caja 2)"
+                                                wire:keydown.enter.prevent="addCashRegister"
                                                 class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                            @error('newCashRegisterName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                            @error('newRegisterName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                         </div>
-                                        <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                                        <button type="button" wire:click="addCashRegister" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                                             </svg>
                                         </button>
-                                    </form>
+                                    </div>
                                 @else
                                     <p class="mt-2 text-xs text-gray-400">Ya creaste el maximo de cajas que permite tu plan.</p>
                                 @endif
@@ -451,12 +530,9 @@
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-widest text-blue-700">
                             Cuadre de caja
-                            @unless ($sessionIsOpen)
-                                · {{ ucfirst(\Illuminate\Support\Carbon::parse($cuadreSession->opened_at)->translatedFormat('d \d\e F \d\e Y')) }}
-                            @endunless
                         </p>
                         <h2 class="mt-0.5 text-xl font-black text-gray-900">
-                            Sesion #{{ $cuadreSession->company_sequence }} · {{ $cuadreSession->cashRegister?->name }}
+                            {{ ucfirst(\Illuminate\Support\Carbon::parse($cuadreSession->opened_at)->translatedFormat('d \d\e F \d\e Y')) }} · {{ $cuadreSession->cashRegister?->name }}
                             @unless ($sessionIsOpen)
                                 <span class="ml-1 align-middle">
                                     <x-status-badge :color="$cuadreSession->status === 'reconciled' ? 'sky' : 'stone'">

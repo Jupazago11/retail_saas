@@ -710,7 +710,6 @@ class PosPage extends Component
             'notes' => ['nullable', 'string'],
             'items' => ['required', 'array', 'min:1'],
             'cashSessionId' => [
-                Rule::requiredIf($this->requiresImmediatePayments() && $this->requiresOpenCashSession()),
                 'nullable',
                 Rule::exists('cash_sessions', 'id')->where(fn ($query) => $query
                     ->where('company_id', $company->id)
@@ -744,8 +743,6 @@ class PosPage extends Component
             'items.*.unit_price' => ['required', 'numeric', 'min:0'],
             'items.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
             'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
-        ], [
-            'cashSessionId.required' => 'Debes abrir una sesión de caja antes de cobrar.',
         ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             $this->toast(collect($e->errors())->flatten()->first() ?? 'Revisa los datos de la venta antes de confirmar.', 'error');
@@ -908,7 +905,7 @@ class PosPage extends Component
                 'product_id' => (string) $item->product_id,
                 'product_presentation_id' => $item->product_presentation_id ? (string) $item->product_presentation_id : '',
                 'product_variant_id' => $item->product_variant_id ? (string) $item->product_variant_id : '',
-                'quantity' => (string) $item->quantity,
+                'quantity' => rtrim(rtrim((string) $item->quantity, '0'), '.'),
                 'unit_price' => (string) $item->unit_price,
                 'discount_amount' => (string) $item->discount_amount,
                 'tax_rate' => (string) $item->tax_rate,
@@ -1059,7 +1056,12 @@ class PosPage extends Component
 
     public function canFreezeCurrentSale(): bool
     {
-        return app(CompanyPlanResolver::class)->hasFeature($this->currentCompany(), 'pos.frozen_sales')
+        // Modificando una venta ya confirmada no hay nada que congelar: o se
+        // confirma el cambio o se cancela y la venta original queda como
+        // estaba. Congelar dejaria un carrito huerfano sin relacion con la
+        // venta que se estaba modificando.
+        return $this->modifyingSaleId === null
+            && app(CompanyPlanResolver::class)->hasFeature($this->currentCompany(), 'pos.frozen_sales')
             && (auth()->user()?->hasCurrentCompanyPermission('sales.freeze') ?? false)
             && $this->canCreateSales();
     }
@@ -1097,11 +1099,6 @@ class PosPage extends Component
     public function requiresImmediatePayments(): bool
     {
         return $this->saleStatus === SaleStatus::Confirmed->value;
-    }
-
-    public function requiresOpenCashSession(): bool
-    {
-        return (bool) app(CompanySettings::class)->get($this->currentCompany(), 'pos', 'requires_open_cash_session');
     }
 
     public function paymentMethodOptions(): array

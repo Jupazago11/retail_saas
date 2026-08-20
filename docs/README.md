@@ -17,7 +17,7 @@ Esta carpeta centraliza las decisiones del proyecto antes de generar migraciones
 - `arquitectura-saas.md`: arquitectura objetivo, capas y limites.
 - `modelo-datos.md`: modelo conceptual y tablas previstas por dominio.
 - `matriz-planes-modulos.md`: propuesta inicial de planes, modulos, features y limites.
-- `roles-y-permisos.md`: permisos tecnicos, plantillas y roles empresariales.
+- `roles-y-permisos.md`: permisos tecnicos y roles empresariales.
 - `estados-del-sistema.md`: enums y transiciones esperadas.
 - `flujo-pos.md`: flujo funcional del POS y puntos de validacion.
 - `reglas-inventario.md`: reglas del stock, costo promedio y kardex.

@@ -7,7 +7,6 @@ use App\Actions\Subscriptions\ProvisionCompanySubscription;
 use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\Company;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Authorization\AuthorizationCatalogBootstrapper;
@@ -40,13 +39,11 @@ class CreateCompany
                 'auto_renew' => true,
             ]);
 
-            $ownerTemplateId = RoleTemplate::query()
-                ->where('code', 'owner')
-                ->value('id');
-
+            // El propietario tiene acceso total via la columna company_role
+            // (ver CurrentCompanyPermissionResolver::has()) — no necesita
+            // ningun rol ligado, ni de plantilla ni personalizado.
             $company->users()->attach($owner->id, [
                 'company_role' => 'owner',
-                'role_template_id' => $ownerTemplateId,
                 'status' => RecordStatus::Active->value,
                 'joined_at' => now(),
             ]);

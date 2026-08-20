@@ -1,19 +1,19 @@
 <div>
     <div class="space-y-6">
 
-        {{-- Header --}}
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
-            <h1 class="mt-1 text-2xl font-black text-gray-900">Usuarios</h1>
-        </div>
-
         {{-- Buscador --}}
         <div x-data="responsivePageSize({ rowHeight: 60, reserved: 300 })" class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
-            <div class="flex items-center gap-3">
-                <input wire:model.live.debounce.300ms="search" type="text"
-                    placeholder="Buscar por nombre, email o usuario..."
-                    class="w-72 rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                <span class="text-xs text-gray-400">{{ $users->total() }} usuarios</span>
+            <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
+                    <h3 class="mt-1 text-2xl font-black text-gray-900">Usuarios</h3>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                    <input wire:model.live.debounce.300ms="search" type="text"
+                        placeholder="Buscar por nombre, email o usuario..."
+                        class="w-72 rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                    <span class="text-xs text-gray-400">{{ $users->total() }} usuarios</span>
+                </div>
             </div>
 
             <div class="mt-5 overflow-x-auto">

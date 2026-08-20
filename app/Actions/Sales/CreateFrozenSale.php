@@ -94,12 +94,10 @@ class CreateFrozenSale
 
     protected function ensureFrozenSalesEnabled(Company $company): void
     {
+        // Ventas congeladas es una feature de plan, no una preferencia que la
+        // empresa pueda prender/apagar: si el plan la trae, esta disponible.
         if (! $this->companyPlanResolver->hasFeature($company, 'pos.frozen_sales')) {
             throw new InvalidArgumentException('El plan actual no tiene habilitada la feature de ventas congeladas.');
-        }
-
-        if (! $this->companySettings->get($company, 'pos', 'frozen_sales_enabled')) {
-            throw new InvalidArgumentException('Las ventas congeladas estan deshabilitadas para esta empresa.');
         }
     }
 

@@ -41,7 +41,6 @@ class PosPageTest extends TestCase
     public function test_pos_page_can_create_confirmed_sale_and_expose_last_ticket_link(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
-        app(CompanySettings::class)->set($company, 'pos', 'sale_document_prefix', 'POS-');
         $cashSession = app(OpenCashSession::class)->handle($company, [
             'branch_id' => $branch->id,
             'cash_register_id' => $cashRegister->id,
@@ -63,17 +62,17 @@ class PosPageTest extends TestCase
             ->set('items.0.unit_price', '1800')
             ->call('saveSale')
             ->assertHasNoErrors()
-            ->assertSee('Abrir ticket de la ultima venta');
+            ->assertSee('Ticket ultima venta');
 
         $sale = Sale::query()->where('company_id', $company->id)->latest('id')->firstOrFail();
-        $this->assertSame('POS-000001', $sale->document_number);
+        $this->assertSame('000001', $sale->document_number);
 
         $this->assertDatabaseHas('sales', [
             'company_id' => $company->id,
             'branch_id' => $branch->id,
             'warehouse_id' => $warehouse->id,
             'cash_register_id' => $cashRegister->id,
-            'document_number' => 'POS-000001',
+            'document_number' => '000001',
             'status' => SaleStatus::Confirmed->value,
             'sale_type' => 'pos',
             'grand_total' => '3600.00',
@@ -87,10 +86,9 @@ class PosPageTest extends TestCase
         ]);
     }
 
-    public function test_pos_page_can_register_confirmed_sale_payment_without_session_when_company_allows_it(): void
+    public function test_pos_page_can_register_confirmed_sale_payment_without_any_open_cash_session(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
-        app(CompanySettings::class)->set($company, 'pos', 'requires_open_cash_session', false);
 
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
@@ -161,7 +159,9 @@ class PosPageTest extends TestCase
             ->set('items.0.quantity', '1')
             ->set('items.0.unit_price', '1800')
             ->call('saveSale')
-            ->assertHasErrors(['cashSessionId']);
+            ->assertDispatched('toast', function (string $eventName, array $params): bool {
+                return ($params['type'] ?? null) === 'error';
+            });
 
         $this->assertDatabaseMissing('payments', [
             'company_id' => $company->id,
@@ -278,7 +278,7 @@ class PosPageTest extends TestCase
             ->set('items.0.unit_price', '1900')
             ->call('saveSale')
             ->assertHasNoErrors()
-            ->assertSee('Abrir ticket de la ultima venta');
+            ->assertSee('Ticket ultima venta');
 
         $draftSale->refresh();
 
@@ -320,7 +320,7 @@ class PosPageTest extends TestCase
         Livewire::test(PosPage::class)
             ->call('loadSaleForModification', $originalSale->id)
             ->assertSet('modifyingSaleId', $originalSale->id)
-            ->assertSet('items.0.quantity', '2.000000')
+            ->assertSet('items.0.quantity', '2')
             ->set('cashSessionId', $cashSession->id)
             ->set('items.0.quantity', '3')
             ->call('saveSale')
@@ -486,7 +486,7 @@ class PosPageTest extends TestCase
             ->set('items.0.quantity', '2')
             ->set('items.0.unit_price', '1800')
             ->assertSee('Promo preview')
-            ->assertSee('3,240.00');
+            ->assertSee('3.240');
     }
 
     public function test_pos_page_can_add_product_from_lookup_input_using_barcode_and_enter(): void
@@ -535,9 +535,8 @@ class PosPageTest extends TestCase
             ->set('branchId', $branch->id)
             ->set('warehouseId', $warehouse->id)
             ->set('cashRegisterId', $cashRegister->id)
-            ->assertSee('pos-product-options', false)
+            ->assertSee('posProductSearch()', false)
             ->assertSee($product->name)
-            ->assertSee('list="pos-product-options"', false)
             ->assertSee('data-pos-product-input', false)
             ->assertDontSee('wire:change="submitProductLookup(', false);
     }

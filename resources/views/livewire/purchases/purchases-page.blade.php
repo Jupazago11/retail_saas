@@ -71,6 +71,7 @@
                             <th class="pb-2">Proveedor</th>
                             <th class="pb-2">Sucursal / Bodega</th>
                             <th class="pb-2 w-px whitespace-nowrap">Estado</th>
+                            <th class="pb-2 w-px whitespace-nowrap">Vence</th>
                             <th class="pb-2 text-right whitespace-nowrap">Total / Saldo</th>
                             <th class="pb-2 w-px whitespace-nowrap text-right">Acciones</th>
                         </tr>
@@ -108,6 +109,17 @@
                                         } }}
                                     </x-status-badge>
                                 </td>
+                                <td class="py-3 align-middle w-px whitespace-nowrap">
+                                    {{-- Semaforo: verde = falta tiempo, amarillo = vence en <=7 dias,
+                                         rojo = vence hoy o ya paso. Null cuando no aplica (pagada,
+                                         cancelada, sin saldo o sin fecha limite). --}}
+                                    @php $due = $this->dueStatus($purchase); @endphp
+                                    @if ($due)
+                                        <x-status-badge :color="$due['color']">{{ $due['label'] }}</x-status-badge>
+                                    @else
+                                        <span class="text-xs text-gray-300">—</span>
+                                    @endif
+                                </td>
                                 <td class="py-3 align-middle text-right whitespace-nowrap">
                                     <p class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $purchase->total) }}</p>
                                     @if ((float) $purchase->balance_due > 0)
@@ -128,36 +140,19 @@
                                         @else
 
                                         <div {!! $tip !!}>
-                                            <button wire:click="toggleLedger({{ $purchase->id }})"
+                                            <button wire:click="openLedger({{ $purchase->id }})"
                                                 @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg transition {{ $expandedLedgerPurchaseId === $purchase->id ? 'text-gray-700 bg-gray-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100' }}">
+                                                class="p-1.5 rounded-lg transition {{ $ledgerPurchaseId === $purchase->id ? 'text-gray-700 bg-gray-100' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100' }}">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                                                 </svg>
                                             </button>
                                             <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
                                                 class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
-                                                Movimientos
+                                                Movimientos{{ $canManagePayables && in_array($purchase->status, ['confirmed', 'partially_paid'], true) ? ' y pagos' : '' }}
                                                 <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
                                             </div>
                                         </div>
-
-                                        @if ($canManagePayables && in_array($purchase->status, ['confirmed', 'partially_paid'], true))
-                                        <div {!! $tip !!}>
-                                            <button wire:click="startRegisteringPayment({{ $purchase->id }})"
-                                                @mouseenter="show($el)" @mouseleave="tip=false"
-                                                class="p-1.5 rounded-lg text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>
-                                                </svg>
-                                            </button>
-                                            <div x-show="tip" :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
-                                                class="pointer-events-none whitespace-nowrap rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white shadow-lg">
-                                                Registrar pago
-                                                <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-stone-900"></div>
-                                            </div>
-                                        </div>
-                                        @endif
 
                                         @if (in_array($purchase->status, ['confirmed', 'partially_paid', 'paid'], true))
                                         <div {!! $tip !!}>
@@ -199,51 +194,9 @@
                                 </td>
                             </tr>
 
-                            @if ($payingPurchaseId === $purchase->id)
-                                <tr wire:key="purchase-pay-{{ $purchase->id }}" class="even:bg-gray-50">
-                                    <td colspan="6" class="pb-4 pt-1">
-                                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
-                                            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar pago · {{ $purchase->invoice_number ?: 'Compra #'.$purchase->company_sequence }}</p>
-                                            <div class="flex flex-col gap-3 md:flex-row md:items-end">
-                                                <div class="flex-1" x-data="digitGroupInput({ path: 'paymentAmount', live: false })">
-                                                    <label class="text-xs font-medium text-gray-700">Monto</label>
-                                                    <input type="text" inputmode="numeric" @input="onInput($event)"
-                                                        value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
-                                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                                    @error('paymentAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                                                </div>
-                                                <div class="flex-1">
-                                                    <label class="text-xs font-medium text-gray-700">Referencia</label>
-                                                    <input wire:model="paymentReference" type="text"
-                                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                                    @error('paymentReference') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                                                </div>
-                                                <div class="flex gap-2">
-                                                    <button wire:click="registerPayment"
-                                                        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
-                                                        Confirmar
-                                                    </button>
-                                                    <button wire:click="cancelRegisteringPayment"
-                                                        class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                                                        Cancelar
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endif
-
-                            @if ($expandedLedgerPurchaseId === $purchase->id)
-                                <tr wire:key="purchase-ledger-{{ $purchase->id }}" class="even:bg-gray-50">
-                                    <td colspan="6" class="pb-4 pt-1">
-                                        @include('livewire.purchases.partials.payable-ledger', ['purchase' => $purchase])
-                                    </td>
-                                </tr>
-                            @endif
                         @empty
                             <tr>
-                                <td colspan="6" class="py-10 text-center text-gray-400">
+                                <td colspan="7" class="py-10 text-center text-gray-400">
                                     Aun no hay compras registradas con el filtro actual.
                                 </td>
                             </tr>
@@ -457,6 +410,65 @@
                     </div>
                 </form>
 
+            </div>
+        </div>
+    @endif
+
+    {{-- Modal de movimientos (ledger) y registro de pagos de una compra --}}
+    @if ($ledgerPurchaseId && $ledgerPurchase)
+        <div wire:click.self="closeLedger"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            style="background: rgba(0,0,0,0.5);">
+            <div class="w-full max-w-2xl rounded-xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
+
+                {{-- Header --}}
+                <div class="flex-shrink-0 flex items-center justify-between border-b border-stone-100 px-5 py-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-blue-700">Movimientos</p>
+                        <h3 class="mt-0.5 text-lg font-black text-gray-900">{{ $ledgerPurchase->invoice_number ?: 'Compra #'.$ledgerPurchase->company_sequence }}</h3>
+                    </div>
+                    <button wire:click="closeLedger" class="text-gray-400 hover:text-gray-700 text-xl leading-none px-1">&times;</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+                    @if ($canManagePayables && in_array($ledgerPurchase->status, ['confirmed', 'partially_paid'], true) && (float) $ledgerPurchase->balance_due > 0)
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar pago</p>
+                            <div class="flex flex-col gap-3 md:flex-row md:items-end">
+                                <div class="flex-1" x-data="digitGroupInput({ path: 'paymentAmount', live: false })">
+                                    <label class="text-xs font-medium text-gray-700">Monto</label>
+                                    <input type="text" inputmode="numeric" @input="onInput($event)"
+                                        value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
+                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                    @error('paymentAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                </div>
+                                <div class="flex-1">
+                                    <label class="text-xs font-medium text-gray-700">Referencia</label>
+                                    <input wire:model="paymentReference" type="text"
+                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                    @error('paymentReference') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                </div>
+                                <div class="flex gap-2">
+                                    <button wire:click="registerPayment"
+                                        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                                        Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
+                    @include('livewire.purchases.partials.payable-ledger', ['purchase' => $ledgerPurchase])
+
+                </div>
+
+                <div class="flex-shrink-0 flex gap-2 border-t border-stone-100 px-5 py-3">
+                    <button type="button" wire:click="closeLedger"
+                        class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                        Cerrar
+                    </button>
+                </div>
             </div>
         </div>
     @endif

@@ -13,17 +13,18 @@ class CompanySettingCatalog
             'general.phone' => ['group' => 'general', 'key' => 'phone', 'type' => 'string', 'default' => null],
             'general.address' => ['group' => 'general', 'key' => 'address', 'type' => 'string', 'default' => null],
             'general.logo_path' => ['group' => 'general', 'key' => 'logo_path', 'type' => 'string', 'default' => null],
+            // Version aparte para el ticket termico: blanco/negro puro por
+            // umbral (ver UpdateCompanyLogo), no el archivo tal cual lo subio
+            // la empresa. El original se conserva para vistas a color (ej.
+            // la miniatura de Reglas).
+            'general.logo_print_path' => ['group' => 'general', 'key' => 'logo_print_path', 'type' => 'string', 'default' => null],
             'general.primary_color' => ['group' => 'general', 'key' => 'primary_color', 'type' => 'string', 'default' => null],
 
-            'pos.frozen_sales_enabled' => ['group' => 'pos', 'key' => 'frozen_sales_enabled', 'type' => 'boolean', 'default' => true],
             'pos.allow_alternative_prices' => ['group' => 'pos', 'key' => 'allow_alternative_prices', 'type' => 'boolean', 'default' => false],
             'pos.allow_manual_discounts' => ['group' => 'pos', 'key' => 'allow_manual_discounts', 'type' => 'boolean', 'default' => false],
             'pos.allow_promotion_stacking' => ['group' => 'pos', 'key' => 'allow_promotion_stacking', 'type' => 'boolean', 'default' => false],
             'pos.allow_negative_stock' => ['group' => 'pos', 'key' => 'allow_negative_stock', 'type' => 'boolean', 'default' => false],
-            'pos.requires_open_cash_session' => ['group' => 'pos', 'key' => 'requires_open_cash_session', 'type' => 'boolean', 'default' => true],
             'pos.require_customer_for_credit_sale' => ['group' => 'pos', 'key' => 'require_customer_for_credit_sale', 'type' => 'boolean', 'default' => true],
-            'pos.sale_document_prefix' => ['group' => 'pos', 'key' => 'sale_document_prefix', 'type' => 'string', 'default' => 'VTA-'],
-            'pos.sale_document_starting_sequence' => ['group' => 'pos', 'key' => 'sale_document_starting_sequence', 'type' => 'integer', 'default' => 1],
 
             'inventory.inventory_enabled' => ['group' => 'inventory', 'key' => 'inventory_enabled', 'type' => 'boolean', 'default' => true],
             'inventory.minimum_stock_alerts_enabled' => ['group' => 'inventory', 'key' => 'minimum_stock_alerts_enabled', 'type' => 'boolean', 'default' => true],
@@ -36,11 +37,9 @@ class CompanySettingCatalog
             'cash.module_enabled' => ['group' => 'cash', 'key' => 'module_enabled', 'type' => 'boolean', 'default' => true],
             'cash.opening_required' => ['group' => 'cash', 'key' => 'opening_required', 'type' => 'boolean', 'default' => true],
             'cash.default_opening_amount' => ['group' => 'cash', 'key' => 'default_opening_amount', 'type' => 'decimal', 'default' => '0.0000'],
-            'cash.allow_close_with_difference' => ['group' => 'cash', 'key' => 'allow_close_with_difference', 'type' => 'boolean', 'default' => false],
 
             'printing.ticket_format' => ['group' => 'printing', 'key' => 'ticket_format', 'type' => 'string', 'default' => 'thermal_80mm'],
             'printing.show_logo' => ['group' => 'printing', 'key' => 'show_logo', 'type' => 'boolean', 'default' => true],
-            'printing.show_saas_branding' => ['group' => 'printing', 'key' => 'show_saas_branding', 'type' => 'boolean', 'default' => false],
 
             'credit.credit_enabled' => ['group' => 'credit', 'key' => 'credit_enabled', 'type' => 'boolean', 'default' => false],
             'credit.default_term_days' => ['group' => 'credit', 'key' => 'default_term_days', 'type' => 'integer', 'default' => 30],

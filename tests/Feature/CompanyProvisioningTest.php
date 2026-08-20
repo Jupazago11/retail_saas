@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Actions\Companies\CreateCompany;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,11 +31,14 @@ class CompanyProvisioningTest extends TestCase
             'slug' => 'san-pedro-centro',
         ]);
 
+        // El propietario tiene acceso total via la columna company_role
+        // (ver CurrentCompanyPermissionResolver::has()) — no necesita
+        // ningun rol personalizado ligado.
         $this->assertDatabaseHas('company_user', [
             'company_id' => $company->id,
             'user_id' => $owner->id,
             'company_role' => 'owner',
-            'role_template_id' => RoleTemplate::query()->where('code', 'owner')->value('id'),
+            'company_role_id' => null,
         ]);
 
         $this->assertDatabaseHas('branches', [

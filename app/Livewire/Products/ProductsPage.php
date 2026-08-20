@@ -3,6 +3,8 @@
 namespace App\Livewire\Products;
 
 use App\Actions\Inventory\CreateInventoryAdjustment;
+use App\Actions\Products\ResolveOrCreateBrand;
+use App\Actions\Products\ResolveOrCreateCategory;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
@@ -15,6 +17,8 @@ use App\Models\Unit;
 use App\Models\Warehouse;
 use App\Services\Plans\CompanyOperationalLimitGuard;
 use App\Services\Tenancy\CurrentCompany;
+use Picqer\Barcode\BarcodeGeneratorSVG;
+use Throwable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,8 +39,11 @@ class ProductsPage extends Component
 
     public bool $showModal = false;
     public ?int $editingProductId = null;
-    public ?int $categoryId = null;
-    public ?int $brandId = null;
+    // Aceptan tambien un string (nombre libre tipeado en el combobox) para
+    // que saveProduct() pueda crear la categoria/marca al vuelo si no
+    // coincide con ninguna existente; ver resolveCategoryValue()/resolveBrandValue().
+    public int|string|null $categoryId = null;
+    public int|string|null $brandId = null;
     public ?int $supplierId = null;
     public ?int $baseUnitId = null;
     public string $taxId = '';
@@ -45,6 +52,7 @@ class ProductsPage extends Component
     public string $barcode = '';
     public string $description = '';
     public string $cost = '0.00';
+    public string $taxRate = '0';
     public string $price1 = '0.00';
     public string $price2 = '';
     public string $price3 = '';
@@ -99,6 +107,25 @@ class ProductsPage extends Component
         }
     }
 
+    // Vista previa en vivo de las barras mientras se escribe/escanea, para
+    // confirmar visualmente el codigo antes de guardar. Cualquier valor que
+    // el generador no pueda codificar simplemente no muestra preview (no es
+    // un error de validacion del producto).
+    public function barcodePreviewSvg(): ?string
+    {
+        $barcode = trim($this->barcode);
+
+        if ($barcode === '') {
+            return null;
+        }
+
+        try {
+            return (new BarcodeGeneratorSVG())->getBarcode($barcode, BarcodeGeneratorSVG::TYPE_CODE_128, 1.4, 40);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     public function openModal(): void
     {
         $this->resetProductForm();
@@ -108,58 +135,6 @@ class ProductsPage extends Component
     public function closeModal(): void
     {
         $this->resetProductForm();
-    }
-
-    public function saveQuickCategory(string $name): void
-    {
-        $name = trim($name);
-        if (! $name) {
-            return;
-        }
-
-        $company = $this->currentCompany();
-
-        $category = Category::create([
-            'company_id' => $company->id,
-            'name'       => $name,
-            'code'       => $this->uniqueCategoryCode($name, $company->id),
-            'status'     => RecordStatus::Active->value,
-        ]);
-
-        $this->categoryId = $category->id;
-    }
-
-    protected function uniqueCategoryCode(string $name, int $companyId): string
-    {
-        $base = Str::upper(Str::slug($name, '_'));
-
-        if ($base === '') {
-            $base = Str::upper(Str::random(6));
-        }
-
-        $base = Str::substr($base, 0, 40);
-        $code = $base;
-        $n    = 2;
-
-        while (Category::where('company_id', $companyId)->where('code', $code)->exists()) {
-            $code = Str::substr($base, 0, 37).'_'.$n++;
-        }
-
-        return $code;
-    }
-
-    public function saveQuickBrand(string $name): void
-    {
-        $name = trim($name);
-        if (! $name) {
-            return;
-        }
-        $brand = Brand::create([
-            'company_id' => $this->currentCompany()->id,
-            'name' => $name,
-            'status' => RecordStatus::Active->value,
-        ]);
-        $this->brandId = $brand->id;
     }
 
     public function saveQuickUnit(string $name, string $code): void
@@ -193,6 +168,20 @@ class ProductsPage extends Component
         }
 
         $company = $this->currentCompany();
+
+        // Si el usuario escribio un nombre que no coincide con ninguna
+        // categoria/marca existente, se crea aqui mismo antes de validar, asi
+        // el "+ Nueva" aparte deja de ser necesario en el formulario.
+        $this->categoryId = $this->resolveCategoryValue($company, $this->categoryId);
+        $this->brandId = $this->resolveBrandValue($company, $this->brandId);
+
+        // El input es texto libre (para permitir tanto "5.5" como "5,5"),
+        // asi que se normaliza a punto decimal antes de validar como numeric.
+        $this->taxRate = str_replace(',', '.', trim($this->taxRate));
+
+        if ($this->taxRate === '') {
+            $this->taxRate = '0';
+        }
 
         $validated = $this->validate([
             'categoryId' => [
@@ -231,6 +220,7 @@ class ProductsPage extends Component
             ],
             'description' => ['nullable', 'string'],
             'cost' => ['required', 'numeric', 'min:0'],
+            'taxRate' => ['required', 'numeric', 'min:0'],
             'price1' => ['required', 'numeric', 'min:0'],
             'price2' => ['nullable', 'numeric', 'min:0'],
             'price3' => ['nullable', 'numeric', 'min:0'],
@@ -266,6 +256,7 @@ class ProductsPage extends Component
             'barcode' => $this->blankToNull(trim($validated['barcode'])),
             'description' => $this->blankToNull(trim($validated['description'])),
             'cost' => $validated['cost'],
+            'tax_rate' => $validated['taxRate'],
             'price_1' => $validated['price1'],
             'price_2' => $this->blankToNull($validated['price2']),
             'price_3' => $this->blankToNull($validated['price3']),
@@ -342,6 +333,7 @@ class ProductsPage extends Component
         $this->barcode = $product->barcode ?? '';
         $this->description = $product->description ?? '';
         $this->cost   = $this->moneyToString($product->cost);
+        $this->taxRate = (string) $product->tax_rate;
         $this->price1 = $this->moneyToString($product->price_1);
         $this->price2 = $product->price_2 !== null ? $this->moneyToString($product->price_2) : '';
         $this->price3 = $product->price_3 !== null ? $this->moneyToString($product->price_3) : '';
@@ -419,11 +411,20 @@ class ProductsPage extends Component
         );
 
         $this->cost   = '0';
+        $this->taxRate = '0';
         $this->price1 = '0';
         $this->tracksInventory = true;
         $this->minimumStock    = '0';
         $this->initializeQuantities();
         $this->resetValidation();
+
+        // Si la empresa solo tiene una unidad activa no tiene caso pedir que
+        // la elijan cada vez: se preselecciona sola (la vista la muestra de
+        // forma informativa en vez de un selector, ver products-page.blade.php).
+        $units = $this->units();
+        if ($units->count() === 1) {
+            $this->baseUnitId = $units->first()->id;
+        }
     }
 
     public function products(): LengthAwarePaginator
@@ -526,6 +527,7 @@ class ProductsPage extends Component
             'warehouses' => $this->warehouses(),
             'canCreateProducts' => $this->canCreateProducts(),
             'hasInventory' => app(\App\Services\Plans\CompanyPlanResolver::class)->hasModule($company, 'inventory'),
+            'barcodePreviewSvg' => $this->barcodePreviewSvg(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Productos',
@@ -556,6 +558,32 @@ class ProductsPage extends Component
     protected function moneyToString(mixed $value): string
     {
         return (string) (int) round((float) $value);
+    }
+
+    protected function resolveCategoryValue(Company $company, int|string|null $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return app(ResolveOrCreateCategory::class)->handle($company, (string) $value)->id;
+    }
+
+    protected function resolveBrandValue(Company $company, int|string|null $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        return app(ResolveOrCreateBrand::class)->handle($company, (string) $value)->id;
     }
 
     protected function marginFrom(string|float|int $cost, string|float|int|null $price): ?string

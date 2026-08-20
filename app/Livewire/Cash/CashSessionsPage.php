@@ -54,11 +54,9 @@ class CashSessionsPage extends Component
     public string $newFundAmount = '';
 
     public bool $showRulesModal = false;
-    public bool $ruleRequiresOpenCashSession = true;
     public bool $ruleOpeningRequired = true;
     public string $ruleDefaultOpeningAmount = '0';
-    public bool $ruleAllowCloseWithDifference = false;
-    public string $newCashRegisterName = '';
+    public string $newRegisterName = '';
 
     public function mount(): void
     {
@@ -253,14 +251,7 @@ class CashSessionsPage extends Component
     public function selectHistoryDate(string $date): void
     {
         $this->historyDate = $date;
-
-        $registerIds = $this->sessionsQuery()
-            ->whereDate('opened_at', $date)
-            ->orderBy('cash_register_id')
-            ->pluck('cash_register_id')
-            ->unique();
-
-        $this->historyCashRegisterId = $registerIds->first();
+        $this->historyCashRegisterId = $this->historyCashRegisterOptions()->first()?->id;
         $this->cashStep = 'day_view';
     }
 
@@ -276,11 +267,9 @@ class CashSessionsPage extends Component
         $companySettings = app(CompanySettings::class);
         $company = $this->currentCompany();
 
-        $this->ruleRequiresOpenCashSession = (bool) $companySettings->get($company, 'pos', 'requires_open_cash_session');
         $this->ruleOpeningRequired = (bool) $companySettings->get($company, 'cash', 'opening_required');
         $this->ruleDefaultOpeningAmount = $this->trimDecimalZeros((string) $companySettings->get($company, 'cash', 'default_opening_amount'));
-        $this->ruleAllowCloseWithDifference = (bool) $companySettings->get($company, 'cash', 'allow_close_with_difference');
-        $this->newCashRegisterName = '';
+        $this->newRegisterName = '';
 
         $this->resetErrorBag();
         $this->showRulesModal = true;
@@ -313,13 +302,9 @@ class CashSessionsPage extends Component
 
         try {
             $updateCompanySettings->handle($this->currentCompany(), [
-                'pos' => [
-                    'requires_open_cash_session' => $this->ruleRequiresOpenCashSession,
-                ],
                 'cash' => [
                     'opening_required' => $this->ruleOpeningRequired,
                     'default_opening_amount' => $validated['ruleDefaultOpeningAmount'],
-                    'allow_close_with_difference' => $this->ruleAllowCloseWithDifference,
                 ],
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
@@ -364,14 +349,14 @@ class CashSessionsPage extends Component
         $this->ensurePermission('settings.manage');
 
         $validated = $this->validate([
-            'newCashRegisterName' => ['required', 'string', 'max:255'],
+            'newRegisterName' => ['required', 'string', 'max:255'],
         ]);
 
         $company = $this->currentCompany();
         $branch = $this->branches()->first();
 
         if (! $branch) {
-            $this->addError('newCashRegisterName', 'Debes tener al menos una sucursal activa para crear una caja.');
+            $this->addError('newRegisterName', 'Debes tener al menos una sucursal activa para crear una caja.');
 
             return;
         }
@@ -379,16 +364,16 @@ class CashSessionsPage extends Component
         try {
             $createCashRegister->handle($company, [
                 'branch_id' => $branch->id,
-                'name' => $validated['newCashRegisterName'],
-                'code' => $validated['newCashRegisterName'],
+                'name' => $validated['newRegisterName'],
+                'code' => $validated['newRegisterName'],
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
-            $this->addError('newCashRegisterName', $exception->getMessage());
+            $this->addError('newRegisterName', $exception->getMessage());
 
             return;
         }
 
-        $this->newCashRegisterName = '';
+        $this->newRegisterName = '';
         $this->toast('Caja creada correctamente.');
     }
 
@@ -604,45 +589,118 @@ class CashSessionsPage extends Component
             ->get();
     }
 
-    public function calendarDaysWithSessions(): array
-    {
-        $start = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $this->calendarMonth . '-01')->startOfMonth();
-        $end = $start->copy()->endOfMonth();
-
-        return $this->sessionsQuery()
-            ->whereBetween('opened_at', [$start, $end])
-            ->selectRaw('DATE(opened_at) as day')
-            ->distinct()
-            ->pluck('day')
-            ->map(fn ($day) => (string) $day)
-            ->all();
-    }
-
     public function calendarCells(): array
     {
         $start = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $this->calendarMonth . '-01')->startOfMonth();
         $end = $start->copy()->endOfMonth();
-        $daysWithSessions = $this->calendarDaysWithSessions();
+
+        $sessionsByDay = $this->sessionsQuery()
+            ->with('cashRegister')
+            ->whereBetween('opened_at', [$start, $end])
+            ->orderBy('opened_at')
+            ->get()
+            ->groupBy(fn (CashSession $session) => $session->opened_at->format('Y-m-d'));
+
+        // Una caja abierta sigue "pendiente" sin importar que dia se abrio
+        // — si se abrio ayer y todavia nadie la cierra, quiero verla en el
+        // popover de HOY, no solo escondida en el dia en que se abrio.
+        $openRegardlessOfDay = $this->sessionsQuery()
+            ->with('cashRegister')
+            ->where('status', CashSessionStatus::Open->value)
+            ->get()
+            ->groupBy('cash_register_id')
+            ->map(fn (Collection $group) => $group->sortByDesc('opened_at')->first());
+
+        // Y al reves: si una caja se abrio OTRO dia pero se cerro HOY, ese
+        // cierre tambien es algo que paso hoy — sin esto, una caja abierta
+        // el 11 y cerrada el 13 solo aparecia en el popover del 11, como si
+        // cerrarla hoy no hubiera sido una accion de hoy.
+        $closedToday = $this->sessionsQuery()
+            ->with('cashRegister')
+            ->whereNotNull('closed_at')
+            ->whereDate('closed_at', now())
+            ->get()
+            ->groupBy('cash_register_id')
+            ->map(fn (Collection $group) => $group->sortByDesc('closed_at')->first());
+
+        $canViewDifference = $this->canViewDifference();
 
         $cells = [];
 
         // Relleno inicial para que el dia 1 caiga en su columna (semana inicia en lunes).
         for ($i = 0; $i < $start->dayOfWeekIso - 1; $i++) {
-            $cells[] = ['date' => null, 'day' => null, 'hasSessions' => false, 'isToday' => false];
+            $cells[] = ['date' => null, 'day' => null, 'hasSessions' => false, 'isToday' => false, 'registers' => []];
         }
 
         for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
             $dateString = $date->format('Y-m-d');
+            $isToday = $date->isToday();
+
+            // Si una caja se abrio/cerro (o reabrio) varias veces el mismo
+            // dia, la sesion mas reciente es la representativa para el
+            // resumen del hover — no tiene sentido listar reaperturas.
+            $sessionsForCell = ($sessionsByDay->get($dateString) ?? new Collection())
+                ->groupBy('cash_register_id')
+                ->map(fn (Collection $group) => $group->sortByDesc('opened_at')->first());
+
+            if ($isToday) {
+                // union() conserva la sesion de $sessionsForCell cuando la
+                // misma caja ya aparece ahi (abierta hoy mismo) y solo
+                // agrega las que faltan. Orden importa: si una caja sigue
+                // abierta ahora mismo, eso pesa mas que un cierre viejo de
+                // hoy mismo para la MISMA caja (caso raro, pero por si acaso).
+                $sessionsForCell = $sessionsForCell->union($openRegardlessOfDay)->union($closedToday);
+            }
+
+            $registers = $sessionsForCell
+                ->map(fn (CashSession $session) => $this->calendarCellRegisterSummary($session, $canViewDifference))
+                ->values()
+                ->all();
 
             $cells[] = [
                 'date' => $dateString,
                 'day' => $date->day,
-                'hasSessions' => in_array($dateString, $daysWithSessions, true),
-                'isToday' => $date->isToday(),
+                'hasSessions' => count($registers) > 0,
+                'isToday' => $isToday,
+                'registers' => $registers,
             ];
         }
 
         return $cells;
+    }
+
+    /**
+     * Resumen de una sesion para la fila de "esta caja este dia" del
+     * popover del calendario: nombre, estado y — solo si ya cerro y el
+     * usuario tiene permiso para verla — el conteo y la diferencia.
+     */
+    protected function calendarCellRegisterSummary(CashSession $session, bool $canViewDifference): array
+    {
+        $isOpen = $session->status === CashSessionStatus::Open->value;
+        $difference = null;
+        $negativeExpected = false;
+
+        if ($canViewDifference && ! $isOpen) {
+            $diffValue = (float) $session->difference_amount;
+            $difference = $diffValue !== 0.0 ? $diffValue : null;
+
+            // Un "esperado" negativo no es un simple "sobrante" de caja —
+            // significa que los pagos registrados superaron las bases mas
+            // las ventas del dia, o sea que el problema esta en lo que se
+            // registro como pago, no en el conteo fisico. Contarlo como
+            // "sobra" (como si el diferencia positivo fuera buena noticia)
+            // esconde ese problema real.
+            $negativeExpected = (float) $session->closing_expected_amount < 0;
+        }
+
+        return [
+            'sessionId' => $session->id,
+            'name' => $session->cashRegister?->name ?? 'Caja',
+            'status' => $session->status,
+            'closingCounted' => $isOpen ? null : (float) $session->closing_counted_amount,
+            'difference' => $difference,
+            'negativeExpected' => $negativeExpected,
+        ];
     }
 
     public function historyCashRegisterOptions(): Collection
@@ -652,12 +710,11 @@ class CashSessionsPage extends Component
         }
 
         $registerIds = $this->sessionsQuery()
-            ->whereDate('opened_at', $this->historyDate)
-            ->pluck('cash_register_id')
-            ->unique();
+            ->where($this->historyDateScope($this->historyDate))
+            ->pluck('cash_register_id');
 
         return CashRegister::query()
-            ->whereIn('id', $registerIds)
+            ->whereIn('id', $registerIds->unique())
             ->orderBy('name')
             ->get();
     }
@@ -674,10 +731,33 @@ class CashSessionsPage extends Component
                 'expenses' => fn ($query) => $query->orderByDesc('id'),
                 'funds' => fn ($query) => $query->orderBy('id'),
             ])
-            ->whereDate('opened_at', $this->historyDate)
             ->where('cash_register_id', $this->historyCashRegisterId)
+            ->where($this->historyDateScope($this->historyDate))
             ->orderByDesc('opened_at')
             ->first();
+    }
+
+    /**
+     * Que sesiones cuentan para un dia dado del historial. Normalmente,
+     * las que se abrieron ese dia exacto. Si el dia es HOY, tambien
+     * cuentan las que siguen abiertas de otro dia (sin cerrar todavia) y
+     * las que se cerraron hoy mismo aunque se hayan abierto otro dia —
+     * "hoy" debe reflejar el estado actual de cada caja, no solo lo que
+     * se abrio hoy. Se usa tanto para listar cajas seleccionables como
+     * para resolver la sesion real al elegir una.
+     */
+    protected function historyDateScope(string $date): \Closure
+    {
+        $isToday = \Illuminate\Support\Carbon::parse($date)->isToday();
+
+        return function (Builder $query) use ($date, $isToday) {
+            $query->whereDate('opened_at', $date);
+
+            if ($isToday) {
+                $query->orWhere('status', CashSessionStatus::Open->value)
+                    ->orWhere(fn (Builder $q) => $q->whereNotNull('closed_at')->whereDate('closed_at', $date));
+            }
+        };
     }
 
     public function canAccessCash(): bool
@@ -718,9 +798,22 @@ class CashSessionsPage extends Component
         return \App\Support\Money::format((float) app(CompanySettings::class)->get($this->currentCompany(), 'cash', 'default_opening_amount'));
     }
 
-    public function allowsCloseWithDifference(): bool
+    /**
+     * Monto contado "en vivo" mientras la sesion sigue abierta: prioriza el
+     * desglose por denominacion si tiene algo cargado (misma prioridad que
+     * closeSession()), y si no cae al monto escrito a mano.
+     */
+    public function currentCountedAmount(): string
     {
-        return (bool) app(CompanySettings::class)->get($this->currentCompany(), 'cash', 'allow_close_with_difference');
+        $denominationTotal = $this->denominationTotal();
+
+        if (bccomp($denominationTotal, '0.00', 2) !== 0) {
+            return $denominationTotal;
+        }
+
+        return $this->blankToNull($this->closingCountedAmount) !== null
+            ? (string) round((float) $this->closingCountedAmount)
+            : '0';
     }
 
     public function expectedCashAmount(CashSession $session): string

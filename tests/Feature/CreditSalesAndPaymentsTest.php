@@ -183,7 +183,7 @@ class CreditSalesAndPaymentsTest extends TestCase
         $this->assertNotNull($newSale->credit_account_id);
     }
 
-    public function test_it_registers_credit_payment_and_reduces_sale_and_account_balance(): void
+    public function test_it_registers_credit_payment_against_the_overall_account_balance(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product, $customer] = $this->creditFixture();
 
@@ -194,7 +194,7 @@ class CreditSalesAndPaymentsTest extends TestCase
             'opening_amount' => '50000',
         ]);
 
-        $sale = app(CreateSale::class)->handle($company, [
+        app(CreateSale::class)->handle($company, [
             'branch_id' => $branch->id,
             'warehouse_id' => $warehouse->id,
             'customer_id' => $customer->id,
@@ -210,7 +210,9 @@ class CreditSalesAndPaymentsTest extends TestCase
             ],
         ]);
 
-        $payment = app(RegisterCreditPayment::class)->handle($company, $sale, [
+        $account = $customer->creditAccount()->firstOrFail()->fresh();
+
+        $payment = app(RegisterCreditPayment::class)->handle($company, $account, [
             'cash_session_id' => $cashSession->id,
             'received_by' => $owner->id,
             'payment_method_code' => 'cash',
@@ -218,23 +220,23 @@ class CreditSalesAndPaymentsTest extends TestCase
             'reference' => 'AB-001',
         ]);
 
-        $account = $customer->creditAccount()->firstOrFail()->fresh();
+        $account = $account->fresh();
 
-        $this->assertSame($sale->id, $payment->sale_id);
+        $this->assertNull($payment->sale_id);
         $this->assertSame($account->id, $payment->credit_account_id);
         $this->assertSame('2600.00', $account->balance_due);
         $this->assertSame('7400.00', $account->available_credit);
         $this->assertDatabaseHas('credit_movements', [
             'company_id' => $company->id,
             'credit_account_id' => $account->id,
-            'sale_id' => $sale->id,
+            'sale_id' => null,
             'movement_type' => CreditMovementType::Payment->value,
             'amount' => '1000.00',
             'balance_after' => '2600.00',
         ]);
     }
 
-    public function test_it_rejects_credit_payment_with_cash_session_from_other_register(): void
+    public function test_it_accepts_credit_payment_with_cash_session_from_any_company_register(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product, $customer] = $this->creditFixture();
 
@@ -252,7 +254,7 @@ class CreditSalesAndPaymentsTest extends TestCase
             'opening_amount' => '20000',
         ]);
 
-        $sale = app(CreateSale::class)->handle($company, [
+        app(CreateSale::class)->handle($company, [
             'branch_id' => $branch->id,
             'warehouse_id' => $warehouse->id,
             'cash_register_id' => $cashRegister->id,
@@ -269,15 +271,64 @@ class CreditSalesAndPaymentsTest extends TestCase
             ],
         ]);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('La sesion de caja debe corresponder a la misma caja operativa de la venta.');
+        $account = $customer->creditAccount()->firstOrFail()->fresh();
 
-        app(RegisterCreditPayment::class)->handle($company, $sale, [
+        // Los abonos ya no se enlazan a una venta puntual, asi que cualquier
+        // sesion de caja abierta de la empresa es valida (no solo la de la
+        // caja donde se registro la venta original).
+        $payment = app(RegisterCreditPayment::class)->handle($company, $account, [
             'cash_session_id' => $foreignSession->id,
             'received_by' => $owner->id,
             'payment_method_code' => 'cash',
             'amount' => '1000',
         ]);
+
+        $this->assertSame($foreignSession->id, $payment->cash_session_id);
+    }
+
+    public function test_it_lets_a_customer_pay_down_pooled_debt_across_multiple_sales_in_one_abono(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product, $customer] = $this->creditFixture();
+
+        $cashSession = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '50000',
+        ]);
+
+        foreach ([2, 2] as $quantity) {
+            app(CreateSale::class)->handle($company, [
+                'branch_id' => $branch->id,
+                'warehouse_id' => $warehouse->id,
+                'customer_id' => $customer->id,
+                'user_id' => $owner->id,
+                'sale_type' => 'credit',
+                'status' => SaleStatus::Confirmed->value,
+                'items' => [
+                    [
+                        'product_id' => $product->id,
+                        'quantity' => (string) $quantity,
+                        'unit_price' => '1800',
+                    ],
+                ],
+            ]);
+        }
+
+        $account = $customer->creditAccount()->firstOrFail()->fresh();
+        $this->assertSame('7200.00', $account->balance_due);
+
+        // Un solo abono, mayor que el cargo de cualquiera de las dos ventas
+        // por separado, se aplica contra el saldo general de la cuenta.
+        app(RegisterCreditPayment::class)->handle($company, $account, [
+            'cash_session_id' => $cashSession->id,
+            'received_by' => $owner->id,
+            'payment_method_code' => 'cash',
+            'amount' => '5000',
+        ]);
+
+        $account = $account->fresh();
+        $this->assertSame('2200.00', $account->balance_due);
     }
 
     public function test_it_rejects_immediate_sale_payments_for_credit_sale(): void
@@ -363,7 +414,7 @@ class CreditSalesAndPaymentsTest extends TestCase
         ]);
     }
 
-    public function test_it_rejects_cancelling_credit_sale_after_abono(): void
+    public function test_it_rejects_cancelling_credit_sale_when_the_account_no_longer_has_balance_for_it(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product, $customer] = $this->creditFixture();
 
@@ -390,7 +441,13 @@ class CreditSalesAndPaymentsTest extends TestCase
             ],
         ]);
 
-        app(RegisterCreditPayment::class)->handle($company, $sale, [
+        $account = $customer->creditAccount()->firstOrFail()->fresh();
+
+        // El abono ya no se enlaza a esta venta puntual: se aplica contra el
+        // saldo general de la cuenta. Al intentar anular la venta completa
+        // ($3600) sobre un saldo que ya bajo a $3100, el saldo de la cuenta
+        // quedaria en negativo y el guard generico de CreditLedger lo bloquea.
+        app(RegisterCreditPayment::class)->handle($company, $account, [
             'cash_session_id' => $cashSession->id,
             'received_by' => $owner->id,
             'payment_method_code' => 'cash',
@@ -398,7 +455,7 @@ class CreditSalesAndPaymentsTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('No se puede anular una venta a credito que ya tiene abonos registrados.');
+        $this->expectExceptionMessage('El movimiento excede el saldo total de la cuenta.');
 
         app(CancelSale::class)->handle($company, $sale, 'Intento de anulacion posterior a abono');
     }

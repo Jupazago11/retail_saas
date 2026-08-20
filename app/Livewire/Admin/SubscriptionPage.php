@@ -28,16 +28,55 @@ class SubscriptionPage extends Component
         return app(CompanyPlanResolver::class)->snapshot($this->currentCompany());
     }
 
-    public function otherPlans(): Collection
+    /**
+     * Planes ordenados de menor a mayor "tamano" (cantidad de modulos
+     * incluidos). No se ordena por precio porque en este catalogo todos
+     * los planes tienen base_price 0 — el conteo de modulos es el proxy
+     * real de que tan basico o completo es cada plan.
+     */
+    public function allPlans(): Collection
     {
-        $currentPlanId = $this->effectiveSnapshot()['plan']?->id;
-
         return Plan::query()
             ->where('status', RecordStatus::Active->value)
-            ->when($currentPlanId, fn ($q) => $q->where('id', '!=', $currentPlanId))
-            ->with('modules')
-            ->orderBy('base_price')
-            ->get();
+            ->with([
+                // Plan::modules() no filtra el pivot "enabled" por defecto
+                // (solo lo expone via withPivot); sin este filtro, modulos
+                // deshabilitados para un plan igual aparecen en la lista.
+                'modules' => fn ($query) => $query->wherePivot('enabled', true),
+                'limits',
+            ])
+            ->get()
+            ->sortBy(fn (Plan $plan) => $plan->modules->count())
+            ->values();
+    }
+
+    /**
+     * Para cada plan (ya ordenado de mas basico a mas completo), calcula
+     * que modulos suma respecto al plan inmediatamente anterior. El
+     * primer plan (el mas basico) muestra todos sus modulos sin
+     * comparar contra nada. Ej: Basic -> [Productos, POS, Caja,
+     * Reportes]; Pro -> "incluye todo lo de Basic, mas" [Inventario,
+     * Compras, Credito, ...].
+     */
+    public function planModuleBreakdown(Collection $plans): array
+    {
+        $breakdown = [];
+        $previousPlan = null;
+
+        foreach ($plans as $plan) {
+            $previousModuleCodes = $previousPlan?->modules->pluck('code')->all() ?? [];
+
+            $breakdown[$plan->id] = [
+                'previous_plan_name' => $previousPlan?->name,
+                'added_modules' => $plan->modules
+                    ->reject(fn ($module) => in_array($module->code, $previousModuleCodes, true))
+                    ->values(),
+            ];
+
+            $previousPlan = $plan;
+        }
+
+        return $breakdown;
     }
 
     public function whatsappUrl(): string
@@ -84,9 +123,12 @@ class SubscriptionPage extends Component
 
     public function render(): View
     {
+        $plans = $this->allPlans();
+
         return view('livewire.admin.subscription-page', [
             'snapshot' => $this->effectiveSnapshot(),
-            'otherPlans' => $this->otherPlans(),
+            'plans' => $plans,
+            'planModuleBreakdown' => $this->planModuleBreakdown($plans),
             'equipmentTypes' => EquipmentType::cases(),
             'equipmentMonthlyTotal' => $this->equipmentMonthlyTotal(),
         ])->layout('layouts.app', [

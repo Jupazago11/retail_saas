@@ -581,8 +581,9 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25h-10.5A2.25 2.25 0 0 0 4.5 6v12a2.25 2.25 0 0 0 2.25 2.25h10.5A2.25 2.25 0 0 0 19.5 18v-2.25m-6-3h7.5m0 0-3-3m3 3-3 3"/></svg>
                     </div>
                 @endif
-                {{-- Congelar venta actual --}}
-                @if ($this->canViewFrozenSales())
+                {{-- Congelar venta actual (no aplica modificando una venta ya
+                confirmada: ahi solo hay confirmar el cambio o cancelar) --}}
+                @if ($this->canViewFrozenSales() && ! $modifyingSaleId)
                     <button type="button" wire:click="freezeCurrentSale" class="pos-tool" title="Congelar venta actual">
                         {{-- cubo de hielo: cube-transparent Heroicon --}}
                         <svg xmlns="http://www.w3.org/2000/svg" class="text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
@@ -1008,34 +1009,47 @@
     style="background: rgba(0,0,0,0.5);"
 >
     <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl" x-show="open" x-on:click.outside="open = false">
-        <h3 class="text-lg font-black text-gray-900">Tienes una venta sin terminar</h3>
-        <p class="mt-2 text-sm leading-6 text-gray-600">
-            Hay productos en el carrito. ¿Qué quieres hacer antes de ir al panel principal?
-        </p>
+        @if ($modifyingSaleId)
+            <h3 class="text-lg font-black text-gray-900">Tienes cambios sin confirmar</h3>
+            <p class="mt-2 text-sm leading-6 text-gray-600">
+                Estas modificando una venta ya confirmada. Si sales sin confirmar el cambio, la venta original queda tal como estaba.
+            </p>
+        @else
+            <h3 class="text-lg font-black text-gray-900">Tienes una venta sin terminar</h3>
+            <p class="mt-2 text-sm leading-6 text-gray-600">
+                Hay productos en el carrito. ¿Qué quieres hacer antes de ir al panel principal?
+            </p>
+        @endif
         <div class="mt-6 flex flex-col gap-2">
-            <button
-                type="button"
-                x-bind:disabled="freezing"
-                x-on:click="
-                    freezing = true;
-                    $wire.freezeCurrentSale().then(() => {
-                        freezing = false;
-                        const stillHasItems = ($wire.items || []).some(i => i.product_id);
-                        if (stillHasItems) { return; }
-                        window.location.href = window.posPendingHomeHref;
-                    });
-                "
-                class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
-            >
-                <span x-show="!freezing">Sí, congelar venta y salir</span>
-                <span x-show="freezing" x-cloak>Congelando venta...</span>
-            </button>
+            @unless ($modifyingSaleId)
+                <button
+                    type="button"
+                    x-bind:disabled="freezing"
+                    x-on:click="
+                        freezing = true;
+                        $wire.freezeCurrentSale().then(() => {
+                            freezing = false;
+                            const stillHasItems = ($wire.items || []).some(i => i.product_id);
+                            if (stillHasItems) { return; }
+                            window.location.href = window.posPendingHomeHref;
+                        });
+                    "
+                    class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                    <span x-show="!freezing">Sí, congelar venta y salir</span>
+                    <span x-show="freezing" x-cloak>Congelando venta...</span>
+                </button>
+            @endunless
             <button
                 type="button"
                 x-on:click="window.location.href = window.posPendingHomeHref"
                 class="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
             >
-                Sí, salir sin guardar nada
+                @if ($modifyingSaleId)
+                    Sí, salir y dejar la venta como estaba
+                @else
+                    Sí, salir sin guardar nada
+                @endif
             </button>
             <button
                 type="button"

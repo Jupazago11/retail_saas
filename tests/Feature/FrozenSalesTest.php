@@ -107,37 +107,12 @@ class FrozenSalesTest extends TestCase
         $this->assertSame(2, InventoryMovement::query()->count());
     }
 
-    public function test_it_rejects_frozen_sale_creation_when_feature_is_disabled(): void
-    {
-        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->frozenSaleFixtureWithoutVariant();
-        app(CompanySettings::class)->set($company, 'pos', 'frozen_sales_enabled', false);
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Las ventas congeladas estan deshabilitadas para esta empresa.');
-
-        app(CreateFrozenSale::class)->handle($company, [
-            'branch_id' => $branch->id,
-            'warehouse_id' => $warehouse->id,
-            'cash_register_id' => $cashRegister->id,
-            'created_by' => $owner->id,
-            'label' => 'Bloqueada',
-            'items' => [
-                [
-                    'product_id' => $product->id,
-                    'quantity' => '1',
-                    'unit_price' => '2000',
-                ],
-            ],
-        ]);
-    }
-
     public function test_it_rejects_frozen_sale_creation_when_plan_does_not_include_feature(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Frozen Basic SAS',
         ]);
-        app(CompanySettings::class)->set($company, 'pos', 'frozen_sales_enabled', true);
         $branch = $company->branches()->firstOrFail();
         $warehouse = $company->warehouses()->firstOrFail();
         $cashRegister = $company->cashRegisters()->firstOrFail();

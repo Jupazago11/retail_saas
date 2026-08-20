@@ -16,7 +16,6 @@ use App\Models\Permission;
 use App\Models\Product;
 use App\Models\ProductPresentation;
 use App\Models\ProductVariant;
-use App\Models\RoleTemplate;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
@@ -155,8 +154,8 @@ class FrozenSalesPageTest extends TestCase
         $user = User::factory()->create();
 
         $company->users()->attach($user->id, [
-            'company_role' => $templateCode,
-            'role_template_id' => RoleTemplate::query()->where('code', $templateCode)->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, $templateCode)->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

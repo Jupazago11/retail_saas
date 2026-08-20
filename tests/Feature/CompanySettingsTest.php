@@ -22,7 +22,7 @@ class CompanySettingsTest extends TestCase
 
         $settings = app(CompanySettings::class);
 
-        $this->assertTrue($settings->get($company, 'pos', 'frozen_sales_enabled'));
+        $this->assertTrue($settings->get($company, 'pos', 'require_customer_for_credit_sale'));
         $this->assertSame('weighted_average', $settings->get($company, 'inventory', 'default_cost_method'));
     }
 
@@ -61,7 +61,6 @@ class CompanySettingsTest extends TestCase
 
         $this->assertSame('letter_a4', $group['ticket_format']);
         $this->assertFalse($group['show_logo']);
-        $this->assertFalse($group['show_saas_branding']);
     }
 
     public function test_it_keeps_settings_isolated_per_company(): void

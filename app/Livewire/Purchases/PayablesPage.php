@@ -162,13 +162,46 @@ class PayablesPage extends Component
             'openBalanceTotal' => $payables->sum(fn (Purchase $purchase) => (float) $purchase->balance_due),
             'overdueBalanceTotal' => $supplierSummary->sum(fn (array $row) => (float) $row['overdue_balance_total']),
             'availableCreditTotal' => $supplierSummary->sum(fn (array $row) => (float) $row['credit_balance']),
-            'netExposureTotal' => $supplierSummary->sum(fn (array $row) => (float) $row['net_balance_exposure']),
+            'agingChartData' => $this->agingChartData($supplierSummary),
+            'topSuppliersChartData' => $this->topSuppliersChartData($supplierSummary),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Cuentas por Pagar',
                 'description' => 'Consulta compras pendientes, vencimientos y aplica saldo a favor del proveedor sobre compras abiertas.',
             ]),
         ]);
+    }
+
+    /**
+     * Cuanto se debe en total por cada tramo de antiguedad (0-30, 31-60,
+     * 61-90, 91+ dias), sumado entre todos los proveedores filtrados —
+     * mismo criterio de color que el semaforo de compras (verde = reciente,
+     * rojo = mas viejo).
+     */
+    protected function agingChartData(SupportCollection $supplierSummary): array
+    {
+        return [
+            ['label' => '0-30 dias', 'value' => $supplierSummary->sum(fn (array $row) => (float) $row['age_0_30_balance_total'])],
+            ['label' => '31-60 dias', 'value' => $supplierSummary->sum(fn (array $row) => (float) $row['age_31_60_balance_total'])],
+            ['label' => '61-90 dias', 'value' => $supplierSummary->sum(fn (array $row) => (float) $row['age_61_90_balance_total'])],
+            ['label' => '91+ dias', 'value' => $supplierSummary->sum(fn (array $row) => (float) $row['age_91_plus_balance_total'])],
+        ];
+    }
+
+    /**
+     * Los proveedores con mayor saldo pendiente entre los filtrados, para
+     * que de un vistazo se vea a quien se le debe mas sin tener que leer
+     * toda la tabla de compras.
+     */
+    protected function topSuppliersChartData(SupportCollection $supplierSummary): array
+    {
+        return $supplierSummary
+            ->filter(fn (array $row) => (float) $row['open_balance_total'] > 0)
+            ->sortByDesc(fn (array $row) => (float) $row['open_balance_total'])
+            ->take(6)
+            ->map(fn (array $row) => ['label' => $row['supplier_name'], 'value' => (float) $row['open_balance_total']])
+            ->values()
+            ->all();
     }
 
     public function movementLabel(PayableMovement $movement): string
@@ -193,6 +226,47 @@ class PayablesPage extends Component
             PayableMovementType::SupplierCreditApplied->value => 'bg-violet-100 text-violet-700',
             default => 'bg-stone-200 text-stone-700',
         };
+    }
+
+    /**
+     * Para un movimiento de tipo Pago: si la compra tiene fecha limite,
+     * indica si ese pago llego a tiempo, con cuantos dias de anticipacion o
+     * con cuantos dias de retraso. Null cuando no aplica (no es un pago, o
+     * la compra no tiene fecha limite registrada).
+     *
+     * @return array{color: string, label: string}|null
+     */
+    public function paymentTimeliness(PayableMovement $movement, Purchase $purchase): ?array
+    {
+        if ($movement->movement_type !== PayableMovementType::Payment->value) {
+            return null;
+        }
+
+        if ($purchase->due_at === null || $movement->occurred_at === null) {
+            return null;
+        }
+
+        $dueDate = $purchase->due_at->copy()->startOfDay();
+        $paidDate = $movement->occurred_at->copy()->startOfDay();
+        $daysFromDue = (int) $dueDate->diffInDays($paidDate);
+
+        if ($daysFromDue < 0) {
+            $daysEarly = abs($daysFromDue);
+
+            return [
+                'color' => 'emerald',
+                'label' => 'Pagado con '.$daysEarly.' '.\Illuminate\Support\Str::plural('dia', $daysEarly).' de anticipacion',
+            ];
+        }
+
+        if ($daysFromDue === 0) {
+            return ['color' => 'emerald', 'label' => 'Pagado a tiempo'];
+        }
+
+        return [
+            'color' => 'rose',
+            'label' => 'Pagado con '.$daysFromDue.' '.\Illuminate\Support\Str::plural('dia', $daysFromDue).' de retraso',
+        ];
     }
 
     protected function currentCompany(): Company

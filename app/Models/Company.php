@@ -42,7 +42,7 @@ class Company extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class)
-            ->withPivot(['company_role', 'role_template_id', 'company_role_id', 'status', 'joined_at'])
+            ->withPivot(['company_role', 'company_role_id', 'status', 'joined_at'])
             ->withTimestamps();
     }
 

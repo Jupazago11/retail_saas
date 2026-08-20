@@ -6,7 +6,6 @@ use App\Actions\Companies\CreateCompany;
 use App\Enums\RecordStatus;
 use App\Livewire\Admin\SubscriptionPage;
 use App\Models\PlatformSetting;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,7 +29,7 @@ class SubscriptionPageTest extends TestCase
         Livewire::test(SubscriptionPage::class)
             ->assertSee('Tu plan actual')
             ->assertSee('Basic')
-            ->assertSee('Otros planes disponibles')
+            ->assertSee('Planes disponibles')
             ->assertSee('Pro')
             ->assertSee('Premium')
             ->assertDontSee('Guardar suscripcion')
@@ -63,8 +62,8 @@ class SubscriptionPageTest extends TestCase
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

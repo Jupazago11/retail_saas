@@ -10,14 +10,12 @@ use App\Models\Payment;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
-use App\Services\Settings\CompanySettings;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class RegisterSalePayments
 {
     public function __construct(
-        protected CompanySettings $companySettings,
         protected AuditLogger $auditLogger,
     ) {
     }
@@ -50,10 +48,6 @@ class RegisterSalePayments
 
         $receivedBy = $this->resolveUser($company, (int) ($attributes['received_by'] ?? 0));
         $cashSession = $this->resolveCashSession($company, $attributes['cash_session_id'] ?? null);
-
-        if ($this->companySettings->get($company, 'pos', 'requires_open_cash_session') && ! $cashSession) {
-            throw new InvalidArgumentException('La empresa requiere una sesion de caja abierta para registrar pagos.');
-        }
 
         $normalizedPayments = collect($payments)
             ->map(function (array $payment) {

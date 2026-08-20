@@ -50,24 +50,41 @@
 
                         @php
                             $moduleLabels = [
-                                'cash'       => 'Caja',
-                                'credit'     => 'Crédito',
-                                'inventory'  => 'Inventario',
-                                'products'   => 'Productos',
-                                'sales'      => 'Ventas',
-                                'purchases'  => 'Compras',
-                                'reports'    => 'Reportes',
-                                'settings'   => 'Configuración',
-                                'roles'      => 'Roles',
-                                'loyalty'    => 'Fidelización',
-                                'promotions' => 'Promociones',
-                                'imports'    => 'Importaciones',
+                                'cash'          => 'Caja',
+                                'credit'        => 'Crédito',
+                                'inventory'     => 'Inventario',
+                                'masters'       => 'Maestras',
+                                'products'      => 'Productos',
+                                'sales'         => 'Ventas',
+                                'purchases'     => 'Compras',
+                                'suppliers'     => 'Proveedores',
+                                'payables'      => 'Cuentas por pagar',
+                                'customers'     => 'Clientes',
+                                'reports'       => 'Reportes',
+                                'settings'      => 'Configuración',
+                                'users'         => 'Usuarios',
+                                'roles'         => 'Roles',
+                                'subscriptions' => 'Suscripciones',
+                                'loyalty'       => 'Fidelización',
+                                'promotions'    => 'Promociones',
+                                'imports'       => 'Importaciones',
                             ];
                         @endphp
                         <div class="mt-3 space-y-4">
                             @foreach ($permissionGroups as $moduleCode => $permissions)
+                                @php
+                                    $moduleCodes = $permissions->pluck('code')->all();
+                                    $allModuleSelected = count($moduleCodes) > 0 && count(array_intersect($moduleCodes, $selectedPermissionCodes)) === count($moduleCodes);
+                                @endphp
                                 <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
-                                    <p class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-600">{{ $moduleLabels[$moduleCode] ?? ucfirst($moduleCode) }}</p>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-600">{{ $moduleLabels[$moduleCode] ?? ucfirst($moduleCode) }}</p>
+                                        <label class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700">
+                                            <input type="checkbox" wire:click="toggleModulePermissions('{{ $moduleCode }}')" @checked($allModuleSelected)
+                                                class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                            Seleccionar todo
+                                        </label>
+                                    </div>
                                     <div class="mt-3 grid gap-3 md:grid-cols-2">
                                         @foreach ($permissions as $permission)
                                             <label class="inline-flex items-start gap-2 text-sm text-gray-700">
@@ -120,9 +137,20 @@
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Usuarios</p>
                     <h3 class="mt-2 text-2xl font-black text-gray-900">Asignaciones operativas</h3>
                 </div>
-                <p class="mt-2 text-sm text-gray-500">
-                    {{ $activeUsersCount }}{{ $maxUsers !== null ? ' de '.$maxUsers : '' }} usuarios activos
-                </p>
+                <div class="mt-2 text-right">
+                    <p class="text-sm text-gray-500">
+                        {{ $activeUsersCount }}{{ $maxUsers !== null ? ' de '.$maxUsers : '' }} usuarios activos
+                    </p>
+                    @if ($remainingUserSlots !== null)
+                        <p class="text-xs {{ $remainingUserSlots > 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                            @if ($remainingUserSlots > 0)
+                                Puedes crear {{ $remainingUserSlots }} {{ \Illuminate\Support\Str::plural('usuario', $remainingUserSlots) }} mas
+                            @else
+                                Alcanzaste el limite de usuarios de tu plan
+                            @endif
+                        </p>
+                    @endif
+                </div>
             </div>
 
             @if ($maxUsers !== null && $activeUsersCount > $maxUsers)
@@ -133,48 +161,84 @@
             @endif
 
             <div class="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-5">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-600">Vincular usuario existente</p>
-                        <p class="mt-2 text-sm text-gray-500">Busca por correo o `username` y asigna una plantilla o rol personalizado al entrar.</p>
-                    </div>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
+                    <button type="button" wire:click="setNewUserMode('new')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $newUserMode === 'new' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Crear usuario nuevo
+                    </button>
+                    <button type="button" wire:click="setNewUserMode('existing')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $newUserMode === 'existing' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Vincular usuario existente
+                    </button>
                 </div>
 
-                <form wire:submit="addUserToCompany" class="mt-5 grid gap-4 xl:grid-cols-[1.4fr_1fr_1fr_auto]">
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Correo o username</label>
-                        <input wire:model="newUserIdentifier" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="usuario@empresa.com o vendedor01">
-                        @error('newUserIdentifier') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-                    </div>
+                @if ($newUserMode === 'new')
+                    <p class="mt-3 text-sm text-gray-500">Crea un usuario interno de operacion (cajero, vendedor, etc.). No requiere correo, solo un nombre de usuario y una contrasena inicial.</p>
 
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Plantilla</label>
-                        <select wire:model="newUserRoleTemplateId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Sin plantilla</option>
-                            @foreach ($roleTemplates as $template)
-                                <option value="{{ $template->id }}">{{ $template->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
+                    <form wire:submit="createInternalUser" class="mt-4 grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Nombre</label>
+                            <input wire:model="newInternalName" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="Ej: Laura Gomez">
+                            @error('newInternalName') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
 
-                    <div>
-                        <label class="text-sm font-medium text-gray-700">Rol personalizado</label>
-                        <select wire:model="newUserCompanyRoleId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Sin rol personalizado</option>
-                            @foreach ($companyRoles as $role)
-                                <option value="{{ $role->id }}">{{ $role->display_name }}</option>
-                            @endforeach
-                        </select>
-                        @error('newUserRoleTemplateId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-                        @error('newUserCompanyRoleId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
-                    </div>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Username</label>
+                            <input wire:model="newInternalUsername" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="vendedor01">
+                            @error('newInternalUsername') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
 
-                    <div class="flex items-end">
-                        <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
-                            Vincular
-                        </button>
-                    </div>
-                </form>
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Contrasena inicial</label>
+                            <input wire:model="newInternalPassword" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="Minimo 8 caracteres">
+                            @error('newInternalPassword') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Rol</label>
+                            <select wire:model="newInternalCompanyRoleId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                <option value="">Selecciona un rol...</option>
+                                @foreach ($companyRoles as $role)
+                                    <option value="{{ $role->id }}">{{ $role->display_name }}</option>
+                                @endforeach
+                            </select>
+                            @error('newInternalCompanyRoleId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
+                                Crear usuario
+                            </button>
+                        </div>
+                    </form>
+                @else
+                    <p class="mt-3 text-sm text-gray-500">Busca por correo o `username` y asigna un rol de esta empresa al entrar.</p>
+
+                    <form wire:submit="addUserToCompany" class="mt-4 grid gap-4 xl:grid-cols-[1.4fr_1fr_auto]">
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Correo o username</label>
+                            <input wire:model="newUserIdentifier" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="usuario@empresa.com o vendedor01">
+                            @error('newUserIdentifier') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="text-sm font-medium text-gray-700">Rol</label>
+                            <select wire:model="newUserCompanyRoleId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                <option value="">Selecciona un rol...</option>
+                                @foreach ($companyRoles as $role)
+                                    <option value="{{ $role->id }}">{{ $role->display_name }}</option>
+                                @endforeach
+                            </select>
+                            @error('newUserCompanyRoleId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="flex items-end">
+                            <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
+                                Vincular
+                            </button>
+                        </div>
+                    </form>
+                @endif
             </div>
 
             <div class="mt-6 space-y-4">
@@ -190,7 +254,7 @@
                                         <x-status-badge color="stone">Inactivo</x-status-badge>
                                     @endif
                                 </div>
-                                <p class="text-sm text-gray-600">{{ '@'.$user->username }} · {{ $user->email }}</p>
+                                <p class="text-sm text-gray-600">{{ '@'.$user->username }}{{ $user->email ? ' · '.$user->email : ' · usuario interno (sin correo)' }}</p>
                                 <p class="text-sm text-gray-500">Actual: <span class="font-medium text-gray-900">{{ $this->currentAssignmentLabel($user) }}</span></p>
                                 @if (($user->pivot->company_role ?? null) !== 'owner')
                                     <button wire:click="toggleUserStatus({{ $user->id }})"
@@ -207,26 +271,15 @@
                                     </div>
                                 @else
                                     <div>
-                                        <label class="text-sm font-medium text-gray-700">Plantilla</label>
-                                        <select wire:model="memberships.{{ $user->id }}.role_template_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                            <option value="">Sin plantilla</option>
-                                            @foreach ($roleTemplates as $template)
-                                                <option value="{{ $template->id }}">{{ $template->name }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label class="text-sm font-medium text-gray-700">Rol personalizado</label>
+                                        <label class="text-sm font-medium text-gray-700">Rol</label>
                                         <select wire:model="memberships.{{ $user->id }}.company_role_id" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                            <option value="">Sin rol personalizado</option>
+                                            <option value="">Selecciona un rol...</option>
                                             @foreach ($companyRoles as $role)
                                                 <option value="{{ $role->id }}">{{ $role->display_name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
 
-                                    @error('memberships.'.$user->id.'.role_template_id') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                                     @error('memberships.'.$user->id.'.company_role_id') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
 
                                     <button wire:click="saveMembership({{ $user->id }})" class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">

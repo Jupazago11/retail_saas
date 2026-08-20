@@ -2,7 +2,6 @@
 
 namespace App\Actions\Sales;
 
-use App\Enums\PaymentStatus;
 use App\Models\Company;
 use App\Models\Sale;
 use App\Services\Audit\AuditLogger;
@@ -31,13 +30,6 @@ class ReturnSale
 
         $sale = $sale->fresh(['items', 'payments', 'creditAccount', 'customer.loyaltyAccount']);
         $beforeSale = $sale->fresh();
-
-        if (
-            $sale->sale_type === 'credit'
-            && $sale->payments->where('credit_account_id', '!=', null)->where('status', PaymentStatus::Confirmed->value)->isNotEmpty()
-        ) {
-            throw new InvalidArgumentException('No se puede devolver una venta a credito que ya tiene abonos registrados.');
-        }
 
         $returnedAmount = $this->calculateReturnedAmount($sale, $items);
 

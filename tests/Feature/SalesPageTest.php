@@ -12,7 +12,6 @@ use App\Livewire\Sales\SalesPage;
 use App\Models\Category;
 use App\Models\CompanyRole;
 use App\Models\Permission;
-use App\Models\RoleTemplate;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
@@ -58,8 +57,8 @@ class SalesPageTest extends TestCase
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
-            'company_role' => 'accounting_assistant',
-            'role_template_id' => RoleTemplate::query()->where('code', 'accounting_assistant')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'accounting_assistant')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

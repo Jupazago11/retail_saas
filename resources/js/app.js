@@ -78,8 +78,14 @@ document.addEventListener('alpine:init', () => {
     // Combobox generico: input de texto que filtra client-side sobre una
     // lista de opciones ya cargada (categorias, marcas, unidades, ...) y se
     // sincroniza en dos vias con una propiedad Livewire via $wire.entangle.
-    Alpine.data('searchableSelect', ({ selected }) => ({
+    // Con allowCreate:true, si el texto tecleado no coincide con ninguna
+    // opcion existente, se ofrece un item sintetico "Crear ..." y `selected`
+    // termina valiendo el texto libre (no un id numerico); el backend
+    // (ProductsPage::resolveCategoryValue/resolveBrandValue) es quien decide
+    // si eso hay que crearlo, al guardar el formulario.
+    Alpine.data('searchableSelect', ({ selected, allowCreate = false }) => ({
         selected,
+        allowCreate,
         options: [],
         query: '',
         open: false,
@@ -90,7 +96,7 @@ document.addEventListener('alpine:init', () => {
             this.syncFromSelected();
 
             // El atributo `data-options` lo reescribe Livewire en cada morph
-            // (p. ej. tras crear una categoria con "+ Nueva"); observarlo es lo
+            // (p. ej. tras crear una unidad con "+ Nueva"); observarlo es lo
             // que mantiene la lista disponible sin recargar la pagina, ya que
             // `x-data` solo se evalua una vez al montar el componente.
             this.optionsObserver = new MutationObserver(() => {
@@ -108,21 +114,47 @@ document.addEventListener('alpine:init', () => {
                 this.options = [];
             }
         },
+        findExact(term) {
+            const normalized = term.trim().toLowerCase();
+
+            return normalized
+                ? this.options.find((option) => option.label.toLowerCase() === normalized)
+                : undefined;
+        },
         syncFromSelected() {
             const match = this.options.find((option) => String(option.id) === String(this.selected));
-            this.query = match ? match.label : '';
+
+            if (match) {
+                this.query = match.label;
+            } else if (this.allowCreate && this.selected) {
+                // `selected` es texto libre pendiente de crear al guardar.
+                this.query = String(this.selected);
+            } else {
+                this.query = '';
+            }
+
             this.touched = false;
         },
         get filtered() {
-            if (! this.touched) {
-                return this.options;
+            const base = (() => {
+                if (! this.touched) {
+                    return this.options;
+                }
+
+                const term = this.query.trim().toLowerCase();
+
+                return term
+                    ? this.options.filter((option) => option.label.toLowerCase().includes(term))
+                    : this.options;
+            })();
+
+            const trimmed = this.query.trim();
+
+            if (this.allowCreate && this.touched && trimmed !== '' && ! this.findExact(trimmed)) {
+                return [...base, { id: trimmed, label: 'Crear "' + trimmed + '"', __create: true }];
             }
 
-            const term = this.query.trim().toLowerCase();
-
-            return term
-                ? this.options.filter((option) => option.label.toLowerCase().includes(term))
-                : this.options;
+            return base;
         },
         onFocus(event) {
             this.open = true;
@@ -135,7 +167,7 @@ document.addEventListener('alpine:init', () => {
         },
         choose(option) {
             this.selected = option.id;
-            this.query = option.label;
+            this.query = option.__create ? option.id : option.label;
             this.open = false;
             this.touched = false;
             this.highlighted = -1;
@@ -143,8 +175,13 @@ document.addEventListener('alpine:init', () => {
         close() {
             this.open = false;
 
-            if (this.query.trim() === '') {
+            const trimmed = this.query.trim();
+
+            if (trimmed === '') {
                 this.selected = '';
+            } else if (this.allowCreate) {
+                const exact = this.findExact(trimmed);
+                this.selected = exact ? exact.id : trimmed;
             }
 
             this.syncFromSelected();
@@ -293,11 +330,27 @@ document.addEventListener('keydown', (event) => {
 // Si el cajero se va al dashboard con productos en el carrito del POS
 // (click accidental en el logo), interceptamos y preguntamos que hacer
 // con la venta en curso en vez de perderla en silencio.
-document.addEventListener('click', (event) => {
-    const link = event.target.closest('[data-app-home-link]');
-    if (!link) return;
+//
+// wire:navigate NO usa la navegacion nativa del <a> (esa si respeta
+// event.preventDefault() en 'click'): Livewire/Alpine disparan el cambio
+// de pagina por su cuenta desde mousedown/mouseup, sin mirar el 'click'
+// para nada. El unico gancho que realmente frena esa navegacion es el
+// evento cancelable 'livewire:navigate', que Livewire dispara justo antes
+// de intercambiar el DOM (ver navigateTo() + fireEventForOtherLibrariesToHookInto
+// en vendor/livewire/livewire/dist/livewire.esm.js). Un listener de 'click'
+// aqui (como habia antes) nunca alcanza a frenarlo.
+document.addEventListener('livewire:navigate', (event) => {
+    const destination = event.detail?.url;
+    if (!destination) return;
 
-    const wire = findPosWire(link);
+    const homeLinks = Array.from(document.querySelectorAll('[data-app-home-link]'));
+    const isHomeDestination = homeLinks.some((link) => link.href === destination.href);
+    if (!isHomeDestination) return;
+
+    const shell = document.querySelector('[data-pos-shell]');
+    if (!shell) return;
+
+    const wire = findPosWire(shell);
     if (!wire) return;
 
     const items = Array.isArray(wire.items) ? wire.items : [];
@@ -305,7 +358,7 @@ document.addEventListener('click', (event) => {
     if (!hasProducts) return;
 
     event.preventDefault();
-    window.posPendingHomeHref = link.href;
+    window.posPendingHomeHref = destination.href;
     window.dispatchEvent(new CustomEvent('pos-leave-guard-open'));
 });
 
@@ -392,6 +445,14 @@ function moneyInputKey(input) {
 
 function isMoneyInput(input) {
     if (!(input instanceof HTMLInputElement)) {
+        return false;
+    }
+
+    // Un checkbox/radio nunca es un campo de dinero — sin este guard, el
+    // detector por nombre (ve mas abajo) puede hacer match por texto (ej:
+    // un futuro checkbox llamado "ruleRequiresCashPayment" contiene "cash")
+    // y forzar type="text" sobre un checkbox real, rompiendolo visualmente.
+    if (input.type === 'checkbox' || input.type === 'radio') {
         return false;
     }
 

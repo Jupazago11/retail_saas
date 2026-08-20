@@ -41,10 +41,6 @@ class CurrentCompanyPermissionResolver
             return true;
         }
 
-        if ($this->templateHasPermission((int) ($membership->role_template_id ?? 0), $permissionCode)) {
-            return true;
-        }
-
         return $this->companyRoleHasPermission((int) ($membership->company_role_id ?? 0), $permissionCode);
     }
 
@@ -70,22 +66,6 @@ class CurrentCompanyPermissionResolver
         }
 
         return $this->currentCompany->company();
-    }
-
-    protected function templateHasPermission(int $roleTemplateId, string $permissionCode): bool
-    {
-        if ($roleTemplateId <= 0) {
-            return false;
-        }
-
-        return DB::table('role_template_permissions')
-            ->join('permissions', 'permissions.id', '=', 'role_template_permissions.permission_id')
-            ->join('role_templates', 'role_templates.id', '=', 'role_template_permissions.role_template_id')
-            ->where('role_template_permissions.role_template_id', $roleTemplateId)
-            ->where('permissions.code', $permissionCode)
-            ->where('permissions.status', RecordStatus::Active->value)
-            ->where('role_templates.status', RecordStatus::Active->value)
-            ->exists();
     }
 
     protected function companyRoleHasPermission(int $companyRoleId, string $permissionCode): bool

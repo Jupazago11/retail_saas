@@ -97,6 +97,52 @@
                 <h2 class="mt-1 text-lg font-black text-gray-900">Aplicación</h2>
 
                 <div class="mt-5">
+                    <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Logo</label>
+
+                    @unless ($this->isLogoStorageConfigured())
+                        <div class="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-700 ring-1 ring-amber-200">
+                            El bucket de Cloudflare R2 todavia no esta configurado (variables <code>R2_*</code> en el <code>.env</code>). En cuanto llenes esas variables, esta seccion empieza a funcionar sin tocar nada mas.
+                        </div>
+                    @endunless
+
+                    <div class="mt-2 flex items-center gap-4">
+                        <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 ring-1 ring-gray-200">
+                            @if ($newLogo)
+                                <img src="{{ $newLogo->temporaryUrl() }}" alt="Vista previa" class="h-full w-full object-contain">
+                            @else
+                                <x-application-logo class="h-10 w-10 object-contain" />
+                            @endif
+                        </div>
+
+                        <div class="flex-1">
+                            <input type="file" wire:model="newLogo" accept="image/*"
+                                {{ $this->isLogoStorageConfigured() ? '' : 'disabled' }}
+                                class="block w-full text-sm text-gray-600 file:mr-3 file:rounded-full file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50">
+                            <p class="mt-1 text-xs text-gray-400">
+                                Imagen cuadrada (ej. 512x512px). Si no subes nada, o si eliminas el que tenias, se usa el logo por defecto.
+                            </p>
+                            @error('newLogo') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+
+                            <div class="mt-2 flex gap-2">
+                                @if ($newLogo)
+                                    <button type="button" wire:click="uploadLogo" wire:loading.attr="disabled" wire:target="uploadLogo"
+                                        class="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                                        <span wire:loading.remove wire:target="uploadLogo">Guardar logo</span>
+                                        <span wire:loading wire:target="uploadLogo">Subiendo...</span>
+                                    </button>
+                                @endif
+                                @if ($currentLogoUrl)
+                                    <button type="button" wire:click="removeLogo" wire:confirm="¿Quitar el logo actual? Se volvera a usar el logo por defecto."
+                                        class="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-semibold text-gray-600 transition hover:border-rose-300 hover:text-rose-600">
+                                        Quitar logo
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-5">
                     <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre de la plataforma</label>
                     <input wire:model="appName" type="text" placeholder="{{ \App\Models\PlatformSetting::appName() }}"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">

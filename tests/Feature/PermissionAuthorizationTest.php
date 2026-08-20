@@ -9,7 +9,6 @@ use App\Livewire\Purchases\SuppliersPage;
 use App\Livewire\Products\ProductsPage;
 use App\Models\CompanyRole;
 use App\Models\Permission;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,8 +29,8 @@ class PermissionAuthorizationTest extends TestCase
         $seller = User::factory()->create();
 
         $company->users()->attach($seller->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);
@@ -125,8 +124,8 @@ class PermissionAuthorizationTest extends TestCase
         $purchasingManager = User::factory()->create();
 
         $company->users()->attach($purchasingManager->id, [
-            'company_role' => 'purchasing_manager',
-            'role_template_id' => RoleTemplate::query()->where('code', 'purchasing_manager')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'purchasing_manager')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

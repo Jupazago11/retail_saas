@@ -45,10 +45,9 @@ class PurchasesPage extends Component
     public string $statusFilter = '';
     public ?int $supplierFilterId = null;
 
-    public ?int $payingPurchaseId = null;
     public string $paymentAmount = '';
     public string $paymentReference = '';
-    public ?int $expandedLedgerPurchaseId = null;
+    public ?int $ledgerPurchaseId = null;
 
     public bool $showModal = false;
 
@@ -191,29 +190,6 @@ class PurchasesPage extends Component
         $this->toast('Compra guardada correctamente.');
     }
 
-    public function startRegisteringPayment(int $purchaseId): void
-    {
-        $this->ensurePermission('payables.manage');
-
-        $purchase = $this->purchasesQuery()->findOrFail($purchaseId);
-
-        if ((float) $purchase->balance_due <= 0) {
-            $this->toast('La compra ya no tiene saldo pendiente.', 'warning');
-
-            return;
-        }
-
-        $this->payingPurchaseId = $purchase->id;
-        $this->paymentAmount = (string) (int) round((float) $purchase->balance_due);
-        $this->paymentReference = '';
-        $this->resetValidation();
-    }
-
-    public function cancelRegisteringPayment(): void
-    {
-        $this->resetPaymentForm();
-    }
-
     public function openModal(): void
     {
         $this->resetPurchaseForm();
@@ -226,11 +202,26 @@ class PurchasesPage extends Component
         $this->resetPurchaseForm();
     }
 
-    public function toggleLedger(int $purchaseId): void
+    // Abre el modal de movimientos de la compra. Si el usuario puede
+    // gestionar pagos y la compra todavia tiene saldo, tambien deja lista la
+    // pestana de "Registrar pago" que vive dentro del mismo modal (ya no hay
+    // una fila aparte en la tabla para eso).
+    public function openLedger(int $purchaseId): void
     {
-        $this->expandedLedgerPurchaseId = $this->expandedLedgerPurchaseId === $purchaseId
-            ? null
-            : $purchaseId;
+        $purchase = $this->purchasesQuery()->findOrFail($purchaseId);
+
+        $this->ledgerPurchaseId = $purchase->id;
+        $this->resetPaymentForm();
+
+        if ($this->canManagePayables() && in_array($purchase->status, ['confirmed', 'partially_paid'], true) && (float) $purchase->balance_due > 0) {
+            $this->paymentAmount = (string) (int) round((float) $purchase->balance_due);
+        }
+    }
+
+    public function closeLedger(): void
+    {
+        $this->ledgerPurchaseId = null;
+        $this->resetPaymentForm();
     }
 
     public function registerPayment(RegisterPurchasePayment $registerPurchasePayment): void
@@ -238,7 +229,7 @@ class PurchasesPage extends Component
         $this->ensurePermission('payables.manage');
 
         $validated = $this->validate([
-            'payingPurchaseId' => [
+            'ledgerPurchaseId' => [
                 'required',
                 Rule::exists('purchases', 'id')->where(fn ($query) => $query->where('company_id', $this->currentCompany()->id)),
             ],
@@ -246,7 +237,7 @@ class PurchasesPage extends Component
             'paymentReference' => ['nullable', 'string', 'max:120'],
         ]);
 
-        $purchase = $this->purchasesQuery()->findOrFail((int) $validated['payingPurchaseId']);
+        $purchase = $this->purchasesQuery()->findOrFail((int) $validated['ledgerPurchaseId']);
 
         try {
             $registerPurchasePayment->handle($this->currentCompany(), $purchase, [
@@ -259,7 +250,11 @@ class PurchasesPage extends Component
             return;
         }
 
-        $this->resetPaymentForm();
+        // El modal se queda abierto (no se cierra el ledger) para que se vea
+        // de una vez el movimiento de pago recien creado.
+        $this->paymentAmount = '';
+        $this->paymentReference = '';
+        $this->resetValidation();
         $this->toast('Pago registrado correctamente.');
     }
 
@@ -365,6 +360,20 @@ class PurchasesPage extends Component
         return auth()->user()?->hasCurrentCompanyPermission('payables.manage') ?? false;
     }
 
+    // Se resuelve aparte de purchases() (que ya viene paginada/filtrada por
+    // los filtros de la lista) para que el modal siempre muestre el ledger
+    // al dia, incluyendo justo despues de registrar un pago.
+    public function ledgerPurchase(): ?Purchase
+    {
+        if (! $this->ledgerPurchaseId) {
+            return null;
+        }
+
+        return $this->purchasesQuery()
+            ->with(['payableMovements.supplier.person'])
+            ->find($this->ledgerPurchaseId);
+    }
+
     public function movementLabel(PayableMovement $movement): string
     {
         return match ($movement->movement_type) {
@@ -389,6 +398,94 @@ class PurchasesPage extends Component
         };
     }
 
+    /**
+     * Semaforo de vencimiento para la fila de una compra: que tan cerca
+     * esta el plazo de pago del proveedor. Null cuando no aplica (sin
+     * fecha limite, ya pagada/cancelada, o sin saldo pendiente) — esas
+     * filas no necesitan alerta.
+     *
+     * @return array{color: string, label: string}|null
+     */
+    public function dueStatus(Purchase $purchase): ?array
+    {
+        if (
+            $purchase->due_at === null
+            || in_array($purchase->status, [PurchaseStatus::Paid->value, PurchaseStatus::Cancelled->value], true)
+            || (float) $purchase->balance_due <= 0
+        ) {
+            return null;
+        }
+
+        $today = now()->startOfDay();
+        $dueDate = $purchase->due_at->copy()->startOfDay();
+        // diffInDays() ya devuelve signo (negativo si $dueDate quedo antes
+        // de hoy) en esta version de Carbon — no hace falta corregir signo
+        // a mano (hacerlo duplica la negacion y da el resultado invertido).
+        $daysUntilDue = (int) $today->diffInDays($dueDate);
+
+        if ($daysUntilDue < 0) {
+            $daysOverdue = abs($daysUntilDue);
+
+            return [
+                'color' => 'rose',
+                'label' => 'Vencida hace '.$daysOverdue.' '.\Illuminate\Support\Str::plural('dia', $daysOverdue),
+            ];
+        }
+
+        if ($daysUntilDue === 0) {
+            return ['color' => 'rose', 'label' => 'Vence hoy'];
+        }
+
+        if ($daysUntilDue <= 7) {
+            return ['color' => 'amber', 'label' => 'Vence en '.$daysUntilDue.' '.\Illuminate\Support\Str::plural('dia', $daysUntilDue)];
+        }
+
+        return ['color' => 'emerald', 'label' => 'Vence en '.$daysUntilDue.' dias'];
+    }
+
+    /**
+     * Para un movimiento de tipo Pago: si la compra tiene fecha limite,
+     * indica si ese pago llego a tiempo, con cuantos dias de anticipacion o
+     * con cuantos dias de retraso. Null cuando no aplica (no es un pago, o
+     * la compra no tiene fecha limite registrada).
+     *
+     * @return array{color: string, label: string}|null
+     */
+    public function paymentTimeliness(PayableMovement $movement, Purchase $purchase): ?array
+    {
+        if ($movement->movement_type !== PayableMovementType::Payment->value) {
+            return null;
+        }
+
+        if ($purchase->due_at === null || $movement->occurred_at === null) {
+            return null;
+        }
+
+        $dueDate = $purchase->due_at->copy()->startOfDay();
+        $paidDate = $movement->occurred_at->copy()->startOfDay();
+        // Mismo criterio de signo que dueStatus(): negativo si $paidDate
+        // quedo antes de $dueDate (pago adelantado).
+        $daysFromDue = (int) $dueDate->diffInDays($paidDate);
+
+        if ($daysFromDue < 0) {
+            $daysEarly = abs($daysFromDue);
+
+            return [
+                'color' => 'emerald',
+                'label' => 'Pagado con '.$daysEarly.' '.\Illuminate\Support\Str::plural('dia', $daysEarly).' de anticipacion',
+            ];
+        }
+
+        if ($daysFromDue === 0) {
+            return ['color' => 'emerald', 'label' => 'Pagado a tiempo'];
+        }
+
+        return [
+            'color' => 'rose',
+            'label' => 'Pagado con '.$daysFromDue.' '.\Illuminate\Support\Str::plural('dia', $daysFromDue).' de retraso',
+        ];
+    }
+
     public function render(): View
     {
         return view('livewire.purchases.purchases-page', [
@@ -398,6 +495,7 @@ class PurchasesPage extends Component
             'purchases' => $this->purchases(),
             'canCreatePurchases' => $this->canCreatePurchases(),
             'canManagePayables' => $this->canManagePayables(),
+            'ledgerPurchase' => $this->ledgerPurchase(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Compras',
@@ -447,7 +545,7 @@ class PurchasesPage extends Component
 
     protected function resetPaymentForm(): void
     {
-        $this->reset('payingPurchaseId', 'paymentAmount', 'paymentReference');
+        $this->reset('paymentAmount', 'paymentReference');
         $this->resetValidation();
     }
 

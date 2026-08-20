@@ -252,6 +252,170 @@ class ProductsCatalogTest extends TestCase
         ]);
     }
 
+    public function test_products_page_creates_category_and_brand_from_typed_name_on_save(): void
+    {
+        [$user, $company] = $this->actingUserWithCurrentCompany();
+        $unit = Unit::query()->create([
+            'company_id' => $company->id,
+            'code' => 'UND',
+            'name' => 'Unidad',
+            'precision_scale' => 0,
+            'status' => RecordStatus::Active->value,
+        ]);
+        // canCreateProducts() exige al menos una categoria existente; la
+        // nueva ("Bebidas") se crea al vuelo desde el nombre tipeado.
+        Category::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Otra',
+            'code' => 'OTRA',
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', 'Bebidas')
+            ->set('brandId', 'Postobon')
+            ->set('baseUnitId', $unit->id)
+            ->set('name', 'Gaseosa 1.5L')
+            ->set('cost', '2000')
+            ->set('price1', '3000')
+            ->set('minimumStock', '1')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $category = Category::query()->where('company_id', $company->id)->where('name', 'Bebidas')->first();
+        $brand = Brand::query()->where('company_id', $company->id)->where('name', 'Postobon')->first();
+
+        $this->assertNotNull($category);
+        $this->assertNotNull($brand);
+        $this->assertDatabaseHas('products', [
+            'company_id' => $company->id,
+            'name' => 'Gaseosa 1.5L',
+            'category_id' => $category->id,
+            'brand_id' => $brand->id,
+        ]);
+
+        // Escribir el mismo nombre con otra capitalizacion reutiliza la
+        // categoria/marca existente en vez de duplicarla.
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', 'bebidas')
+            ->set('brandId', 'postobon')
+            ->set('baseUnitId', $unit->id)
+            ->set('name', 'Gaseosa 2L')
+            ->set('cost', '2200')
+            ->set('price1', '3300')
+            ->set('minimumStock', '1')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, Category::query()->where('company_id', $company->id)->whereRaw('upper(name) = ?', ['BEBIDAS'])->count());
+        $this->assertSame(1, Brand::query()->where('company_id', $company->id)->whereRaw('upper(name) = ?', ['POSTOBON'])->count());
+        $this->assertDatabaseHas('products', [
+            'company_id' => $company->id,
+            'name' => 'Gaseosa 2L',
+            'category_id' => $category->id,
+            'brand_id' => $brand->id,
+        ]);
+    }
+
+    public function test_products_page_tax_rate_defaults_to_zero_and_rejects_negative(): void
+    {
+        [$user, $company] = $this->actingUserWithCurrentCompany();
+        $category = Category::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Aseo',
+            'code' => 'ASE',
+            'status' => RecordStatus::Active->value,
+        ]);
+        $unit = Unit::query()->create([
+            'company_id' => $company->id,
+            'code' => 'UND',
+            'name' => 'Unidad',
+            'precision_scale' => 0,
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', $category->id)
+            ->set('baseUnitId', $unit->id)
+            ->set('name', 'Producto Sin IVA')
+            ->set('cost', '1000')
+            ->set('price1', '1500')
+            ->set('minimumStock', '1')
+            ->set('taxRate', '')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $product = Product::query()->where('company_id', $company->id)->where('name', 'Producto Sin IVA')->firstOrFail();
+        $this->assertSame('0.00', $product->tax_rate);
+
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', $category->id)
+            ->set('baseUnitId', $unit->id)
+            ->set('name', 'Producto IVA Invalido')
+            ->set('cost', '1000')
+            ->set('price1', '1500')
+            ->set('minimumStock', '1')
+            ->set('taxRate', '-5')
+            ->call('saveProduct')
+            ->assertHasErrors(['taxRate']);
+
+        // El input acepta coma o punto decimal (el usuario puede escribir
+        // cualquiera de los dos, se normaliza antes de guardar).
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', $category->id)
+            ->set('baseUnitId', $unit->id)
+            ->set('name', 'Producto IVA Con Coma')
+            ->set('cost', '1000')
+            ->set('price1', '1500')
+            ->set('minimumStock', '1')
+            ->set('taxRate', '5,5')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $productWithComma = Product::query()->where('company_id', $company->id)->where('name', 'Producto IVA Con Coma')->firstOrFail();
+        $this->assertSame('5.50', $productWithComma->tax_rate);
+    }
+
+    public function test_products_page_preselects_base_unit_when_company_has_only_one(): void
+    {
+        [$user, $company] = $this->actingUserWithCurrentCompany();
+        Category::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Aseo',
+            'code' => 'ASE',
+            'status' => RecordStatus::Active->value,
+        ]);
+        $unit = Unit::query()->create([
+            'company_id' => $company->id,
+            'code' => 'UND',
+            'name' => 'Unidad',
+            'precision_scale' => 0,
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $this->actingAs($user);
+
+        Livewire::test(ProductsPage::class)
+            ->call('openModal')
+            ->assertSet('baseUnitId', $unit->id);
+
+        Unit::query()->create([
+            'company_id' => $company->id,
+            'code' => 'KG',
+            'name' => 'Kilogramo',
+            'precision_scale' => 3,
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        Livewire::test(ProductsPage::class)
+            ->call('openModal')
+            ->assertSet('baseUnitId', null);
+    }
+
     protected function actingUserWithCurrentCompany(): array
     {
         $user = User::factory()->create();

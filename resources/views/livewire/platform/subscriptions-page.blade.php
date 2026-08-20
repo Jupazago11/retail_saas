@@ -5,44 +5,55 @@
          overlay down from the real top of the viewport. --}}
     <div class="space-y-6">
 
-    {{-- Header --}}
-    <div>
-        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
-        <h1 class="mt-1 text-2xl font-black text-gray-900">Suscripciones</h1>
-    </div>
-
     {{-- Filtros --}}
     <div x-data="responsivePageSize({ rowHeight: 76, reserved: 300 })" class="rounded-xl bg-white p-6 ring-1 ring-gray-200">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div class="flex items-center gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
+                <h3 class="mt-1 text-2xl font-black text-gray-900">Suscripciones</h3>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
                 <input wire:model.live.debounce.300ms="search" type="text"
                     placeholder="Buscar empresa..."
                     class="w-56 rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                <select wire:model.live="filter"
-                    class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    <option value="all">Todas</option>
-                    <option value="pending">Pendientes</option>
-                    <option value="active">Activas</option>
-                    <option value="trialing">Trial</option>
-                    <option value="vencida">Vencidas</option>
-                </select>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setFilter('all')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todas
+                    </button>
+                    <button type="button" wire:click="setFilter('pending')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'pending' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Pendientes
+                    </button>
+                    <button type="button" wire:click="setFilter('active')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'active' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Activas
+                    </button>
+                    <button type="button" wire:click="setFilter('trialing')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'trialing' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Trial
+                    </button>
+                    <button type="button" wire:click="setFilter('vencida')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'vencida' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Vencidas
+                    </button>
+                </div>
             </div>
         </div>
 
         <div class="mt-6 overflow-x-auto">
-            <table class="min-w-full divide-y divide-stone-200 text-sm">
+            <table class="w-full table-fixed divide-y divide-stone-200 text-sm">
                 <thead>
                     <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        <th class="pb-2">Empresa</th>
-                        <th class="pb-2">Propietario</th>
-                        <th class="pb-2">Plan</th>
-                        <th class="pb-2 w-px whitespace-nowrap">Equipos</th>
-                        <th class="pb-2 w-px whitespace-nowrap">Estado</th>
-                        <th class="pb-2 w-px whitespace-nowrap">Inicio</th>
-                        <th class="pb-2 w-px whitespace-nowrap">Vence</th>
-                        <th class="pb-2 w-px whitespace-nowrap">Pago</th>
-                        <th class="pb-2 w-px whitespace-nowrap text-center">Auto-renovación</th>
-                        <th class="pb-2 w-px whitespace-nowrap text-right">Acción</th>
+                        <th class="w-[20%] pb-2">Empresa</th>
+                        <th class="w-[13%] pb-2">Propietario</th>
+                        <th class="w-[8%] pb-2">Plan</th>
+                        <th class="w-[7%] pb-2">Equipos</th>
+                        <th class="w-[8%] pb-2">Estado</th>
+                        <th class="w-[10%] pb-2">Vigencia</th>
+                        <th class="w-[11%] pb-2">Pago</th>
+                        <th class="w-[9%] pb-2 text-center">Auto-renovación</th>
+                        <th class="w-[14%] pb-2 text-right">Acción</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-stone-100">
@@ -55,7 +66,7 @@
                             </td>
                             <td class="py-3 align-middle text-xs text-gray-500">{{ $sub->company?->owner?->name ?? '—' }}</td>
                             <td class="py-3 align-middle text-xs text-gray-600">{{ $sub->plan?->name ?? '—' }}</td>
-                            <td class="py-3 align-middle w-px whitespace-nowrap">
+                            <td class="py-3 align-middle">
                                 @if (($equipmentDisplaySubscriptionIds[$sub->company_id] ?? null) === $sub->id)
                                     @php $companyEquipment = $equipmentByCompany[$sub->company_id] ?? []; @endphp
                                     <button type="button" wire:click="openEquipmentModal({{ $sub->company_id }})"
@@ -91,7 +102,7 @@
                                     <span class="text-xs text-gray-300">—</span>
                                 @endif
                             </td>
-                            <td class="py-3 align-middle w-px whitespace-nowrap">
+                            <td class="py-3 align-middle">
                                 @if ($isPastDue)
                                     <x-status-badge color="rose">vencida</x-status-badge>
                                 @elseif ($sub->status === 'active')
@@ -104,14 +115,13 @@
                                     <x-status-badge color="stone">{{ $sub->status }}</x-status-badge>
                                 @endif
                             </td>
-                            <td class="py-3 align-middle text-xs text-gray-400 w-px whitespace-nowrap">
-                                {{ $sub->starts_at?->format('d/m/Y') ?? '—' }}
+                            <td class="py-3 align-middle text-xs">
+                                <p class="text-gray-400">{{ $sub->starts_at?->format('d/m/Y') ?? '—' }}</p>
+                                <p class="{{ $sub->ends_at && $sub->ends_at->isPast() ? 'font-semibold text-rose-500' : 'text-gray-400' }}">
+                                    {{ $sub->ends_at?->format('d/m/Y') ?? 'sin fin' }}
+                                </p>
                             </td>
-                            <td class="py-3 align-middle text-xs w-px whitespace-nowrap
-                                {{ $sub->ends_at && $sub->ends_at->isPast() ? 'text-rose-500 font-semibold' : 'text-gray-400' }}">
-                                {{ $sub->ends_at?->format('d/m/Y') ?? '—' }}
-                            </td>
-                            <td class="py-3 align-middle w-px whitespace-nowrap">
+                            <td class="py-3 align-middle">
                                 <div class="flex items-center gap-1.5">
                                     @if ($sub->isPaid())
                                         <span title="{{ $sub->payment_reference ?? 'Sin referencia' }}">
@@ -131,7 +141,7 @@
                                     </button>
                                 </div>
                             </td>
-                            <td class="py-3 align-middle w-px whitespace-nowrap text-center">
+                            <td class="py-3 align-middle text-center">
                                 @if ($sub->company)
                                     <button wire:click="toggleAutoRenew({{ $sub->company_id }})"
                                         title="{{ $sub->company->auto_renew ? 'Apagar renovación automática' : 'Encender renovación automática' }}"
@@ -140,22 +150,24 @@
                                     </button>
                                 @endif
                             </td>
-                            <td class="py-3 align-middle w-px whitespace-nowrap text-right space-x-2">
-                                <button wire:click="startEdit({{ $sub->id }})"
-                                    class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
-                                    Editar
-                                </button>
-                                @if (in_array($sub->id, $latestSubscriptionIds, true) && ($isPastDue || $sub->status === 'ended'))
-                                    <button wire:click="startActivate({{ $sub->company_id }})"
-                                        class="rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700">
-                                        Activar nuevo plan
+                            <td class="py-3 align-middle text-right">
+                                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                    <button wire:click="startEdit({{ $sub->id }})"
+                                        class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
+                                        Editar
                                     </button>
-                                @endif
+                                    @if (in_array($sub->id, $latestSubscriptionIds, true) && ($isPastDue || $sub->status === 'ended'))
+                                        <button wire:click="startActivate({{ $sub->company_id }})"
+                                            class="whitespace-nowrap rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700">
+                                            Activar plan
+                                        </button>
+                                    @endif
+                                </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="py-10 text-center text-xs text-gray-400">Sin suscripciones.</td>
+                            <td colspan="9" class="py-10 text-center text-xs text-gray-400">Sin suscripciones.</td>
                         </tr>
                     @endforelse
                 </tbody>

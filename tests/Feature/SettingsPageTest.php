@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Actions\Companies\CreateCompany;
 use App\Enums\RecordStatus;
 use App\Livewire\Admin\SettingsPage;
-use App\Models\RoleTemplate;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -31,8 +30,6 @@ class SettingsPageTest extends TestCase
             ->set('settings.general.display_name', 'Retail Central')
             ->set('settings.general.tax_id', '900123456')
             ->set('settings.pos.allow_manual_discounts', true)
-            ->set('settings.pos.sale_document_prefix', 'POS-')
-            ->set('settings.pos.sale_document_starting_sequence', 1001)
             ->set('settings.cash.default_opening_amount', '125000.50')
             ->call('saveSettings')
             ->assertHasNoErrors();
@@ -54,18 +51,6 @@ class SettingsPageTest extends TestCase
             'setting_key' => 'default_opening_amount',
             'value_decimal' => '125000.5000',
         ]);
-        $this->assertDatabaseHas('company_settings', [
-            'company_id' => $company->id,
-            'group_key' => 'pos',
-            'setting_key' => 'sale_document_prefix',
-            'value_string' => 'POS-',
-        ]);
-        $this->assertDatabaseHas('company_settings', [
-            'company_id' => $company->id,
-            'group_key' => 'pos',
-            'setting_key' => 'sale_document_starting_sequence',
-            'value_integer' => 1001,
-        ]);
         $this->assertDatabaseHas('audit_logs', [
             'company_id' => $company->id,
             'action' => 'company_setting.created',
@@ -78,11 +63,12 @@ class SettingsPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Configuracion Restringida SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
-            'company_role' => 'seller',
-            'role_template_id' => RoleTemplate::query()->where('code', 'seller')->value('id'),
+            'company_role' => 'custom',
+            'company_role_id' => $this->companyRolePreset($company, 'seller')->id,
             'status' => RecordStatus::Active->value,
             'joined_at' => now(),
         ]);

@@ -164,7 +164,7 @@ class CreateSale
             ->map(function (array $item) {
                 $item['product']->setAttribute('__promotion_snapshot', $item['promotion_snapshot'] !== [] ? $item['promotion_snapshot'] : null);
 
-                return $this->saleCalculator->calculateLine(
+                $line = $this->saleCalculator->calculateLine(
                     $item['product'],
                     $item['presentation'],
                     $item['variant'],
@@ -177,6 +177,13 @@ class CreateSale
                     ),
                     $item['tax_rate'],
                 );
+
+                // IVA propio del producto (incluido en su costo/precio), distinto
+                // del `tax_rate` aditivo de la linea: solo se usa para desglosar
+                // el ticket impreso, ver BuildSaleTicketViewData.
+                $line['product_tax_rate'] = (string) $item['product']->tax_rate;
+
+                return $line;
             })
             ->all();
     }

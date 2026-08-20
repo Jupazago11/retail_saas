@@ -13,6 +13,7 @@ class ApplyCompanyModuleOverride
 {
     public function __construct(
         protected AuditLogger $auditLogger,
+        protected ReconcileCompanyInventoryTracking $reconcileCompanyInventoryTracking,
     ) {
     }
 
@@ -49,6 +50,8 @@ class ApplyCompanyModuleOverride
 
             $this->auditLogger->logUpdated($company, 'company_module_override.updated', $before, $override->fresh('module'), $actor);
 
+            $this->reconcileCompanyInventoryTracking->handle($company, $actor);
+
             return $override->fresh('module');
         }
 
@@ -61,6 +64,8 @@ class ApplyCompanyModuleOverride
         ]);
 
         $this->auditLogger->logCreated($company, 'company_module_override.created', $created->fresh('module'), $actor);
+
+        $this->reconcileCompanyInventoryTracking->handle($company, $actor);
 
         return $created->fresh('module');
     }

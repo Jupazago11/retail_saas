@@ -45,23 +45,29 @@
             @endforeach
 
             @if ($canEditThisCuadre)
-                <form wire:submit="addFund" class="flex items-start gap-2 pt-1">
-                    <div class="flex-1">
+                {{-- Etiqueta en su propia fila (ancho completo) y Valor+boton debajo:
+                     con las tres cosas en una sola fila, en una columna de ~230px el
+                     input de texto quedaba exprimido a ~68px — apenas espacio para
+                     escribir, y facil confundirlo con el de Valor. --}}
+                <form wire:submit="addFund" class="space-y-1.5 pt-1">
+                    <div>
                         <input wire:model="newFundLabel" type="text" placeholder="Nueva base (ej: refuerzo de caja)"
                             class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('newFundLabel') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
-                    <div class="w-24" x-data="digitGroupInput({ path: 'newFundAmount', live: false })">
-                        <input type="text" inputmode="numeric" placeholder="Valor" @input="onInput($event)"
-                            value="{{ $newFundAmount !== '' ? number_format((int) $newFundAmount, 0, ',', '.') : '' }}"
-                            class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('newFundAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    <div class="flex items-start gap-2">
+                        <div class="flex-1" x-data="digitGroupInput({ path: 'newFundAmount', live: false })">
+                            <input type="text" inputmode="numeric" placeholder="Valor" @input="onInput($event)"
+                                value="{{ $newFundAmount !== '' ? number_format((int) $newFundAmount, 0, ',', '.') : '' }}"
+                                class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                            @error('newFundAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                        </div>
+                        <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                            </svg>
+                        </button>
                     </div>
-                    <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                        </svg>
-                    </button>
                 </form>
             @endif
 
@@ -89,23 +95,25 @@
         <p class="text-xs text-gray-500">Dinero que sale de caja: gas, servicios, una factura, etc.</p>
 
         @if ($canEditThisCuadre)
-            <form wire:submit="addExpense" class="flex items-start gap-2">
-                <div class="flex-1">
+            <form wire:submit="addExpense" class="space-y-1.5">
+                <div>
                     <input wire:model="newExpenseDescription" type="text" placeholder="Descripcion"
                         class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     @error('newExpenseDescription') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
-                <div class="w-28" x-data="digitGroupInput({ path: 'newExpenseAmount', live: false })">
-                    <input type="text" inputmode="numeric" placeholder="Valor" @input="onInput($event)"
-                        value="{{ $newExpenseAmount !== '' ? number_format((int) $newExpenseAmount, 0, ',', '.') : '' }}"
-                        class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('newExpenseAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                <div class="flex items-start gap-2">
+                    <div class="flex-1" x-data="digitGroupInput({ path: 'newExpenseAmount', live: false })">
+                        <input type="text" inputmode="numeric" placeholder="Valor" @input="onInput($event)"
+                            value="{{ $newExpenseAmount !== '' ? number_format((int) $newExpenseAmount, 0, ',', '.') : '' }}"
+                            class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                        @error('newExpenseAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    </div>
+                    <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </button>
                 </div>
-                <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                    </svg>
-                </button>
             </form>
         @endif
 
@@ -166,7 +174,7 @@
                 <span class="text-lg font-black">${{ \App\Support\Money::format((float) $this->denominationTotal()) }}</span>
             </div>
 
-            <div x-data="digitGroupInput({ path: 'closingCountedAmount', live: false })">
+            <div x-data="digitGroupInput({ path: 'closingCountedAmount', live: true })">
                 <label class="text-xs text-gray-500">O escribe el monto contado directamente (sin denominaciones)</label>
                 <input type="text" inputmode="numeric" placeholder="0" @input="onInput($event)"
                     value="{{ $closingCountedAmount !== '' ? number_format((int) $closingCountedAmount, 0, ',', '.') : '' }}"
@@ -174,13 +182,15 @@
                 @error('closingCountedAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
             </div>
 
-            <p class="text-[11px] text-gray-500">
-                @if ($this->allowsCloseWithDifference())
-                    La empresa permite cerrar con diferencia si el conteo no coincide con el resultado.
-                @else
-                    La empresa bloquea el cierre si el conteo no coincide exactamente con el resultado.
-                @endif
-            </p>
+            @if ($this->canViewDifference())
+                @php($liveDiff = bcsub($this->currentCountedAmount(), $this->expectedCashAmount($session), 2))
+                <div class="flex items-center justify-between rounded-lg px-3 py-2 text-sm {{ bccomp($liveDiff, '0.00', 2) === 0 ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-rose-50 ring-1 ring-rose-200' }}">
+                    <span class="{{ bccomp($liveDiff, '0.00', 2) === 0 ? 'text-emerald-800' : 'text-rose-800' }}">Diferencia</span>
+                    <span class="font-semibold {{ bccomp($liveDiff, '0.00', 2) === 0 ? 'text-emerald-800' : 'text-rose-800' }}">${{ \App\Support\Money::format((float) $liveDiff) }}</span>
+                </div>
+            @endif
+
+            <p class="text-[11px] text-gray-500">El cierre se permite aunque el conteo no coincida con el resultado esperado; la diferencia queda registrada en la sesion.</p>
 
             @if ($this->canCloseCash())
                 <button wire:click="closeSession" wire:confirm="¿Cerrar esta sesion de caja?"

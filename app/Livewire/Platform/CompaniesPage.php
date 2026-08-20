@@ -25,8 +25,17 @@ class CompaniesPage extends Component
         abort_unless(auth()->user()?->is_platform_admin, 403);
     }
 
-    public function updatedFilter(): void { $this->resetPage(); }
     public function updatedSearch(): void { $this->resetPage(); }
+
+    public function setFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'pending', 'active'], true)) {
+            return;
+        }
+
+        $this->filter = $filter;
+        $this->resetPage();
+    }
 
     public function activate(int $companyId): void
     {

@@ -4,12 +4,30 @@ namespace App\Actions\Audit;
 
 use App\Models\AuditLog;
 use App\Models\Company;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
 class ListAuditLogs
 {
     public function handle(Company $company, array $filters = []): Collection
+    {
+        return $this->buildQuery($company, $filters)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    public function paginate(Company $company, array $filters, int $perPage, int $page): LengthAwarePaginator
+    {
+        return $this->buildQuery($company, $filters)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($perPage, ['*'], 'page', $page);
+    }
+
+    protected function buildQuery(Company $company, array $filters): Builder
     {
         $query = AuditLog::query()
             ->where('company_id', $company->id)
@@ -73,10 +91,7 @@ class ListAuditLogs
             });
         }
 
-        return $query
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->get();
+        return $query;
     }
 
     protected function blankToNull(mixed $value): ?string

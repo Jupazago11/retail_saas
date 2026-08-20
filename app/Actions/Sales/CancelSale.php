@@ -64,16 +64,6 @@ class CancelSale
                 throw new InvalidArgumentException('Solo se pueden anular ventas en borrador o confirmadas.');
             }
 
-            if (
-                $sale->sale_type === 'credit'
-                && $sale->payments()
-                    ->whereNotNull('credit_account_id')
-                    ->where('status', PaymentStatus::Confirmed->value)
-                    ->exists()
-            ) {
-                throw new InvalidArgumentException('No se puede anular una venta a credito que ya tiene abonos registrados.');
-            }
-
             $remainingItems = $sale->items
                 ->map(fn ($item) => [
                     'sale_item_id' => $item->id,
