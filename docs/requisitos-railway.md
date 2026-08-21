@@ -124,6 +124,58 @@ que no es identico a tu Docker local — preferir la ruta plana
 (`storage_path()`/`base_path()`/etc.) sin normalizar, salvo que de verdad
 necesites resolver symlinks.
 
+### 2026-08-20 — Start Command vs pre-deploy step: el 502 no era de puerto
+**Proyecto:** retail_saas (Laravel).
+**Sintoma:** "Application failed to respond" (502) aunque el build pasaba
+limpio y las migraciones/seeders corrian bien segun los logs.
+**Causa real:** el comando `php artisan migrate:fresh --force && php
+artisan db:seed ...` quedo puesto en **"Custom Start Command"** en vez de
+en **"Add pre-deploy step"** (son dos campos distintos en Settings →
+Deploy). El Start Command es el proceso que Railway espera que se quede
+VIVO para atender peticiones HTTP — un comando de una sola pasada (migra,
+siembra, termina) hace que el contenedor se quede sin proceso principal en
+cuanto acaba, y Railway nunca tiene nada escuchando en el puerto.
+**Fix:** vaciar "Custom Start Command" (para que Railpack use el suyo, el
+que de verdad levanta FrankenPHP) y mover el comando de
+migrate/seed a "Add pre-deploy step" — ese SI se espera que termine antes
+de arrancar el servidor.
+**Leccion general:** en cualquier PaaS con estos dos conceptos separados
+(start command persistente vs. pre-deploy/release step de una sola
+pasada), un comando que TERMINA nunca va en el campo del proceso
+principal, sin importar cuan bien le vaya al correr.
+
+### 2026-08-20 — Sitio cargaba sin CSS/JS (assets en http:// en un sitio https://)
+**Proyecto:** retail_saas (Laravel).
+**Sintoma:** la pagina cargaba (ya sin 502) pero se veia sin ningun
+estilo — HTML plano, fuente serif por defecto del navegador.
+**Causa real:** Railway (como Heroku/Render/Fly) termina el TLS en su
+borde y reenvia la peticion al contenedor por HTTP plano, con headers
+`X-Forwarded-*`. El proyecto no tenia `trustProxies()` configurado en
+`bootstrap/app.php`, asi que Laravel veia la conexion interna como
+"http" y generaba TODAS las URLs (assets de Vite, rutas, redirects) con
+`http://` aunque el sitio publico es `https://`. El navegador bloquea
+esos recursos como "contenido mixto" — el CSS/JS existian y respondian
+bien, simplemente nunca se cargaban.
+**Fix:** agregar en `bootstrap/app.php`, dentro de `withMiddleware()`:
+```php
+$middleware->trustProxies(
+    at: '*',
+    headers: Request::HEADER_X_FORWARDED_FOR
+        | Request::HEADER_X_FORWARDED_HOST
+        | Request::HEADER_X_FORWARDED_PORT
+        | Request::HEADER_X_FORWARDED_PROTO,
+);
+```
+`at: '*'` (confiar en cualquier proxy) es seguro aqui porque el unico que
+le puede hablar al contenedor es el borde de Railway — no hay acceso
+publico directo que lo bypassee.
+**Leccion general:** cualquier framework detras de un PaaS que termina
+TLS en su borde (Railway, Heroku, Render, Fly...) necesita confiar
+explicitamente en los headers `X-Forwarded-*` del proxy, o va a generar
+URLs con el esquema equivocado (http en vez de https) sin ningun error
+visible — el sintoma es "la pagina carga pero se ve rota/sin assets", no
+un error claro en logs.
+
 ## Comandos utiles de diagnostico
 
 - `composer validate --no-check-all --strict` — confirma que
