@@ -24,6 +24,16 @@
         </a>
     @endif
 
+    @if ($canManageSettings)
+        <a href="{{ route('admin.printers') }}" wire:navigate @class([
+            'rounded-full px-4 py-2 text-sm font-semibold transition',
+            'bg-blue-600 text-white' => $active === 'admin.printers',
+            'border border-gray-300 text-gray-700 hover:border-stone-400' => $active !== 'admin.printers',
+        ])>
+            Impresora
+        </a>
+    @endif
+
     {{-- "Paquetes" (admin.bundles) y "Cupones" (admin.coupons) se quitaron
     de esta barra: no forman parte de ningun plan/membresia actual. Las
     rutas y componentes siguen existiendo, solo se dejo de enlazarlos

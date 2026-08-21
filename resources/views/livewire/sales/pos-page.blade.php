@@ -218,7 +218,18 @@
 </script>
 
 <script>
-    document.addEventListener('livewire:initialized', function () {
+    (function () {
+        // Este <script> se vuelve a ejecutar cada vez que se navega aqui con
+        // wire:navigate (Livewire clona los <script> del body en cada visita
+        // SPA) — pero 'livewire:initialized' solo se dispara UNA vez en toda
+        // la sesion del navegador (cuando Livewire arranca). Si el usuario
+        // llega a /sales/pos por SPA (no con un F5), ese evento ya paso hace
+        // rato y el listener de abajo nunca se ejecutaba: el ticket dejaba de
+        // abrirse solo despues de la primera carga dura de la pagina.
+        if (window.__posPageScriptInitialized) return;
+        window.__posPageScriptInitialized = true;
+
+        function init() {
         var POS = {
             log: function() { var a = ['[POS]'].concat(Array.from(arguments)); console.log.apply(console, a); },
             err: function() { var a = ['[POS ERR]'].concat(Array.from(arguments)); console.error.apply(console, a); }
@@ -279,32 +290,16 @@
         });
 
         POS.log('Debug hooks OK');
-    });
-</script>
-
-<script>
-    // Si hay productos en el carrito y el usuario refresca/cierra la pestaña
-    // (F5, Ctrl+R, cerrar la ventana), el navegador pregunta antes de perder
-    // esos datos (los textos del dialogo los define el navegador, no se
-    // pueden personalizar por seguridad — esto solo controla si aparece).
-    // Reusa findPosWire() de app.js (mismo localizador que ya usa el guard
-    // de "click en el logo" via [data-pos-shell]) para no duplicar logica.
-    window.addEventListener('beforeunload', function (e) {
-        var hasCartItems = false;
-
-        try {
-            var shell = document.querySelector('[data-pos-shell]');
-            var wire = shell && window.retailSaas?.findPosWire ? window.retailSaas.findPosWire(shell) : null;
-            var items = wire && Array.isArray(wire.items) ? wire.items : [];
-            hasCartItems = items.some(function (item) { return item && item.product_id; });
-        } catch (err) {}
-
-        if (hasCartItems) {
-            e.preventDefault();
-            e.returnValue = '';
         }
-    });
+
+        if (window.Livewire) {
+            init();
+        } else {
+            document.addEventListener('livewire:initialized', init);
+        }
+    })();
 </script>
+
 
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">

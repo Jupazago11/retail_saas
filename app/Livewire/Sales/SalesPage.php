@@ -18,6 +18,7 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
@@ -64,6 +65,17 @@ class SalesPage extends Component
     }
 
     public function updatedSaleTypeFilter(): void
+    {
+        $this->resetPage();
+    }
+
+    // Disparado desde PosPage (componente hermano dentro del mismo
+    // SalesWorkspacePage) al guardar cualquier venta. Sin esto la tabla
+    // quedaba con datos viejos hasta que el usuario recargaba la pagina a
+    // mano: Ventas y POS son instancias Livewire separadas que no se
+    // refrescan entre si solo por compartir la misma pagina.
+    #[On('sale-saved')]
+    public function refreshSalesList(): void
     {
         $this->resetPage();
     }

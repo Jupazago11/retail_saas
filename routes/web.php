@@ -8,6 +8,7 @@ use App\Livewire\Admin\BundlesPage;
 use App\Livewire\Admin\CompanyStructurePage;
 use App\Livewire\Admin\CouponsPage;
 use App\Livewire\Admin\PlanOverridesPage;
+use App\Livewire\Admin\PrintersPage;
 use App\Livewire\Admin\RolesPage;
 use App\Livewire\Admin\SettingsPage;
 use App\Livewire\Admin\SubscriptionPage;
@@ -16,6 +17,7 @@ use App\Livewire\Platform\DashboardPage as PlatformDashboardPage;
 use App\Livewire\Platform\SubscriptionsPage as PlatformSubscriptionsPage;
 use App\Livewire\Platform\PlansPage as PlatformPlansPage;
 use App\Livewire\Platform\PlatformCouponsPage;
+use App\Livewire\Platform\PlatformPrintersPage;
 use App\Livewire\Platform\UsersPage as PlatformUsersPage;
 use App\Livewire\Platform\PlatformSettingsPage;
 use App\Livewire\Cash\CashSessionsPage;
@@ -67,6 +69,7 @@ Route::middleware('auth')->group(function () {
         Route::get('subscriptions',PlatformSubscriptionsPage::class)->name('subscriptions');
         Route::get('plans',        PlatformPlansPage::class)      ->name('plans');
         Route::get('coupons',      PlatformCouponsPage::class)    ->name('coupons');
+        Route::get('printers',     PlatformPrintersPage::class)   ->name('printers');
         Route::get('users',        PlatformUsersPage::class)      ->name('users');
         Route::get('settings',     PlatformSettingsPage::class)   ->name('settings');
     });
@@ -219,6 +222,10 @@ Route::get('cash/sessions', CashSessionsPage::class)
         Route::get('admin/roles', RolesPage::class)
             ->middleware('company.permission:roles.manage')
             ->name('admin.roles');
+
+        Route::get('admin/printers', PrintersPage::class)
+            ->middleware('company.permission:settings.manage')
+            ->name('admin.printers');
     });
 
     Route::view('profile', 'profile')

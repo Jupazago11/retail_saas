@@ -866,6 +866,12 @@ class PosPage extends Component
         $this->resetSaleForm();
         $this->lastCreatedSaleId = $sale->id;
 
+        // SalesPage (componente hermano en el mismo SalesWorkspacePage) tiene
+        // su propia copia paginada de la tabla de ventas — sin avisarle, se
+        // queda mostrando datos viejos hasta que el usuario recarga la
+        // pagina a mano.
+        $this->dispatch('sale-saved');
+
         // Al cobrar (venta queda Confirmada), el ticket se abre solo en una
         // pestaña nueva — sin esto el cajero tenia que buscar el icono de
         // "Ticket ultima venta" a mano cada vez.
