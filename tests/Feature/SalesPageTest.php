@@ -159,7 +159,7 @@ class SalesPageTest extends TestCase
 
         Livewire::test(SalesPage::class)
             ->assertSee('Editar borrador')
-            ->assertSee(route('sales.pos', ['edit' => $sale->id]));
+            ->assertSee("edit-draft-requested', { saleId: {$sale->id} }", false);
     }
 
     public function test_sales_page_shows_modify_action_only_for_confirmed_pos_sales(): void
@@ -181,9 +181,9 @@ class SalesPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         $component = Livewire::test(SalesPage::class)
-            ->assertSee(route('sales.pos', ['modify' => $confirmedSale->id]));
+            ->assertSee("modify-sale-requested', { saleId: {$confirmedSale->id} }", false);
 
-        $component->assertDontSee(route('sales.pos', ['modify' => $draftSale->id]));
+        $component->assertDontSee("modify-sale-requested', { saleId: {$draftSale->id} }", false);
     }
 
     public function test_sales_page_return_action_is_forbidden_without_sales_return_permission(): void

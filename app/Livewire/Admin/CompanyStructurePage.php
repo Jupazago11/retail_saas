@@ -14,6 +14,7 @@ use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use Livewire\Component;
 
@@ -30,9 +31,10 @@ class CompanyStructurePage extends Component
     public string $warehouseCode     = '';
     public ?int   $warehouseBranchId = null;
 
-    public string $cajaName     = '';
-    public string $cajaCode     = '';
-    public ?int   $cajaBranchId = null;
+    public string $cajaName        = '';
+    public string $cajaCode        = '';
+    public ?int   $cajaBranchId    = null;
+    public string $cajaPrinterType = 'thermal_58mm';
 
     public function mount(): void
     {
@@ -51,9 +53,10 @@ class CompanyStructurePage extends Component
                 $this->warehouseBranchId = $firstBranchId,
             ],
             'cash' => [
-                $this->cajaName     = '',
-                $this->cajaCode     = '',
-                $this->cajaBranchId = $firstBranchId,
+                $this->cajaName        = '',
+                $this->cajaCode        = '',
+                $this->cajaBranchId    = $firstBranchId,
+                $this->cajaPrinterType = 'thermal_58mm',
             ],
             default => [
                 $this->branchName = '',
@@ -125,16 +128,18 @@ class CompanyStructurePage extends Component
         $this->ensurePermission('settings.manage');
 
         $validated = $this->validate([
-            'cajaBranchId' => ['required', 'integer'],
-            'cajaName'     => ['required', 'string', 'max:255'],
-            'cajaCode'     => ['required', 'string', 'max:80'],
+            'cajaBranchId'    => ['required', 'integer'],
+            'cajaName'        => ['required', 'string', 'max:255'],
+            'cajaCode'        => ['required', 'string', 'max:80'],
+            'cajaPrinterType' => ['required', Rule::in(array_keys(CashRegister::PRINTER_TYPES))],
         ]);
 
         try {
             $createCashRegister->handle($this->currentCompany(), [
-                'branch_id' => $validated['cajaBranchId'],
-                'name'      => $validated['cajaName'],
-                'code'      => strtoupper($validated['cajaCode']),
+                'branch_id'    => $validated['cajaBranchId'],
+                'name'         => $validated['cajaName'],
+                'code'         => strtoupper($validated['cajaCode']),
+                'printer_type' => $validated['cajaPrinterType'],
             ], auth()->user());
         } catch (InvalidArgumentException $e) {
             $this->addError('cajaName', $e->getMessage());

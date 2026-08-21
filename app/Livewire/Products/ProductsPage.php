@@ -45,7 +45,6 @@ class ProductsPage extends Component
     public int|string|null $categoryId = null;
     public int|string|null $brandId = null;
     public ?int $supplierId = null;
-    public ?int $baseUnitId = null;
     public string $taxId = '';
     public string $name = '';
     public string $sku = '';
@@ -88,6 +87,15 @@ class ProductsPage extends Component
         $this->resetPage();
     }
 
+    // Ademas de Enter (wire:keydown.enter en la vista), la busqueda se
+    // dispara sola cuando el codigo termina de sincronizarse (wire:model.live
+    // .debounce) — asi funciona igual con un lector laser que no manda Enter,
+    // o si el usuario borra y vuelve a escribir el codigo sin darle Enter.
+    public function updatedBarcode(): void
+    {
+        $this->lookupBarcode();
+    }
+
     public function lookupBarcode(): void
     {
         $barcode = trim($this->barcode);
@@ -128,29 +136,29 @@ class ProductsPage extends Component
 
     public function openModal(): void
     {
-        $this->resetProductForm();
+        // Si habia un borrador de producto NUEVO sin guardar (el modal se
+        // cerro sin querer via dismissModal(), p. ej. clic afuera), lo
+        // retomamos en vez de perderlo. Si se estaba editando un producto
+        // existente, "+" es inequivocamente "producto nuevo" y si descarta
+        // ese borrador (reabrir el lapiz del producto lo vuelve a traer
+        // igual, sin perder nada, porque ese si viene de la BD).
+        if ($this->editingProductId !== null || $this->name === '') {
+            $this->resetProductForm();
+        }
+
         $this->showModal = true;
+    }
+
+    // Clic afuera del modal: normalmente sin querer, no debe botar lo que ya
+    // se escribio. Ver openModal() para donde se retoma el borrador.
+    public function dismissModal(): void
+    {
+        $this->showModal = false;
     }
 
     public function closeModal(): void
     {
         $this->resetProductForm();
-    }
-
-    public function saveQuickUnit(string $name, string $code): void
-    {
-        $name = trim($name);
-        $code = strtoupper(trim($code));
-        if (! $name || ! $code) {
-            return;
-        }
-        $unit = Unit::create([
-            'company_id' => $this->currentCompany()->id,
-            'name' => $name,
-            'code' => $code,
-            'status' => RecordStatus::Active->value,
-        ]);
-        $this->baseUnitId = $unit->id;
     }
 
     public function saveProduct(CreateInventoryAdjustment $createInventoryAdjustment): void
@@ -159,12 +167,6 @@ class ProductsPage extends Component
             $this->authorize('update', $this->productsQuery()->findOrFail($this->editingProductId));
         } else {
             $this->authorize('create', Product::class);
-        }
-
-        if (! $this->canCreateProducts()) {
-            $this->addError('categoryId', 'Debes crear al menos una categoria y una unidad antes de registrar productos.');
-
-            return;
         }
 
         $company = $this->currentCompany();
@@ -195,10 +197,6 @@ class ProductsPage extends Component
             'supplierId' => [
                 'nullable',
                 Rule::exists('suppliers', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
-            ],
-            'baseUnitId' => [
-                'required',
-                Rule::exists('units', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
             ],
             'taxId' => ['nullable', 'string', 'max:50'],
             'name' => ['required', 'string', 'max:255'],
@@ -249,7 +247,7 @@ class ProductsPage extends Component
             'category_id' => $validated['categoryId'],
             'brand_id' => $validated['brandId'] ?: null,
             'supplier_id' => $validated['supplierId'] ?: null,
-            'base_unit_id' => $validated['baseUnitId'],
+            'base_unit_id' => $this->resolveDefaultUnit($company)->id,
             'tax_id' => $this->blankToNull($validated['taxId']),
             'name' => trim($validated['name']),
             'sku' => $this->blankToNull(Str::upper(trim($validated['sku']))),
@@ -326,7 +324,6 @@ class ProductsPage extends Component
         $this->categoryId = $product->category_id;
         $this->brandId = $product->brand_id;
         $this->supplierId = $product->supplier_id;
-        $this->baseUnitId = $product->base_unit_id;
         $this->taxId = $product->tax_id ?? '';
         $this->name = $product->name;
         $this->sku = $product->sku ?? '';
@@ -400,7 +397,6 @@ class ProductsPage extends Component
             'categoryId',
             'brandId',
             'supplierId',
-            'baseUnitId',
             'taxId',
             'name',
             'sku',
@@ -417,14 +413,6 @@ class ProductsPage extends Component
         $this->minimumStock    = '0';
         $this->initializeQuantities();
         $this->resetValidation();
-
-        // Si la empresa solo tiene una unidad activa no tiene caso pedir que
-        // la elijan cada vez: se preselecciona sola (la vista la muestra de
-        // forma informativa en vez de un selector, ver products-page.blade.php).
-        $units = $this->units();
-        if ($units->count() === 1) {
-            $this->baseUnitId = $units->first()->id;
-        }
     }
 
     public function products(): LengthAwarePaginator
@@ -500,20 +488,6 @@ class ProductsPage extends Component
             ->all();
     }
 
-    public function units(): Collection
-    {
-        return Unit::query()
-            ->where('company_id', $this->currentCompany()->id)
-            ->where('status', RecordStatus::Active->value)
-            ->orderBy('name')
-            ->get();
-    }
-
-    public function canCreateProducts(): bool
-    {
-        return $this->categories()->isNotEmpty() && $this->units()->isNotEmpty();
-    }
-
     public function render(): View
     {
         $company = $this->currentCompany();
@@ -523,15 +497,13 @@ class ProductsPage extends Component
             'categories' => $this->categories(),
             'brands' => $this->brands(),
             'suppliers' => $this->suppliers(),
-            'units' => $this->units(),
             'warehouses' => $this->warehouses(),
-            'canCreateProducts' => $this->canCreateProducts(),
             'hasInventory' => app(\App\Services\Plans\CompanyPlanResolver::class)->hasModule($company, 'inventory'),
             'barcodePreviewSvg' => $this->barcodePreviewSvg(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Productos',
-                'description' => 'Define el catalogo base con precios, unidad principal y control inicial de inventario.',
+                'description' => 'Define el catalogo base con precios y control inicial de inventario.',
             ]),
         ]);
     }
@@ -584,6 +556,18 @@ class ProductsPage extends Component
         }
 
         return app(ResolveOrCreateBrand::class)->handle($company, (string) $value)->id;
+    }
+
+    // La unidad base ya no se elige en el formulario: todo producto usa la
+    // unidad generica de la empresa ("Unidad"/UND), creada sola la primera
+    // vez que se guarda un producto (no hace falta que el usuario la cree
+    // ni que exista de antemano).
+    protected function resolveDefaultUnit(Company $company): Unit
+    {
+        return Unit::query()->firstOrCreate(
+            ['company_id' => $company->id, 'code' => 'UND'],
+            ['name' => 'Unidad', 'status' => RecordStatus::Active->value]
+        );
     }
 
     protected function marginFrom(string|float|int $cost, string|float|int|null $price): ?string

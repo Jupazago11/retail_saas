@@ -6,8 +6,9 @@
     "keywords": ["laravel", "saas", "retail", "pos", "inventory"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "blade-ui-kit/blade-heroicons": "^2.7",
+        "endroid/qr-code": "^6.0",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.35",

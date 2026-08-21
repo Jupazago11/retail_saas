@@ -94,7 +94,7 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Datos básicos</p>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="editName" type="text"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('editName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
@@ -102,14 +102,14 @@
 
                     <div class="grid grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Precio base (COP)</label>
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Precio base (COP) <span class="text-rose-600">*</span></label>
                             <input wire:model="editPrice" type="number" min="0" step="1000"
                                 class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @error('editPrice') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Período de facturación</label>
+                            <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Período de facturación <span class="text-rose-600">*</span></label>
                             <select wire:model="editPeriod"
                                 class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="monthly">Mensual</option>
@@ -120,7 +120,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Estado <span class="text-rose-600">*</span></label>
                         <select wire:model="editStatus"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="active">Activo</option>
@@ -168,7 +168,7 @@
                     <div class="grid grid-cols-2 gap-4">
                         @foreach ($limitDefinitions as $key => $label)
                             <div>
-                                <label class="block text-xs font-semibold text-gray-500">{{ $label }}</label>
+                                <label class="block text-xs font-semibold text-gray-500">{{ $label }} <span class="text-rose-600">*</span></label>
                                 <input wire:model="editLimits.{{ $key }}" type="number" min="0" step="1"
                                     class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 @error('editLimits.'.$key) <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror

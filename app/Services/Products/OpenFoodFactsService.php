@@ -8,7 +8,10 @@ use Illuminate\Support\Facades\Log;
 class OpenFoodFactsService
 {
     private const BASE_URL = 'https://world.openfoodfacts.org/api/v3/product';
-    private const TIMEOUT  = 6;
+    // El formulario bloquea Codigo de barras/Nombre mientras esta consulta
+    // esta en vuelo (ver products-page.blade.php, wire:loading.attr) — este
+    // timeout es el limite real de cuanto puede durar ese bloqueo.
+    private const TIMEOUT = 2;
 
     public function findName(string $barcode): ?string
     {

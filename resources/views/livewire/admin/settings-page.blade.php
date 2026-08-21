@@ -24,19 +24,21 @@
                 </div>
             @enderror
 
-            {{-- Step tabs --}}
-            <div class="flex flex-wrap gap-1.5 border-b border-stone-100 px-6 py-4">
-                @foreach ($groups as $group => $definitions)
-                    <button type="button"
-                        @click="active = '{{ $group }}'"
-                        :class="active === '{{ $group }}'
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-600 hover:bg-stone-200'"
-                        class="rounded-full px-4 py-2 text-sm font-semibold transition">
-                        {{ $this->groupLabel($group) }}
-                    </button>
-                @endforeach
-            </div>
+            {{-- Step tabs: solo tiene sentido elegir cuando hay mas de un grupo disponible --}}
+            @if (count($groups) > 1)
+                <div class="flex flex-wrap gap-1.5 border-b border-stone-100 px-6 py-4">
+                    @foreach ($groups as $group => $definitions)
+                        <button type="button"
+                            @click="active = '{{ $group }}'"
+                            :class="active === '{{ $group }}'
+                                ? 'bg-blue-600 text-white shadow-sm'
+                                : 'bg-gray-100 text-gray-600 hover:bg-stone-200'"
+                            class="rounded-full px-4 py-2 text-sm font-semibold transition">
+                            {{ $this->groupLabel($group) }}
+                        </button>
+                    @endforeach
+                </div>
+            @endif
 
             {{-- Step content --}}
             <div class="px-6 py-6">

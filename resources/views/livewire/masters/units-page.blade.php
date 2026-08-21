@@ -19,19 +19,19 @@
 
                 <form wire:submit="saveUnit" class="mt-6 space-y-4">
                     <div>
-                        <label for="unit-code" class="text-sm font-medium text-gray-700">Codigo</label>
+                        <label for="unit-code" class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                         <input wire:model="code" id="unit-code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('code') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="unit-name" class="text-sm font-medium text-gray-700">Nombre</label>
+                        <label for="unit-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" id="unit-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="unit-precision" class="text-sm font-medium text-gray-700">Precision decimal</label>
+                        <label for="unit-precision" class="text-sm font-medium text-gray-700">Precision decimal <span class="text-rose-600">*</span></label>
                         <input wire:model="precisionScale" id="unit-precision" type="number" min="0" max="6" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('precisionScale') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
@@ -80,7 +80,7 @@
                                             Editar
                                         </button>
                                         @if ($unit->status === 'archived')
-                                            <button wire:click="restoreUnit({{ $unit->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                            <button wire:click="restoreUnit({{ $unit->id }})" wire:confirm="¿Restaurar esta unidad?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                 Restaurar
                                             </button>
                                         @else

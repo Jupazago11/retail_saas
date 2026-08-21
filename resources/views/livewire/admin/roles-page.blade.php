@@ -21,13 +21,13 @@
                 <form wire:submit="saveRole" class="mt-6 space-y-5">
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
-                            <label for="role-code" class="text-sm font-medium text-gray-700">Codigo</label>
+                            <label for="role-code" class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                             <input wire:model="roleCode" id="role-code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @error('roleCode') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label for="role-status" class="text-sm font-medium text-gray-700">Estado</label>
+                            <label for="role-status" class="text-sm font-medium text-gray-700">Estado <span class="text-rose-600">*</span></label>
                             <select wire:model="roleStatus" id="role-status" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="active">Activo</option>
                                 <option value="inactive">Inactivo</option>
@@ -37,14 +37,14 @@
                     </div>
 
                     <div>
-                        <label for="role-display-name" class="text-sm font-medium text-gray-700">Nombre visible</label>
+                        <label for="role-display-name" class="text-sm font-medium text-gray-700">Nombre visible <span class="text-rose-600">*</span></label>
                         <input wire:model="displayName" id="role-display-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('displayName') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <div class="flex items-center justify-between">
-                            <label class="text-sm font-medium text-gray-700">Permisos</label>
+                            <label class="text-sm font-medium text-gray-700">Permisos <span class="text-rose-600">*</span></label>
                             <p class="text-xs uppercase tracking-[0.18em] text-gray-500">{{ count($selectedPermissionCodes) }} seleccionados</p>
                         </div>
 
@@ -177,25 +177,25 @@
 
                     <form wire:submit="createInternalUser" class="mt-4 grid gap-4 md:grid-cols-2">
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Nombre</label>
+                            <label class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="newInternalName" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="Ej: Laura Gomez">
                             @error('newInternalName') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Username</label>
+                            <label class="text-sm font-medium text-gray-700">Username <span class="text-rose-600">*</span></label>
                             <input wire:model="newInternalUsername" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="vendedor01">
                             @error('newInternalUsername') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Contrasena inicial</label>
+                            <label class="text-sm font-medium text-gray-700">Contrasena inicial <span class="text-rose-600">*</span></label>
                             <input wire:model="newInternalPassword" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="Minimo 8 caracteres">
                             @error('newInternalPassword') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Rol</label>
+                            <label class="text-sm font-medium text-gray-700">Rol <span class="text-rose-600">*</span></label>
                             <select wire:model="newInternalCompanyRoleId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="">Selecciona un rol...</option>
                                 @foreach ($companyRoles as $role)
@@ -216,13 +216,13 @@
 
                     <form wire:submit="addUserToCompany" class="mt-4 grid gap-4 xl:grid-cols-[1.4fr_1fr_auto]">
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Correo o username</label>
+                            <label class="text-sm font-medium text-gray-700">Correo o username <span class="text-rose-600">*</span></label>
                             <input wire:model="newUserIdentifier" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="usuario@empresa.com o vendedor01">
                             @error('newUserIdentifier') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Rol</label>
+                            <label class="text-sm font-medium text-gray-700">Rol <span class="text-rose-600">*</span></label>
                             <select wire:model="newUserCompanyRoleId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="">Selecciona un rol...</option>
                                 @foreach ($companyRoles as $role)

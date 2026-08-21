@@ -222,13 +222,18 @@
 
                     <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_0.7fr]">
                         <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por etiqueta, cliente o creador" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        <select wire:model.live="statusFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Todos los estados</option>
-                            <option value="open">Abiertas</option>
-                            <option value="expired">Expiradas</option>
-                            <option value="converted">Convertidas</option>
-                            <option value="cancelled">Canceladas</option>
-                        </select>
+                        <x-searchable-select
+                            id="frozen-sales-filter-status"
+                            model="statusFilter"
+                            placeholder="Todos los estados"
+                            live
+                            :options="[
+                                ['id' => 'open', 'label' => 'Abiertas'],
+                                ['id' => 'expired', 'label' => 'Expiradas'],
+                                ['id' => 'converted', 'label' => 'Convertidas'],
+                                ['id' => 'cancelled', 'label' => 'Canceladas'],
+                            ]"
+                        />
                     </div>
                 </div>
 

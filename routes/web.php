@@ -1,8 +1,8 @@
 <?php
 
+use App\Http\Controllers\Sales\PublicSaleReceiptController;
 use App\Http\Controllers\Sales\SaleTicketController;
 use App\Http\Controllers\Admin\ExportAuditLogsController;
-use App\Http\Controllers\Reports\ExportOperationalReportController;
 use App\Livewire\Admin\AuditLogsPage;
 use App\Livewire\Admin\BundlesPage;
 use App\Livewire\Admin\CompanyStructurePage;
@@ -35,8 +35,7 @@ use App\Livewire\Purchases\PurchasesPage;
 use App\Livewire\Purchases\PurchaseImportsPage;
 use App\Livewire\Purchases\SupplierImportsPage;
 use App\Livewire\Purchases\SuppliersPage;
-use App\Livewire\Sales\PosPage;
-use App\Livewire\Sales\SalesPage;
+use App\Livewire\Sales\SalesWorkspacePage;
 use App\Livewire\Products\ProductsPage;
 use App\Livewire\Products\ProductImportsPage;
 use App\Livewire\Products\AttributesPage;
@@ -47,6 +46,13 @@ use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
+
+// Recibo publico del QR del ticket: sin login, la firma de la URL (Laravel
+// URL::signedRoute, sin expiracion) es la unica autorizacion — ver
+// PublicSaleReceiptController. Fuera a proposito del grupo 'auth' de abajo.
+Route::get('r/{sale}', PublicSaleReceiptController::class)
+    ->middleware('signed')
+    ->name('sales.receipt.public');
 
 Route::middleware('auth')->group(function () {
     Route::get('companies/select', SelectCompanyPage::class)
@@ -134,11 +140,17 @@ Route::middleware('auth')->group(function () {
             ->middleware('company.permission:payables.view')
             ->name('purchases.payables');
 
-        Route::get('sales', SalesPage::class)
+        // Ventas y POS son el MISMO componente (SalesWorkspacePage), que monta
+        // ambos submodulos y cambia de pestaña client-side (ver
+        // sales-workspace-page.blade.php) — las dos rutas siguen separadas
+        // solo para conservar el permiso distinto de cada una y la URL de
+        // entrada, y para que SalesWorkspacePage::mount() sepa con cual
+        // pestaña abrir segun por donde entro el usuario.
+        Route::get('sales', SalesWorkspacePage::class)
             ->middleware('company.permission:sales.view')
             ->name('sales.index');
 
-        Route::get('sales/pos', PosPage::class)
+        Route::get('sales/pos', SalesWorkspacePage::class)
             ->middleware('company.permission:sales.create')
             ->name('sales.pos');
 
@@ -171,10 +183,6 @@ Route::get('cash/sessions', CashSessionsPage::class)
         Route::get('reports', OperationalReportsPage::class)
             ->middleware('company.permission:reports.view')
             ->name('reports.index');
-
-        Route::get('reports/export', ExportOperationalReportController::class)
-            ->middleware('company.permission:reports.view')
-            ->name('reports.export');
 
         Route::get('admin/audit-logs', AuditLogsPage::class)
             ->middleware('company.permission:settings.manage')

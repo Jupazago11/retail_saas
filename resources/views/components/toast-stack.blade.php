@@ -53,6 +53,16 @@
                 <div class="min-w-0 flex-1">
                     <p x-show="toast.title" x-text="toast.title" class="text-sm font-black uppercase tracking-[0.18em]"></p>
                     <p x-text="toast.message" class="mt-1 text-sm leading-5"></p>
+                    {{-- Salida de respaldo: si algo (ej. un bloqueador de
+                    ventanas emergentes) impide que una accion automatica
+                    como abrir el ticket se note, este link siempre queda
+                    visible y clickeable. --}}
+                    <template x-if="toast.actionUrl">
+                        <a :href="toast.actionUrl" target="_blank" rel="noopener"
+                            x-text="toast.actionLabel || 'Abrir'"
+                            class="mt-1.5 inline-block text-sm font-semibold underline underline-offset-2 opacity-90 hover:opacity-100"
+                        ></a>
+                    </template>
                 </div>
 
                 <button

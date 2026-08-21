@@ -11,6 +11,7 @@ use App\Models\CompanyLimitOverride;
 use App\Models\Product;
 use App\Models\Unit;
 use App\Models\User;
+use App\Services\Products\OpenFoodFactsService;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -35,20 +36,12 @@ class ProductsCatalogTest extends TestCase
             'name' => 'Campo Vivo',
             'status' => RecordStatus::Active->value,
         ]);
-        $unit = Unit::query()->create([
-            'company_id' => $company->id,
-            'code' => 'UND',
-            'name' => 'Unidad',
-            'precision_scale' => 0,
-            'status' => RecordStatus::Active->value,
-        ]);
 
         $this->actingAs($user);
 
         Livewire::test(ProductsPage::class)
             ->set('categoryId', $category->id)
             ->set('brandId', $brand->id)
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Leche Entera 1L')
             ->set('sku', 'LEC-001')
             ->set('barcode', '7701234567890')
@@ -60,10 +53,12 @@ class ProductsCatalogTest extends TestCase
             ->assertHasNoErrors();
 
         $product = Product::query()->where('company_id', $company->id)->firstOrFail();
+        $defaultUnit = Unit::query()->where('company_id', $company->id)->where('code', 'UND')->firstOrFail();
 
         $this->assertSame('LEC-001', $product->sku);
         $this->assertSame('40.63', $product->margin_1);
         $this->assertSame(RecordStatus::Active->value, $product->status);
+        $this->assertSame($defaultUnit->id, $product->base_unit_id);
 
         Livewire::test(ProductsPage::class)
             ->call('editProduct', $product->id)
@@ -98,13 +93,6 @@ class ProductsCatalogTest extends TestCase
     {
         [$user, $company] = $this->actingUserWithCurrentCompany();
         $this->assignCompanyPlan($company, 'premium');
-        $unit = Unit::query()->create([
-            'company_id' => $company->id,
-            'code' => 'UND',
-            'name' => 'Unidad',
-            'precision_scale' => 0,
-            'status' => RecordStatus::Active->value,
-        ]);
 
         $otherCompany = app(CreateCompany::class)->handle($user, [
             'legal_name' => 'Otra Retail SAS',
@@ -121,7 +109,6 @@ class ProductsCatalogTest extends TestCase
 
         Livewire::test(ProductsPage::class)
             ->set('categoryId', $foreignCategory->id)
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Producto Invalido')
             ->set('cost', '1000')
             ->set('price1', '1500')
@@ -140,6 +127,8 @@ class ProductsCatalogTest extends TestCase
             'code' => 'BEB',
             'status' => RecordStatus::Active->value,
         ]);
+        // Este test crea el Product directamente (sin pasar por saveProduct()),
+        // asi que la unidad "UND" hay que crearla a mano.
         $unit = Unit::query()->create([
             'company_id' => $company->id,
             'code' => 'UND',
@@ -214,6 +203,8 @@ class ProductsCatalogTest extends TestCase
             'code' => 'DES',
             'status' => RecordStatus::Active->value,
         ]);
+        // Este test crea el Product directamente (sin pasar por saveProduct()),
+        // asi que la unidad "UND" hay que crearla a mano.
         $unit = Unit::query()->create([
             'company_id' => $company->id,
             'code' => 'UND',
@@ -238,7 +229,6 @@ class ProductsCatalogTest extends TestCase
 
         Livewire::test(ProductsPage::class)
             ->set('categoryId', $category->id)
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Producto Excedido')
             ->set('cost', '1200')
             ->set('price1', '1800')
@@ -255,28 +245,11 @@ class ProductsCatalogTest extends TestCase
     public function test_products_page_creates_category_and_brand_from_typed_name_on_save(): void
     {
         [$user, $company] = $this->actingUserWithCurrentCompany();
-        $unit = Unit::query()->create([
-            'company_id' => $company->id,
-            'code' => 'UND',
-            'name' => 'Unidad',
-            'precision_scale' => 0,
-            'status' => RecordStatus::Active->value,
-        ]);
-        // canCreateProducts() exige al menos una categoria existente; la
-        // nueva ("Bebidas") se crea al vuelo desde el nombre tipeado.
-        Category::query()->create([
-            'company_id' => $company->id,
-            'name' => 'Otra',
-            'code' => 'OTRA',
-            'status' => RecordStatus::Active->value,
-        ]);
-
         $this->actingAs($user);
 
         Livewire::test(ProductsPage::class)
             ->set('categoryId', 'Bebidas')
             ->set('brandId', 'Postobon')
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Gaseosa 1.5L')
             ->set('cost', '2000')
             ->set('price1', '3000')
@@ -301,7 +274,6 @@ class ProductsCatalogTest extends TestCase
         Livewire::test(ProductsPage::class)
             ->set('categoryId', 'bebidas')
             ->set('brandId', 'postobon')
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Gaseosa 2L')
             ->set('cost', '2200')
             ->set('price1', '3300')
@@ -319,6 +291,47 @@ class ProductsCatalogTest extends TestCase
         ]);
     }
 
+    public function test_products_page_always_uses_company_default_unit(): void
+    {
+        // La unidad base ya no se elige en el formulario: sin necesidad de
+        // que exista de antemano, saveProduct() crea/reutiliza sola una
+        // unidad generica "Unidad"/UND para la empresa y la usa siempre.
+        [$user, $company] = $this->actingUserWithCurrentCompany();
+        $this->actingAs($user);
+
+        $this->assertSame(0, Unit::query()->where('company_id', $company->id)->count());
+
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', 'Bebidas')
+            ->set('brandId', 'Postobon')
+            ->set('name', 'Gaseosa 1.5L')
+            ->set('cost', '2000')
+            ->set('price1', '3000')
+            ->set('minimumStock', '1')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $defaultUnit = Unit::query()->where('company_id', $company->id)->where('code', 'UND')->firstOrFail();
+        $this->assertSame('Unidad', $defaultUnit->name);
+        $this->assertDatabaseHas('products', [
+            'company_id' => $company->id,
+            'name' => 'Gaseosa 1.5L',
+            'base_unit_id' => $defaultUnit->id,
+        ]);
+
+        // Un segundo producto reutiliza la misma unidad en vez de duplicarla.
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', 'Bebidas')
+            ->set('name', 'Gaseosa 2L')
+            ->set('cost', '2200')
+            ->set('price1', '3300')
+            ->set('minimumStock', '1')
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $this->assertSame(1, Unit::query()->where('company_id', $company->id)->count());
+    }
+
     public function test_products_page_tax_rate_defaults_to_zero_and_rejects_negative(): void
     {
         [$user, $company] = $this->actingUserWithCurrentCompany();
@@ -328,19 +341,11 @@ class ProductsCatalogTest extends TestCase
             'code' => 'ASE',
             'status' => RecordStatus::Active->value,
         ]);
-        $unit = Unit::query()->create([
-            'company_id' => $company->id,
-            'code' => 'UND',
-            'name' => 'Unidad',
-            'precision_scale' => 0,
-            'status' => RecordStatus::Active->value,
-        ]);
 
         $this->actingAs($user);
 
         Livewire::test(ProductsPage::class)
             ->set('categoryId', $category->id)
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Producto Sin IVA')
             ->set('cost', '1000')
             ->set('price1', '1500')
@@ -354,7 +359,6 @@ class ProductsCatalogTest extends TestCase
 
         Livewire::test(ProductsPage::class)
             ->set('categoryId', $category->id)
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Producto IVA Invalido')
             ->set('cost', '1000')
             ->set('price1', '1500')
@@ -367,7 +371,6 @@ class ProductsCatalogTest extends TestCase
         // cualquiera de los dos, se normaliza antes de guardar).
         Livewire::test(ProductsPage::class)
             ->set('categoryId', $category->id)
-            ->set('baseUnitId', $unit->id)
             ->set('name', 'Producto IVA Con Coma')
             ->set('cost', '1000')
             ->set('price1', '1500')
@@ -380,40 +383,34 @@ class ProductsCatalogTest extends TestCase
         $this->assertSame('5.50', $productWithComma->tax_rate);
     }
 
-    public function test_products_page_preselects_base_unit_when_company_has_only_one(): void
+    public function test_products_page_looks_up_barcode_automatically_when_it_changes(): void
     {
+        // La busqueda ya no depende solo de Enter (wire:keydown.enter): el
+        // wire:model.live.debounce del campo tambien la dispara via
+        // updatedBarcode(), asi que volver a escribir/escanear el mismo
+        // codigo despues de borrarlo lo vuelve a consultar sin necesidad de
+        // Enter.
         [$user, $company] = $this->actingUserWithCurrentCompany();
-        Category::query()->create([
-            'company_id' => $company->id,
-            'name' => 'Aseo',
-            'code' => 'ASE',
-            'status' => RecordStatus::Active->value,
-        ]);
-        $unit = Unit::query()->create([
-            'company_id' => $company->id,
-            'code' => 'UND',
-            'name' => 'Unidad',
-            'precision_scale' => 0,
-            'status' => RecordStatus::Active->value,
-        ]);
-
         $this->actingAs($user);
 
-        Livewire::test(ProductsPage::class)
-            ->call('openModal')
-            ->assertSet('baseUnitId', $unit->id);
+        $this->mock(OpenFoodFactsService::class, function ($mock) {
+            $mock->shouldReceive('findName')
+                ->with('7701234567890')
+                ->twice()
+                ->andReturn('Gaseosa Cola 1.5L');
+        });
 
-        Unit::query()->create([
-            'company_id' => $company->id,
-            'code' => 'KG',
-            'name' => 'Kilogramo',
-            'precision_scale' => 3,
-            'status' => RecordStatus::Active->value,
-        ]);
+        $component = Livewire::test(ProductsPage::class)
+            ->set('barcode', '7701234567890')
+            ->assertSet('name', 'Gaseosa Cola 1.5L');
 
-        Livewire::test(ProductsPage::class)
-            ->call('openModal')
-            ->assertSet('baseUnitId', null);
+        // El usuario borra nombre y codigo, y vuelve a escribir el mismo
+        // codigo: debe volver a autocompletar el nombre.
+        $component
+            ->set('name', '')
+            ->set('barcode', '')
+            ->set('barcode', '7701234567890')
+            ->assertSet('name', 'Gaseosa Cola 1.5L');
     }
 
     protected function actingUserWithCurrentCompany(): array

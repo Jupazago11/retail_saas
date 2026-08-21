@@ -34,15 +34,13 @@ class PurchasesPage extends Component
     public string $supplierName = '';
     public string $invoiceNumber = '';
     public string $purchaseType = 'invoice';
-    public string $purchaseStatus = 'confirmed';
     public string $purchasedAt = '';
     public string $dueAt = '';
     public string $notes = '';
     public string $totalAmount = '';
-    public string $initialPaidAmount = '';
 
     public string $search = '';
-    public string $statusFilter = '';
+    public string $statusFilter = 'confirmed';
     public ?int $supplierFilterId = null;
 
     public string $paymentAmount = '';
@@ -136,24 +134,10 @@ class PurchasesPage extends Component
             ],
             'invoiceNumber' => ['nullable', 'string', 'max:120'],
             'purchaseType' => ['required', 'string', 'max:50'],
-            'purchaseStatus' => ['required', Rule::in([
-                PurchaseStatus::Confirmed->value,
-                PurchaseStatus::PartiallyPaid->value,
-                PurchaseStatus::Paid->value,
-            ])],
             'purchasedAt' => ['nullable', 'date'],
             'dueAt' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'totalAmount' => ['required', 'numeric', 'min:0.01'],
-            'initialPaidAmount' => [
-                Rule::requiredIf(in_array($this->purchaseStatus, [
-                    PurchaseStatus::PartiallyPaid->value,
-                    PurchaseStatus::Paid->value,
-                ], true)),
-                'nullable',
-                'numeric',
-                'min:0',
-            ],
         ]);
 
         $payload = [
@@ -163,19 +147,13 @@ class PurchasesPage extends Component
             'supplier_name' => $this->blankToNull($validated['supplierName']),
             'invoice_number' => $this->blankToNull($validated['invoiceNumber']),
             'purchase_type' => trim($validated['purchaseType']),
-            'status' => $validated['purchaseStatus'],
+            // Toda compra nueva nace en Pendiente; el estado avanza despues via pagos reales.
+            'status' => PurchaseStatus::Confirmed->value,
             'purchased_at' => $this->normalizeDateTime($validated['purchasedAt'] ?? null),
             'due_at' => $this->normalizeDateTime($validated['dueAt'] ?? null),
             'notes' => $this->blankToNull($validated['notes']),
             'total' => (string) $validated['totalAmount'],
         ];
-
-        if (in_array($validated['purchaseStatus'], [
-            PurchaseStatus::PartiallyPaid->value,
-            PurchaseStatus::Paid->value,
-        ], true)) {
-            $payload['paid_amount'] = (string) $validated['initialPaidAmount'];
-        }
 
         try {
             app(CreatePurchase::class)->handle($company, $payload);
@@ -534,12 +512,10 @@ class PurchasesPage extends Component
         $this->supplierName = '';
         $this->invoiceNumber = '';
         $this->purchaseType = 'invoice';
-        $this->purchaseStatus = PurchaseStatus::Confirmed->value;
         $this->purchasedAt = now()->format('Y-m-d');
         $this->dueAt = '';
         $this->notes = '';
         $this->totalAmount = '';
-        $this->initialPaidAmount = '';
         $this->resetValidation();
     }
 

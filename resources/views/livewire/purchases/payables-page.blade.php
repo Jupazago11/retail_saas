@@ -13,19 +13,21 @@
                 </div>
 
                 <div class="flex flex-wrap items-center gap-3">
-                    <select wire:model.live="supplierId"
-                        class="rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos los proveedores</option>
-                        @foreach ($suppliers as $supplier)
-                            @php
-                                $fullName = trim(implode(' ', array_filter([
-                                    $supplier->person?->first_name,
-                                    $supplier->person?->last_name,
-                                ])));
-                            @endphp
-                            <option value="{{ $supplier->id }}">{{ $fullName !== '' ? $fullName : 'Proveedor '.$supplier->id }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        id="payables-filter-supplier"
+                        model="supplierId"
+                        placeholder="Todos los proveedores"
+                        class="w-56"
+                        live
+                        :options="$suppliers->map(function ($supplier) {
+                            $fullName = trim(implode(' ', array_filter([
+                                $supplier->person?->first_name,
+                                $supplier->person?->last_name,
+                            ])));
+
+                            return ['id' => $supplier->id, 'label' => $fullName !== '' ? $fullName : 'Proveedor '.$supplier->id];
+                        })"
+                    />
 
                     <div class="inline-flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
                         <button type="button" wire:click="setStatus('open')"
@@ -66,14 +68,19 @@
 
                 <div>
                     <label for="payables-aging-bucket" class="text-xs font-medium text-gray-700">Antiguedad</label>
-                    <select wire:model.live="agingBucket" id="payables-aging-bucket"
-                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todas</option>
-                        <option value="0_30">0-30 dias</option>
-                        <option value="31_60">31-60 dias</option>
-                        <option value="61_90">61-90 dias</option>
-                        <option value="91_plus">91+ dias</option>
-                    </select>
+                    <x-searchable-select
+                        id="payables-aging-bucket"
+                        model="agingBucket"
+                        placeholder="Todas"
+                        class="mt-1"
+                        live
+                        :options="[
+                            ['id' => '0_30', 'label' => '0-30 dias'],
+                            ['id' => '31_60', 'label' => '31-60 dias'],
+                            ['id' => '61_90', 'label' => '61-90 dias'],
+                            ['id' => '91_plus', 'label' => '91+ dias'],
+                        ]"
+                    />
                 </div>
 
                 <div>
@@ -115,6 +122,12 @@
                 <p class="mt-2 text-2xl font-black text-emerald-700">${{ \App\Support\Money::format((float) $availableCreditTotal) }}</p>
             </div>
         </div>
+
+        @if ($emptyDueToFilters)
+            <p class="mt-2 text-xs text-gray-400">
+                Ningun proveedor o compra cumple los filtros actuales &mdash; por eso las tarjetas estan en $0. Prueba a quitar algun filtro.
+            </p>
+        @endif
 
         {{-- Graficas: reemplazan la grilla densa de 6 columnas por proveedor
              que habia antes — de un vistazo se ve que tan vieja es la deuda
@@ -301,14 +314,14 @@
                                             <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Aplicar saldo a favor · {{ $supplierLabel }}</p>
                                             <div class="flex flex-col gap-3 lg:flex-row lg:items-end">
                                                 <div class="flex-1" x-data="digitGroupInput({ path: 'creditAmount', live: false })">
-                                                    <label class="text-xs font-medium text-gray-700">Monto a aplicar</label>
+                                                    <label class="text-xs font-medium text-gray-700">Monto a aplicar <span class="text-rose-600">*</span></label>
                                                     <input type="text" inputmode="numeric" @input="onInput($event)"
                                                         value="{{ $creditAmount !== '' ? number_format((int) $creditAmount, 0, ',', '.') : '' }}"
                                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                     @error('creditAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                                 <div class="flex-1">
-                                                    <label class="text-xs font-medium text-gray-700">Referencia</label>
+                                                    <label class="text-xs font-medium text-gray-700">Referencia <span class="text-rose-600">*</span></label>
                                                     <input wire:model="creditReference" type="text"
                                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                     @error('creditReference') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

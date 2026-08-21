@@ -38,7 +38,6 @@ class CompanySettingCatalog
             'cash.opening_required' => ['group' => 'cash', 'key' => 'opening_required', 'type' => 'boolean', 'default' => true],
             'cash.default_opening_amount' => ['group' => 'cash', 'key' => 'default_opening_amount', 'type' => 'decimal', 'default' => '0.0000'],
 
-            'printing.ticket_format' => ['group' => 'printing', 'key' => 'ticket_format', 'type' => 'string', 'default' => 'thermal_80mm'],
             'printing.show_logo' => ['group' => 'printing', 'key' => 'show_logo', 'type' => 'boolean', 'default' => true],
 
             'credit.credit_enabled' => ['group' => 'credit', 'key' => 'credit_enabled', 'type' => 'boolean', 'default' => false],

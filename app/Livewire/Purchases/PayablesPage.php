@@ -164,6 +164,10 @@ class PayablesPage extends Component
             'availableCreditTotal' => $supplierSummary->sum(fn (array $row) => (float) $row['credit_balance']),
             'agingChartData' => $this->agingChartData($supplierSummary),
             'topSuppliersChartData' => $this->topSuppliersChartData($supplierSummary),
+            // Si los filtros activos no dejan ningun proveedor/compra visible, las 3
+            // tarjetas quedan en $0 a la vez y parecen rotas; esto distingue ese caso
+            // (filtro estrecho) de una empresa que genuinamente no tiene deuda.
+            'emptyDueToFilters' => $payables->isEmpty() && $supplierSummary->isEmpty() && $this->hasNonDefaultFilters(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Cuentas por Pagar',
@@ -288,6 +292,23 @@ class PayablesPage extends Component
             403,
             'No tienes permiso para acceder a este modulo.'
         );
+    }
+
+    /**
+     * True si hay algun filtro distinto de su valor por defecto (estado
+     * "open" incluido). Sirve para distinguir "sin deuda porque el filtro
+     * actual es muy estrecho" de "sin deuda porque la empresa esta al dia".
+     */
+    protected function hasNonDefaultFilters(): bool
+    {
+        return $this->status !== 'open'
+            || $this->supplierId !== null
+            || $this->supplierName !== ''
+            || $this->overdueOnly
+            || $this->hasCreditOnly
+            || $this->agingBucket !== ''
+            || $this->dueFrom !== ''
+            || $this->dueTo !== '';
     }
 
     protected function resetCreditForm(): void

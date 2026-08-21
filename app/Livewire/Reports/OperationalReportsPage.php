@@ -113,16 +113,6 @@ class OperationalReportsPage extends Component
         return app(OperationalReportService::class)->creditAging($this->currentCompany(), $this->filters());
     }
 
-    public function exportUrl(string $dataset): string
-    {
-        return route('reports.export', array_filter([
-            'dataset' => $dataset,
-            'date_from' => $this->dateFrom,
-            'date_to' => $this->dateTo,
-            'branch_id' => $this->branchId,
-        ], fn ($value) => $value !== null && $value !== ''));
-    }
-
     public function render(): View
     {
         return view('livewire.reports.operational-reports-page', [
@@ -141,7 +131,7 @@ class OperationalReportsPage extends Component
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Reportes',
-                'description' => 'Consulta ventas, recaudo, cartera, fidelizacion y actividad promocional con filtros operativos y exportacion CSV.',
+                'description' => 'Consulta ventas, recaudo, cartera, fidelizacion y actividad promocional con filtros operativos.',
             ]),
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Actions\Audit\ListAuditLogs;
+use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\User;
@@ -17,6 +18,7 @@ use Livewire\WithPagination;
 class AuditLogsPage extends Component
 {
     use WithPagination;
+    use HasResponsivePageSize;
 
     public string $action = '';
     public ?int $actorUserId = null;

@@ -55,11 +55,9 @@ class CompanySettingsTest extends TestCase
 
         $settings = app(CompanySettings::class);
         $settings->set($company, 'printing', 'show_logo', false);
-        $settings->set($company, 'printing', 'ticket_format', 'letter_a4');
 
         $group = $settings->group($company, 'printing');
 
-        $this->assertSame('letter_a4', $group['ticket_format']);
         $this->assertFalse($group['show_logo']);
     }
 

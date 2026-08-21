@@ -10,13 +10,14 @@
                 <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por nombre o codigo de barras"
                         class="w-64 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <select wire:model.live="filterBrandId"
-                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todas las marcas</option>
-                        @foreach ($brands as $brand)
-                            <option value="{{ $brand->id }}">{{ $brand->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        id="products-filter-brand"
+                        model="filterBrandId"
+                        placeholder="Todas las marcas"
+                        class="w-48"
+                        live
+                        :options="$brands->map(fn ($brand) => ['id' => $brand->id, 'label' => $brand->name])"
+                    />
                     <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
                         <button type="button" wire:click="setStatusFilter('all')"
                             class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
@@ -64,7 +65,7 @@
                                 <td class="py-2 align-middle text-gray-600 text-xs">
                                     <p>{{ $product->category->name }}</p>
                                     <p>{{ $product->brand?->name ?: '—' }}</p>
-                                    <p>{{ $product->baseUnit->name }} ({{ $product->baseUnit->code }})</p>
+                                    <p class="font-semibold text-indigo-600">IVA {{ rtrim(rtrim(number_format((float) $product->tax_rate, 2, '.', ''), '0'), '.') }}%</p>
                                 </td>
                                 <td class="py-2 align-middle text-gray-600 text-xs">
                                     <p class="text-gray-400">{{ \App\Support\Money::format((float) $product->cost) }}</p>
@@ -90,6 +91,7 @@
                                     <div class="flex justify-end gap-2">
                                         @if ($product->deleted_at)
                                             <button wire:click="restoreProduct({{ $product->id }})"
+                                                wire:confirm="¿Restaurar este producto?"
                                                 class="rounded-full border border-emerald-300 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
                                                 Restaurar
                                             </button>
@@ -131,7 +133,8 @@
         </div>
     </div>
 
-    {{-- Boton flotante + --}}
+    {{-- Boton flotante + (oculto mientras hay un modal abierto para que no quede flotando sobre el overlay) --}}
+    @if (! $showModal)
     <button wire:click="openModal" title="Nuevo producto"
         style="position:fixed;bottom:2rem;right:2rem;z-index:9999;width:3.5rem;height:3.5rem;border-radius:9999px;background:#2563eb;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,0.25);"
         onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#1c1917'">
@@ -139,10 +142,14 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
         </svg>
     </button>
+    @endif
 
     {{-- Modal crear / editar producto --}}
     @if ($showModal)
-        <div wire:click.self="closeModal"
+        {{-- wire:click.self="dismissModal" (no closeModal): un clic afuera suele
+        ser sin querer, no debe botar lo que ya se escribio. Solo Cancelar/X
+        descartan el formulario a proposito. --}}
+        <div wire:click.self="dismissModal"
             class="fixed inset-0 z-50 flex items-center justify-center p-4"
             style="background: rgba(0,0,0,0.5);">
             <div class="w-full max-w-xl rounded-xl bg-white shadow-xl flex flex-col" style="max-height: 90vh;">
@@ -162,10 +169,10 @@
                 <form wire:submit="saveProduct" class="flex flex-col flex-1 min-h-0">
                     <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
 
-                        {{-- Categoria / Marca / Unidad / Ref fiscal --}}
+                        {{-- Categoria / Marca --}}
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label for="product-category" class="mb-1 block text-xs font-medium text-gray-700">Categoria</label>
+                                <label for="product-category" class="mb-1 block text-xs font-medium text-gray-700">Categoria <span class="text-rose-600">*</span></label>
                                 <x-searchable-select
                                     id="product-category"
                                     model="categoryId"
@@ -188,34 +195,6 @@
                                 <p class="mt-1 text-[11px] text-gray-400">Si escribes un nombre que no existe, se crea al guardar.</p>
                                 @error('brandId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
-
-                            @if ($units->count() > 1)
-                                <div x-data="{ open: false, n: '', c: '' }">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <label for="product-unit" class="text-xs font-medium text-gray-700">Unidad base</label>
-                                        <button type="button" x-on:click="open = !open"
-                                            class="text-xs font-semibold text-blue-700 hover:underline">+ Nueva</button>
-                                    </div>
-                                    <x-searchable-select
-                                        id="product-unit"
-                                        model="baseUnitId"
-                                        :options="$units->map(fn ($unit) => ['id' => $unit->id, 'label' => $unit->name.' ('.$unit->code.')'])"
-                                    />
-                                    <div x-show="open" x-cloak class="mt-1.5 flex gap-1.5">
-                                        <input x-model="n" type="text" placeholder="Nombre (ej: Kilogramo)"
-                                            class="flex-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
-                                        <input x-model="c" type="text" placeholder="Cod" maxlength="10"
-                                            class="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-sm focus:border-blue-400 focus:outline-none">
-                                        <button type="button"
-                                            x-on:click="$wire.call('saveQuickUnit', n, c).then(function() { open = false; n = ''; c = ''; })"
-                                            class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700">Crear</button>
-                                        <button type="button" x-on:click="open = false; n = ''; c = ''"
-                                            class="text-gray-400 hover:text-gray-600 px-1">×</button>
-                                    </div>
-                                    @error('baseUnitId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                                </div>
-                            @endif
-
                         </div>
 
                         {{-- Codigo de barras + Nombre --}}
@@ -223,13 +202,20 @@
                             <div class="sm:col-span-2">
                                 <div class="mb-1 flex items-center gap-2">
                                     <label for="product-barcode" class="block text-xs font-medium text-gray-700">Codigo de barras</label>
-                                    <span wire:loading wire:target="lookupBarcode" class="text-xs text-blue-600">Buscando...</span>
+                                    <span wire:loading wire:target="lookupBarcode" class="inline-flex items-center gap-1 text-xs text-blue-600">
+                                        <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                        </svg>
+                                        Consultando...
+                                    </span>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <input wire:model.live.debounce.400ms="barcode"
                                            wire:keydown.enter.prevent="lookupBarcode"
+                                           wire:loading.attr="disabled" wire:target="lookupBarcode"
                                            id="product-barcode" type="text"
-                                           class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                           class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm disabled:bg-gray-50 disabled:text-gray-400">
                                     @if ($barcodePreviewSvg)
                                         <div class="flex-shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-1" wire:key="barcode-preview">
                                             {!! $barcodePreviewSvg !!}
@@ -239,30 +225,36 @@
                                 @error('barcode') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div class="sm:col-span-2">
-                                <label for="product-name" class="mb-1 block text-xs font-medium text-gray-700">Nombre</label>
+                                <label for="product-name" class="mb-1 block text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                                 <input wire:model="name" id="product-name" type="text"
-                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                    wire:loading.attr="disabled" wire:target="lookupBarcode"
+                                    x-on:blur="$wire.set('name', $capitalize($event.target.value), false)"
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm disabled:bg-gray-50 disabled:text-gray-400">
                                 @error('name') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
                         {{-- Precios --}}
+                        {{-- wire:key: sin esto, wire:navigate puede dejar los efectos
+                        reactivos de cls()/margin() pegados a un nodo que sobrevive el
+                        morph al salir de esta pagina, tirando "cls is not defined" en
+                        consola. Ver el mismo comentario en searchable-select.blade.php. --}}
                         <div class="grid gap-3 grid-cols-2 sm:grid-cols-5"
+                            wire:key="product-prices-{{ $editingProductId ?? 'new' }}"
                             x-data="{
-                                cost: parseFloat('{{ $cost }}') || 0,
-                                p1:   parseFloat('{{ $price1 }}') || 0,
-                                p2:   parseFloat('{{ $price2 ?: 0 }}') || 0,
-                                p3:   parseFloat('{{ $price3 ?: 0 }}') || 0,
-                                moneyValue(raw) {
-                                    // Money inputs are live-formatted with '.' as a thousands
-                                    // separator (e.g. '20.000'); parseFloat would misread that
-                                    // dot as a decimal point, so strip everything but digits.
-                                    const digits = String(raw ?? '').replace(/\D+/g, '');
-                                    return digits ? parseInt(digits, 10) : 0;
+                                group(digits) {
+                                    return digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
                                 },
-                                margin(price) {
-                                    if (this.cost <= 0 || price <= 0) return null;
-                                    return (((price - this.cost) / this.cost) * 100).toFixed(1);
+                                onInput(event, path) {
+                                    const digits = event.target.value.replace(/\D+/g, '');
+                                    event.target.value = this.group(digits);
+                                    this.$wire.set(path, digits, false);
+                                },
+                                margin(priceDigits) {
+                                    const cost = parseFloat($wire.cost) || 0;
+                                    const price = parseFloat(priceDigits) || 0;
+                                    if (cost <= 0 || price <= 0) return null;
+                                    return (((price - cost) / cost) * 100).toFixed(1);
                                 },
                                 cls(m) {
                                     if (m === null) return 'text-stone-300';
@@ -273,22 +265,38 @@
                                 }
                             }">
                             <div>
-                                <label for="product-cost" class="mb-1 block text-xs font-medium text-gray-700">Costo</label>
-                                <input wire:model="cost" @input="cost = moneyValue($event.target.value)"
-                                    id="product-cost" type="number" min="0" step="1"
+                                <label for="product-cost" class="mb-1 block text-xs font-medium text-gray-700">Costo <span class="text-rose-600">*</span></label>
+                                <input type="text" inputmode="numeric" @input="onInput($event, 'cost')"
+                                    value="{{ $cost !== '' ? number_format((int) $cost, 0, ',', '.') : '' }}"
+                                    id="product-cost"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('cost') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
-                            <div x-data="{
+                            <div wire:key="product-tax-rate-stepper" x-data="{
                                 step(delta) {
                                     const current = parseFloat(String($wire.taxRate).replace(',', '.')) || 0;
                                     const next = Math.max(0, Math.round((current + delta) * 100) / 100);
                                     $wire.taxRate = String(next);
+                                },
+                                onInput(event) {
+                                    // Igual que Costo/Precio: si el input traia solo '0' y se
+                                    // escribe un digito nuevo, el '0' sobra ('0'+'1' -> '01' por
+                                    // insercion normal del navegador) — se quita, salvo que sea
+                                    // parte de un decimal valido tipo '0.5'.
+                                    let value = event.target.value.replace(',', '.').replace(/[^\d.]/g, '');
+                                    const firstDot = value.indexOf('.');
+                                    if (firstDot !== -1) {
+                                        value = value.slice(0, firstDot + 1) + value.slice(firstDot + 1).replace(/\./g, '');
+                                    }
+                                    value = value.replace(/^0+(?=\d)/, '');
+                                    event.target.value = value;
+                                    $wire.taxRate = value;
                                 }
                             }">
-                                <label for="product-tax-rate" class="mb-1 block text-xs font-medium text-gray-700">IVA %</label>
+                                <label for="product-tax-rate" class="mb-1 block text-xs font-medium text-gray-700">IVA % <span class="text-rose-600">*</span></label>
                                 <div class="relative">
-                                    <input wire:model="taxRate"
+                                    <input @input="onInput($event)"
+                                        value="{{ $taxRate }}"
                                         id="product-tax-rate" type="text" inputmode="decimal" placeholder="0"
                                         class="block w-full rounded-xl border-gray-300 pr-5 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <div class="absolute inset-y-0 right-0 flex flex-col justify-center gap-px pr-1.5">
@@ -302,32 +310,35 @@
                                 @error('taxRate') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label for="product-price-1" class="mb-1 block text-xs font-medium text-gray-700">Precio 1</label>
-                                <input wire:model="price1" @input="p1 = moneyValue($event.target.value)"
-                                    id="product-price-1" type="number" min="0" step="1"
+                                <label for="product-price-1" class="mb-1 block text-xs font-medium text-gray-700">Precio 1 <span class="text-rose-600">*</span></label>
+                                <input type="text" inputmode="numeric" @input="onInput($event, 'price1')"
+                                    value="{{ $price1 !== '' ? number_format((int) $price1, 0, ',', '.') : '' }}"
+                                    id="product-price-1"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin(p1))">
-                                    <span x-text="margin(p1) !== null ? margin(p1) + '% margen' : ''"></span>
+                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price1))">
+                                    <span x-text="margin($wire.price1) !== null ? margin($wire.price1) + '% margen' : ''"></span>
                                 </p>
                                 @error('price1') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="product-price-2" class="mb-1 block text-xs font-medium text-gray-700">Precio 2</label>
-                                <input wire:model="price2" @input="p2 = moneyValue($event.target.value)"
-                                    id="product-price-2" type="number" min="0" step="1"
+                                <input type="text" inputmode="numeric" @input="onInput($event, 'price2')"
+                                    value="{{ $price2 !== '' ? number_format((int) $price2, 0, ',', '.') : '' }}"
+                                    id="product-price-2"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin(p2))">
-                                    <span x-text="p2 > 0 && margin(p2) !== null ? margin(p2) + '% margen' : ''"></span>
+                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price2))">
+                                    <span x-text="$wire.price2 > 0 && margin($wire.price2) !== null ? margin($wire.price2) + '% margen' : ''"></span>
                                 </p>
                                 @error('price2') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="product-price-3" class="mb-1 block text-xs font-medium text-gray-700">Precio 3</label>
-                                <input wire:model="price3" @input="p3 = moneyValue($event.target.value)"
-                                    id="product-price-3" type="number" min="0" step="1"
+                                <input type="text" inputmode="numeric" @input="onInput($event, 'price3')"
+                                    value="{{ $price3 !== '' ? number_format((int) $price3, 0, ',', '.') : '' }}"
+                                    id="product-price-3"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin(p3))">
-                                    <span x-text="p3 > 0 && margin(p3) !== null ? margin(p3) + '% margen' : ''"></span>
+                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price3))">
+                                    <span x-text="$wire.price3 > 0 && margin($wire.price3) !== null ? margin($wire.price3) + '% margen' : ''"></span>
                                 </p>
                                 @error('price3') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
@@ -344,7 +355,7 @@
 
                             @if ($tracksInventory)
                                 <div class="mt-3">
-                                    <label for="product-minimum-stock" class="mb-1 block text-xs font-medium text-gray-700">Stock minimo (alerta)</label>
+                                    <label for="product-minimum-stock" class="mb-1 block text-xs font-medium text-gray-700">Stock minimo (alerta) <span class="text-rose-600">*</span></label>
                                     <input wire:model="minimumStock" id="product-minimum-stock" type="number" min="0" step="1"
                                         class="block w-full max-w-[200px] rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     @error('minimumStock') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

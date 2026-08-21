@@ -1,6 +1,7 @@
 <div class="pb-10">
     <div class="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-        <x-sales-nav active="sales.index" />
+        {{-- Sin <x-sales-nav>: las pestañas Ventas/POS las dibuja el
+        componente contenedor (sales-workspace-page.blade.php) una sola vez. --}}
 
         {{-- Panel --}}
         <div x-data="responsivePageSize({ rowHeight: 64, reserved: 340 })" class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
@@ -13,10 +14,10 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     @if ($this->canCreateSales())
-                        <a href="{{ route('sales.pos') }}" wire:navigate
+                        <button type="button" x-on:click="$dispatch('switch-sales-tab', { tab: 'pos' })"
                             class="rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
                             Ir al POS
-                        </a>
+                        </button>
                     @endif
                     @if ($this->canManageRules())
                         <button type="button" wire:click="openRulesModal" title="Reglas de ventas"
@@ -29,21 +30,31 @@
                     @endif
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por documento, cliente o vendedor"
                         class="w-64 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <select wire:model.live="statusFilter"
-                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos los estados</option>
-                        <option value="draft">Borrador</option>
-                        <option value="confirmed">Confirmada</option>
-                        <option value="partially_returned">Parcialmente devuelta</option>
-                        <option value="returned">Devuelta</option>
-                        <option value="cancelled">Anulada</option>
-                    </select>
-                    <select wire:model.live="saleTypeFilter"
-                        class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos los tipos</option>
-                        <option value="pos">POS</option>
-                        <option value="credit">Credito</option>
-                    </select>
+                    <x-searchable-select
+                        id="sales-filter-status"
+                        model="statusFilter"
+                        placeholder="Todos los estados"
+                        class="w-48"
+                        live
+                        :options="[
+                            ['id' => 'draft', 'label' => 'Borrador'],
+                            ['id' => 'confirmed', 'label' => 'Confirmada'],
+                            ['id' => 'partially_returned', 'label' => 'Parcialmente devuelta'],
+                            ['id' => 'returned', 'label' => 'Devuelta'],
+                            ['id' => 'cancelled', 'label' => 'Anulada'],
+                        ]"
+                    />
+                    <x-searchable-select
+                        id="sales-filter-type"
+                        model="saleTypeFilter"
+                        placeholder="Todos los tipos"
+                        class="w-40"
+                        live
+                        :options="[
+                            ['id' => 'pos', 'label' => 'POS'],
+                            ['id' => 'credit', 'label' => 'Credito'],
+                        ]"
+                    />
                 </div>
             </div>
 
@@ -106,20 +117,23 @@
                                 <td class="py-2 align-middle w-px whitespace-nowrap">
                                     <div class="flex items-center justify-end gap-3">
                                         @if ($this->canCreateSales() && $sale->status === 'draft')
-                                            <a href="{{ $this->draftEditUrl($sale->id) }}" wire:navigate title="Editar borrador"
-                                                class="text-gray-400 hover:text-blue-600 transition">
+                                            {{-- Dispara un evento (escuchado por PosPage::loadDraftSaleForEditing
+                                            via #[On(...)] Y por el contenedor para cambiar de pestaña) en vez de
+                                            navegar — POS ya esta montado, solo hay que pedirle que cargue esta venta. --}}
+                                            <button type="button" wire:click="$dispatch('edit-draft-requested', { saleId: {{ $sale->id }} })"
+                                                title="Editar borrador" class="text-gray-400 hover:text-blue-600 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2.414a2 2 0 01.586-1.415z"/>
                                                 </svg>
-                                            </a>
+                                            </button>
                                         @endif
                                         @if ($this->canCreateSales() && $sale->status === 'confirmed' && $sale->sale_type === 'pos')
-                                            <a href="{{ $this->modifySaleUrl($sale->id) }}" wire:navigate title="Modificar venta"
-                                                class="text-gray-400 hover:text-violet-600 transition">
+                                            <button type="button" wire:click="$dispatch('modify-sale-requested', { saleId: {{ $sale->id }} })"
+                                                title="Modificar venta" class="text-gray-400 hover:text-violet-600 transition">
                                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.415.586H9v-2.414a2 2 0 01.586-1.415z"/>
                                                 </svg>
-                                            </a>
+                                            </button>
                                         @endif
                                         @if ($this->canReturnSales() && in_array($sale->status, ['confirmed', 'partially_returned'], true))
                                             <button wire:click="startReturningSale({{ $sale->id }})" title="Devolver"
@@ -157,7 +171,7 @@
                                         </div>
                                         <div class="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                                             <div class="sm:col-span-2 lg:col-span-3">
-                                                <label class="text-xs text-gray-600">Motivo</label>
+                                                <label class="text-xs text-gray-600">Motivo <span class="text-rose-600">*</span></label>
                                                 <textarea wire:model="returnReason" rows="2"
                                                     class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-sky-400 focus:ring-0"></textarea>
                                                 @error('returnReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
@@ -193,7 +207,7 @@
                                             <button wire:click="cancelCancellingSale" class="text-[11px] text-gray-400 hover:text-gray-600">Cancelar</button>
                                         </div>
                                         <div class="mt-2">
-                                            <label class="text-xs text-gray-600">Motivo</label>
+                                            <label class="text-xs text-gray-600">Motivo <span class="text-rose-600">*</span></label>
                                             <textarea wire:model="cancellationReason" rows="2"
                                                 class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-rose-400 focus:ring-0"></textarea>
                                             @error('cancellationReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
@@ -306,16 +320,7 @@
 
                             <div class="border-t border-stone-100 pt-4">
                                 <p class="text-sm font-semibold text-gray-900">Impresion de tickets</p>
-
-                                <div class="mt-3">
-                                    <label class="text-sm font-medium text-gray-700">Formato de ticket</label>
-                                    <select wire:model="ruleTicketFormat"
-                                        class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                        <option value="thermal_58mm">Termica 58mm</option>
-                                        <option value="thermal_80mm">Termica 80mm</option>
-                                        <option value="letter_a4">Carta / A4</option>
-                                    </select>
-                                </div>
+                                <p class="mt-1 text-xs text-gray-400">El tipo de impresora (58mm/80mm/carta) ahora se configura por caja en Admin &rarr; Estructura.</p>
 
                                 <div class="mt-3">
                                     <label class="text-sm font-medium text-gray-700">Logo de la empresa</label>
@@ -362,11 +367,14 @@
                                     </div>
                                 </div>
 
-                                <label class="mt-3 flex items-start gap-3">
-                                    <input wire:model="ruleShowLogo" type="checkbox"
-                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                <label class="mt-3 flex items-start gap-3 {{ $currentLogoUrl ? '' : 'opacity-50' }}">
+                                    <input wire:model="ruleShowLogo" type="checkbox" @disabled(! $currentLogoUrl)
+                                        class="mt-0.5 rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600 disabled:cursor-not-allowed">
                                     <span class="block text-sm font-medium text-gray-900">Mostrar logo en el ticket</span>
                                 </label>
+                                @unless ($currentLogoUrl)
+                                    <p class="mt-1 text-xs text-gray-400">Carga un logo para poder activar esta opcion.</p>
+                                @endunless
 
                                 <p class="mt-3 text-xs text-gray-500">
                                     La marca "Desarrollado por {{ \App\Models\PlatformSetting::appName() }}" siempre aparece en el ticket.

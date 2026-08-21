@@ -36,7 +36,7 @@ class OperationalReportsPageTest extends TestCase
     use InteractsWithCompanyPlans;
     use RefreshDatabase;
 
-    public function test_reports_page_shows_operational_summary_and_exports_csv(): void
+    public function test_reports_page_shows_operational_summary(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->fixture();
         app(CompanySettings::class)->set($company, 'loyalty', 'loyalty_enabled', true);
@@ -138,18 +138,6 @@ class OperationalReportsPageTest extends TestCase
         $this->assertNotNull($overdueBucket);
         $this->assertSame(1, $overdueBucket['sales_count']);
         $this->assertSame('820', $overdueBucket['balance_total']);
-
-        $this->get(route('reports.export', ['dataset' => 'products']))
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
-
-        $this->get(route('reports.export', ['dataset' => 'payment-methods']))
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
-
-        $this->get(route('reports.export', ['dataset' => 'credit-aging']))
-            ->assertOk()
-            ->assertHeader('content-type', 'text/csv; charset=UTF-8');
     }
 
     public function test_reports_route_is_forbidden_without_reports_permission(): void

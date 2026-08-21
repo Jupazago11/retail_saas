@@ -38,6 +38,7 @@ class PermissionCatalog
             ['code' => 'cash.open', 'name' => 'Abrir caja', 'module_code' => 'cash'],
             ['code' => 'cash.close', 'name' => 'Cerrar caja', 'module_code' => 'cash'],
             ['code' => 'cash.view_difference', 'name' => 'Ver diferencias de caja', 'module_code' => 'cash'],
+            ['code' => 'cash.edit_closed', 'name' => 'Editar cierres de caja', 'module_code' => 'cash'],
             ['code' => 'credit.view', 'name' => 'Ver credito', 'module_code' => 'credit'],
             ['code' => 'credit.manage', 'name' => 'Gestionar credito', 'module_code' => 'credit'],
             ['code' => 'loyalty.manage', 'name' => 'Gestionar fidelizacion', 'module_code' => 'loyalty'],

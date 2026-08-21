@@ -27,7 +27,24 @@ window.addEventListener('pos-debug', (event) => {
     window.posDebug(event.detail?.stage ?? 'server.event', event.detail?.details ?? event.detail ?? {});
 });
 
+// Si el usuario escribio todo en minuscula ("bebida"), se ve descuidado en
+// tablas/listas ("Bebida" es lo esperado). Solo toca el texto cuando NO hay
+// ninguna mayuscula en absoluto: si ya escribieron algo con mayusculas a
+// proposito (siglas, "iPhone", etc.) se respeta tal cual, sin tocar el resto
+// de las palabras (solo la primera letra).
+function capitalizeIfAllLowercase(text) {
+    if (typeof text !== 'string' || text === '' || text !== text.toLowerCase()) {
+        return text;
+    }
+
+    return text.replace(/\p{L}/u, (letter) => letter.toUpperCase());
+}
+window.retailSaas.capitalizeIfAllLowercase = capitalizeIfAllLowercase;
+
 document.addEventListener('alpine:init', () => {
+    Alpine.magic('capitalize', () => capitalizeIfAllLowercase);
+
+
     // Input numerico con puntos de miles mientras se escribe (ej "200.000").
     // No depende del detector global de campos "money" (que solo actua sobre
     // <input type=number> por nombre): aqui se controla explicitamente que
@@ -83,6 +100,10 @@ document.addEventListener('alpine:init', () => {
     // termina valiendo el texto libre (no un id numerico); el backend
     // (ProductsPage::resolveCategoryValue/resolveBrandValue) es quien decide
     // si eso hay que crearlo, al guardar el formulario.
+    // null (valor inicial de una prop PHP sin seleccion), undefined y '' se
+    // tratan como "lo mismo: nada seleccionado" — ver el porque en close().
+    const isBlankSelection = (value) => value === null || value === undefined || value === '';
+
     Alpine.data('searchableSelect', ({ selected, allowCreate = false }) => ({
         selected,
         allowCreate,
@@ -151,7 +172,9 @@ document.addEventListener('alpine:init', () => {
             const trimmed = this.query.trim();
 
             if (this.allowCreate && this.touched && trimmed !== '' && ! this.findExact(trimmed)) {
-                return [...base, { id: trimmed, label: 'Crear "' + trimmed + '"', __create: true }];
+                const value = capitalizeIfAllLowercase(trimmed);
+
+                return [...base, { id: value, label: 'Crear "' + value + '"', __create: true }];
             }
 
             return base;
@@ -166,7 +189,17 @@ document.addEventListener('alpine:init', () => {
             this.highlighted = -1;
         },
         choose(option) {
-            this.selected = option.id;
+            // No reasignar si ya es el mismo valor: en un campo .live
+            // (ej. filtro "Marca" fuera de un modal), CUALQUIER asignacion a
+            // `selected` -aunque sea al mismo valor- dispara un commit en
+            // vivo. Si ese commit trae un valor "" (cadena vacia), un bug de
+            // Livewire en mergeQueuedUpdates() (diffKey.startsWith("") es
+            // SIEMPRE true) borra TODOS los demas cambios pendientes de ese
+            // mismo request -incluyendo lo que se acaba de escribir en OTROS
+            // campos del formulario, aunque no tengan relacion alguna-.
+            if (!(isBlankSelection(this.selected) && isBlankSelection(option.id)) && this.selected !== option.id) {
+                this.selected = option.id;
+            }
             this.query = option.__create ? option.id : option.label;
             this.open = false;
             this.touched = false;
@@ -176,15 +209,32 @@ document.addEventListener('alpine:init', () => {
             this.open = false;
 
             const trimmed = this.query.trim();
+            let next = this.selected;
 
             if (trimmed === '') {
-                this.selected = '';
+                next = '';
             } else if (this.allowCreate) {
                 const exact = this.findExact(trimmed);
-                this.selected = exact ? exact.id : trimmed;
+                next = exact ? exact.id : capitalizeIfAllLowercase(trimmed);
+            }
+
+            // Ver el comentario en choose() — evitar reasignar al mismo
+            // valor (tratando null/undefined/'' como equivalentes) es lo
+            // que evita el commit-en-vivo espurio.
+            if (!(isBlankSelection(this.selected) && isBlankSelection(next)) && next !== this.selected) {
+                this.selected = next;
             }
 
             this.syncFromSelected();
+        },
+        clear() {
+            if (!isBlankSelection(this.selected)) {
+                this.selected = '';
+            }
+            this.query = '';
+            this.open = false;
+            this.touched = false;
+            this.highlighted = -1;
         },
         highlightNext() {
             this.open = true;
@@ -249,6 +299,10 @@ function findPosWire(input) {
 
     return null;
 }
+// Expuesto para el guard de beforeunload (F5/cerrar pestaña) en
+// pos-page.blade.php — mismo localizador de $wire que usa el guard de
+// "click en el logo" de arriba, sin duplicar la logica de busqueda.
+window.retailSaas.findPosWire = findPosWire;
 
 async function submitPosProductLookup(input, source) {
     const value = input.value.trim();
@@ -378,6 +432,8 @@ window.toastStack = (sessionToast = null) => ({
             title: toast?.title ?? null,
             message: toast?.message ?? '',
             duration: toast?.duration ?? this.duration,
+            actionUrl: toast?.actionUrl ?? null,
+            actionLabel: toast?.actionLabel ?? null,
             visible: false,
         };
 

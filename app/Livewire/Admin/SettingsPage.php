@@ -77,7 +77,6 @@ class SettingsPage extends Component
             'pos.allow_promotion_stacking',
             'pos.allow_negative_stock',
             'pos.require_customer_for_credit_sale',
-            'printing.ticket_format',
             'printing.show_logo',
         ];
 
@@ -122,7 +121,6 @@ class SettingsPage extends Component
             'module_enabled' => 'Esta empresa usa caja registradora',
             'opening_required' => 'Exigir apertura de caja',
             'default_opening_amount' => 'Monto por defecto de apertura',
-            'ticket_format' => 'Formato de ticket',
             'show_logo' => 'Mostrar logo',
             'credit_enabled' => 'Credito habilitado',
             'default_term_days' => 'Plazo por defecto en dias',
@@ -165,11 +163,6 @@ class SettingsPage extends Component
         return match ("{$group}.{$key}") {
             'inventory.default_cost_method' => [
                 'weighted_average' => 'Promedio ponderado',
-            ],
-            'printing.ticket_format' => [
-                'thermal_58mm' => 'Termica 58mm',
-                'thermal_80mm' => 'Termica 80mm',
-                'letter_a4' => 'Carta / A4',
             ],
             'loyalty.points_rule_type' => [
                 'per_currency' => 'Por moneda',

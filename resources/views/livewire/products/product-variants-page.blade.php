@@ -28,7 +28,7 @@
 
                 <form wire:submit="saveVariant" class="mt-6 space-y-5">
                     <div>
-                        <label for="variant-product" class="text-sm font-medium text-gray-700">Producto</label>
+                        <label for="variant-product" class="text-sm font-medium text-gray-700">Producto <span class="text-rose-600">*</span></label>
                         <select wire:model="productId" id="variant-product" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateVariants)>
                             <option value="">Selecciona</option>
                             @foreach ($products as $product)
@@ -146,7 +146,7 @@
                                             Editar
                                         </button>
                                         @if ($variant->status === 'archived')
-                                            <button wire:click="restoreVariant({{ $variant->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                            <button wire:click="restoreVariant({{ $variant->id }})" wire:confirm="¿Restaurar esta variante?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                 Restaurar
                                             </button>
                                         @else

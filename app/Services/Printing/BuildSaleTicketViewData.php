@@ -6,6 +6,10 @@ use App\Actions\Settings\UpdateCompanyLogo;
 use App\Models\Company;
 use App\Models\Sale;
 use App\Services\Settings\CompanySettings;
+use App\Support\SaleTaxCalculator;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\SvgWriter;
+use Illuminate\Support\Facades\URL;
 use Picqer\Barcode\BarcodeGeneratorSVG;
 
 class BuildSaleTicketViewData
@@ -28,7 +32,16 @@ class BuildSaleTicketViewData
             'user',
         ]);
 
-        $ticketFormat = (string) $this->companySettings->get($company, 'printing', 'ticket_format');
+        // El formato de ticket es una propiedad de la caja, no de la empresa
+        // (cada caja fisica puede tener su propia impresora). Si la venta no
+        // quedo ligada a una caja (cash_register_id es nullable) o esa caja
+        // aun no tiene impresora asignada, se cae a la caja principal de la
+        // empresa y, en ultimo caso, a un default fijo.
+        $ticketFormat = (string) (
+            $sale->cashRegister?->printer_type
+            ?? $company->cashRegisters()->where('is_primary', true)->value('printer_type')
+            ?? 'thermal_80mm'
+        );
 
         // El papel termico (58mm/80mm) no tiene ancho para nombres largos sin
         // romper la tabla de items; en letter_a4 sobra espacio de sobra.
@@ -52,6 +65,11 @@ class BuildSaleTicketViewData
             'company' => $company,
             'ticketFormat' => $ticketFormat,
             'barcodeSvg' => $this->buildBarcodeSvg($sale->document_number, $ticketFormat),
+            // QR al recibo publico (URL firmada, sin login — ver
+            // PublicSaleReceiptController): el cliente lo escanea con su
+            // celular y ve sus productos con nombre completo, sin acceso a
+            // nada mas de la app.
+            'receiptQrSvg' => $this->buildReceiptQrSvg($sale),
             'showLogo' => (bool) $this->companySettings->get($company, 'printing', 'show_logo'),
             // El ticket usa la version blanco/negro pre-procesada (no el
             // logo a color que ve la empresa en Reglas): asi no depende de
@@ -90,35 +108,25 @@ class BuildSaleTicketViewData
                     'line_total' => \App\Support\Money::format((float) $item->line_total),
                 ];
             })->all(),
-            // IVA que ya viene incluido en el total (no se suma aparte): se
-            // desglosa solo para informar al cliente cuanto de lo pagado es
-            // impuesto. Distinto de $sale->tax_total (impuesto aditivo, hoy
-            // sin uso real en ningun flujo de venta).
-            'taxIncludedTotal' => \App\Support\Money::format((float) $this->includedTaxTotal($sale)),
+            // Impuesto de la venta, calculado item por item (precio x el IVA
+            // con el que se creo CADA producto), no un $sale->tax_total unico
+            // para toda la venta — verificado que ambos coinciden en una
+            // venta de un solo item con una sola tasa, pero esta cuenta no
+            // depende de que tax_total este bien poblado en TODOS los flujos
+            // (ventas con descuentos, multiples tasas, etc.), asi que se
+            // prefiere calcularlo aqui mismo. Compartido con el recibo
+            // publico via SaleTaxCalculator.
+            'taxIncludedTotal' => \App\Support\Money::format((float) SaleTaxCalculator::includedTaxTotal($sale)),
         ];
     }
 
-    protected function includedTaxTotal(Sale $sale): string
+    protected function buildReceiptQrSvg(Sale $sale): string
     {
-        return $sale->items->reduce(
-            fn (string $carry, $item) => bcadd($carry, $this->includedTaxAmount(
-                (string) $item->line_total,
-                (string) ($item->product_tax_rate ?? '0'),
-            ), 2),
-            '0.00',
-        );
-    }
+        $url = URL::signedRoute('sales.receipt.public', ['sale' => $sale->id]);
 
-    protected function includedTaxAmount(string $amount, string $ratePercent): string
-    {
-        if (bccomp($ratePercent, '0', 2) <= 0) {
-            return '0.00';
-        }
+        $qrCode = new QrCode(data: $url, size: 120, margin: 4);
 
-        $divisor = bcadd('1', bcdiv($ratePercent, '100', 6), 6);
-        $net = bcdiv($amount, $divisor, 6);
-
-        return number_format((float) bcsub($amount, $net, 6), 2, '.', '');
+        return (new SvgWriter())->write($qrCode)->getString();
     }
 
     // "1.00" -> "1", "0.750" -> "0.75": sin ceros de relleno, salvo que el
@@ -186,7 +194,7 @@ class BuildSaleTicketViewData
             $documentNumber,
             BarcodeGeneratorSVG::TYPE_CODE_128,
             widthFactor: $widthFactor,
-            height: 36,
+            height: 22,
         );
     }
 }

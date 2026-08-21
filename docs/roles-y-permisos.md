@@ -46,6 +46,7 @@
 - `cash.open`
 - `cash.close`
 - `cash.view_difference`
+- `cash.edit_closed`: corregir un cuadre ya cerrado (antes solo posible con `settings.manage`, un permiso mucho mas amplio).
 - `credit.view`
 - `credit.manage`
 - `loyalty.manage`

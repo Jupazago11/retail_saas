@@ -23,7 +23,7 @@
 
                 <form wire:submit="saveModuleOverride" class="mt-6 space-y-4">
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Modulo</label>
+                        <label class="text-sm font-medium text-gray-700">Modulo <span class="text-rose-600">*</span></label>
                         <select wire:model="moduleId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Selecciona un modulo</option>
                             @foreach ($availableModules as $module)
@@ -32,7 +32,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Estado de la excepcion</label>
+                        <label class="text-sm font-medium text-gray-700">Estado de la excepcion <span class="text-rose-600">*</span></label>
                         <select wire:model="moduleEnabled" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="1">Habilitar</option>
                             <option value="0">Deshabilitar</option>
@@ -68,7 +68,7 @@
 
                 <form wire:submit="saveFeatureOverride" class="mt-6 space-y-4">
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Funcion</label>
+                        <label class="text-sm font-medium text-gray-700">Funcion <span class="text-rose-600">*</span></label>
                         <select wire:model="featureId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Selecciona una funcion</option>
                             @foreach ($availableFeatures as $feature)
@@ -77,7 +77,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Estado de la excepcion</label>
+                        <label class="text-sm font-medium text-gray-700">Estado de la excepcion <span class="text-rose-600">*</span></label>
                         <select wire:model="featureEnabled" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="1">Habilitar</option>
                             <option value="0">Deshabilitar</option>
@@ -113,7 +113,7 @@
 
                 <form wire:submit="saveLimitOverride" class="mt-6 space-y-4">
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Clave de limite</label>
+                        <label class="text-sm font-medium text-gray-700">Clave de limite <span class="text-rose-600">*</span></label>
                         <select wire:model="limitKey" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Selecciona un limite</option>
                             @foreach ($availableLimitKeys as $key)
@@ -122,7 +122,7 @@
                         </select>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Valor</label>
+                        <label class="text-sm font-medium text-gray-700">Valor <span class="text-rose-600">*</span></label>
                         <input wire:model="limitValue" type="number" min="1" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
                     <div class="grid gap-4 md:grid-cols-2">

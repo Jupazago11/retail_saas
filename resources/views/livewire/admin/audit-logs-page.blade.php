@@ -2,7 +2,7 @@
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6">
         <x-admin-nav active="admin.audit-logs" />
 
-        <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <div x-data="responsivePageSize({ rowHeight: 68, reserved: 400 })" class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
             <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Auditoria</p>
@@ -20,26 +20,32 @@
             </div>
 
             <div class="mt-4 flex flex-wrap items-center gap-3">
-                <select wire:model.live="action" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <option value="">Todas las acciones</option>
-                    @foreach ($actionOptions as $actionOption)
-                        <option value="{{ $actionOption }}">{{ $this->actionLabel($actionOption) }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    id="audit-filter-action"
+                    model="action"
+                    placeholder="Todas las acciones"
+                    class="w-48"
+                    live
+                    :options="collect($actionOptions)->map(fn ($actionOption) => ['id' => $actionOption, 'label' => $this->actionLabel($actionOption)])"
+                />
 
-                <select wire:model.live="actorUserId" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <option value="">Todos los actores</option>
-                    @foreach ($actors as $actor)
-                        <option value="{{ $actor->id }}">{{ $actor->name }} · {{ '@'.$actor->username }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    id="audit-filter-actor"
+                    model="actorUserId"
+                    placeholder="Todos los actores"
+                    class="w-56"
+                    live
+                    :options="$actors->map(fn ($actor) => ['id' => $actor->id, 'label' => $actor->name.' · @'.$actor->username])"
+                />
 
-                <select wire:model.live="auditableType" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <option value="">Todas las entidades</option>
-                    @foreach ($auditableTypeOptions as $typeOption)
-                        <option value="{{ $typeOption }}">{{ $this->auditableTypeLabel($typeOption) }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    id="audit-filter-auditable-type"
+                    model="auditableType"
+                    placeholder="Todas las entidades"
+                    class="w-48"
+                    live
+                    :options="collect($auditableTypeOptions)->map(fn ($typeOption) => ['id' => $typeOption, 'label' => $this->auditableTypeLabel($typeOption)])"
+                />
 
                 <input wire:model.live.debounce.300ms="auditableId" type="number" min="1" placeholder="ID entidad"
                     class="w-32 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">

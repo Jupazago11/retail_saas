@@ -185,14 +185,14 @@
                                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar abono · saldo total de la cuenta</p>
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         <div x-data="digitGroupInput({ path: 'paymentAmount', live: false })">
-                                            <label class="text-xs font-medium text-gray-700">Monto</label>
+                                            <label class="text-xs font-medium text-gray-700">Monto <span class="text-rose-600">*</span></label>
                                             <input type="text" inputmode="numeric" @input="onInput($event)"
                                                 value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
                                                 class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                             @error('paymentAmount') <p class="mt-0.5 text-xs text-rose-600">{{ $message }}</p> @enderror
                                         </div>
                                         <div>
-                                            <label class="text-xs font-medium text-gray-700">Metodo</label>
+                                            <label class="text-xs font-medium text-gray-700">Metodo <span class="text-rose-600">*</span></label>
                                             <select wire:model="paymentMethodCode"
                                                 class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
                                                 <option value="cash">Efectivo</option>
@@ -316,7 +316,7 @@
                 <div class="px-5 py-4 space-y-3">
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-gray-700">Nombre</label>
+                            <label class="mb-1 block text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="editFirstName" type="text"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             @error('editFirstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
@@ -341,7 +341,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-gray-700">Cupo de credito</label>
+                        <label class="mb-1 block text-xs font-medium text-gray-700">Cupo de credito <span class="text-rose-600">*</span></label>
                         <input wire:model="editCreditLimit" type="number" min="0" step="1"
                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                         @error('editCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
@@ -379,7 +379,7 @@
                         <p class="text-xs text-gray-500">Cliente nuevo: no existe todavia en el sistema. Estos datos se pueden completar despues desde "Editar cliente".</p>
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label class="mb-1 block text-xs font-medium text-gray-700">Nombre</label>
+                                <label class="mb-1 block text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                                 <input wire:model="newCustomerFirstName" type="text"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('newCustomerFirstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
@@ -416,7 +416,7 @@
                             </div>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito</label>
+                            <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito <span class="text-rose-600">*</span></label>
                             <input wire:model="addCustomerCreditLimit" type="number" min="0" step="1"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             @error('addCustomerCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
@@ -471,7 +471,7 @@
                             <button wire:click="$set('addCustomerSelectedId', null)" class="text-gray-400 hover:text-rose-600 text-lg leading-none">&times;</button>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito</label>
+                            <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito <span class="text-rose-600">*</span></label>
                             <input wire:model="addCustomerCreditLimit" type="number" min="0" step="1"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             @error('addCustomerCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

@@ -19,13 +19,13 @@
 
                 <form wire:submit="saveAttribute" class="mt-6 space-y-4">
                     <div>
-                        <label for="attribute-name" class="text-sm font-medium text-gray-700">Nombre</label>
+                        <label for="attribute-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" id="attribute-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="attribute-code" class="text-sm font-medium text-gray-700">Codigo</label>
+                        <label for="attribute-code" class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                         <input wire:model="code" id="attribute-code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('code') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
@@ -59,7 +59,7 @@
 
                     <form wire:submit="saveValue" class="mt-6 space-y-4">
                         <div>
-                            <label for="attribute-value" class="text-sm font-medium text-gray-700">Valor</label>
+                            <label for="attribute-value" class="text-sm font-medium text-gray-700">Valor <span class="text-rose-600">*</span></label>
                             <input wire:model="value" id="attribute-value" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @error('value') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -118,7 +118,7 @@
                                                 Editar
                                             </button>
                                             @if ($attribute->status === 'archived')
-                                                <button wire:click="restoreAttribute({{ $attribute->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                                <button wire:click="restoreAttribute({{ $attribute->id }})" wire:confirm="¿Restaurar este atributo?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                     Restaurar
                                                 </button>
                                             @else
@@ -177,7 +177,7 @@
                                                     Editar
                                                 </button>
                                                 @if ($attributeValue->status === 'archived')
-                                                    <button wire:click="restoreValue({{ $attributeValue->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                                    <button wire:click="restoreValue({{ $attributeValue->id }})" wire:confirm="¿Restaurar este valor?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                         Restaurar
                                                     </button>
                                                 @else

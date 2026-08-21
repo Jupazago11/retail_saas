@@ -276,6 +276,27 @@
             color: var(--muted);
         }
 
+        {{-- QR al recibo publico (ver public-receipt.blade.php): va en el
+        footer, separado del codigo de barras (ese es para el scanner del
+        cajero, el QR es para el celular del cliente). --}}
+        .receipt-qr {
+            margin: 14px 0 0;
+            text-align: center;
+        }
+
+        .receipt-qr svg {
+            display: block;
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+        }
+
+        .receipt-qr-text {
+            margin: 4px 0 0;
+            font-size: 10px;
+            color: var(--muted);
+        }
+
         .items {
             width: 100%;
             table-layout: fixed;
@@ -416,6 +437,20 @@
             font-weight: 700;
             letter-spacing: 0.06em;
             text-transform: uppercase;
+        }
+
+        {{-- Los tamaños de fuente/anchos de arriba estan calibrados en mm
+        reales para la impresora termica (48/72mm) — a esa escala, en un
+        monitor normal el ticket se ve diminuto e ilegible. `zoom` (no
+        `transform: scale`, que no reacomoda el layout y se solaparia con
+        los botones de al lado) agranda SOLO la vista en pantalla; esta
+        regla vive fuera de @media print asi que la impresion real no
+        cambia en nada. --}}
+        @media screen {
+            .sheet.thermal_58mm,
+            .sheet.thermal_80mm {
+                zoom: 2;
+            }
         }
 
         {{-- El fondo gris y la sombra son solo para la vista previa en
@@ -570,27 +605,37 @@
         </table>
 
         <section class="totals">
+            {{-- Subtotal = Total menos el IVA ya incluido en cada producto
+            (ver Impuestos abajo), para que Subtotal + Impuestos = Total
+            cuadre visualmente. NO es $sale->subtotal (esa es la base ANTES
+            del tax_rate aditivo de la linea, que en ventas POS siempre es 0,
+            asi que sin este ajuste quedaba igual al Total). --}}
             <div class="totals-row">
                 <span>Subtotal</span>
-                <span>{{ \App\Support\Money::format((float) $sale->subtotal) }}</span>
+                <span>{{ \App\Support\Money::format((float) \App\Support\SaleTaxCalculator::taxExcludedSubtotal($sale)) }}</span>
             </div>
-            <div class="totals-row">
-                <span>Descuentos</span>
-                <span>{{ \App\Support\Money::format((float) $sale->discount_total) }}</span>
-            </div>
+            {{-- Impuestos = suma del IVA de cada producto (precio del item x
+            el IVA con el que se creo ese producto), ya incluido en el total
+            — no $sale->tax_total, que es un impuesto ADITIVO sin uso real en
+            ventas POS y siempre queda en 0. Antes esto mismo se repetia
+            aparte como "IVA incluido"; con Impuestos mostrando el valor
+            correcto, esa segunda linea sobraba. --}}
             <div class="totals-row">
                 <span>Impuestos</span>
-                <span>{{ \App\Support\Money::format((float) $sale->tax_total) }}</span>
+                <span>{{ $taxIncludedTotal }}</span>
             </div>
             <div class="totals-row total">
                 <span>Total</span>
                 <span>{{ \App\Support\Money::format((float) $sale->grand_total) }}</span>
             </div>
-            <div class="totals-row">
-                <span>IVA incluido</span>
-                <span>{{ $taxIncludedTotal }}</span>
-            </div>
         </section>
+
+        @if ($receiptQrSvg)
+            <section class="receipt-qr">
+                {!! $receiptQrSvg !!}
+                <p class="receipt-qr-text">Escanea para ver tu compra</p>
+            </section>
+        @endif
 
         {{-- La marca del SaaS no es un ajuste de empresa: siempre va, no es
         algo que la empresa pueda quitar desde Reglas. --}}

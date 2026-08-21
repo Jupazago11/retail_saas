@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sales;
 
+use App\Actions\Customers\EnableCustomerCredit;
 use App\Actions\Sales\CreateFrozenSale;
 use App\Actions\Sales\CreatePosSale;
 use App\Actions\Sales\ModifySale;
@@ -31,6 +32,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use InvalidArgumentException;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class PosPage extends Component
@@ -339,9 +341,11 @@ class PosPage extends Component
             return;
         }
 
-        $this->paymentCustomerDocument = '';
-        $this->resolvedCustomerId = null;
-        $this->resolvedCustomerName = null;
+        // No se resetea cliente/pagos aqui: si el cajero cierra el modal (ej.
+        // para agregar un producto olvidado) y lo vuelve a abrir, debe
+        // encontrar todo como lo dejo. Solo se limpia al completar la venta
+        // (ver resetSaleForm()).
+        $this->prefillBlankPaymentAmounts();
         $this->showPaymentModal = true;
 
         $this->dispatch('pos-debug', stage: 'openPaymentModal.done', details: [
@@ -587,9 +591,60 @@ class PosPage extends Component
         $this->adjustQuantity($lineKey, '-1');
     }
 
+    // Si el cajero cambia una linea a Credito (select wire:model.live) y su
+    // monto sigue en blanco, se autocompleta con el restante en ese momento
+    // — mismo criterio que prefillBlankPaymentAmounts()/addPaymentLine().
+    public function updated(string $name, mixed $value): void
+    {
+        if (! preg_match('/^payments\.(\d+)\.payment_method_code$/', $name, $matches) || $value !== 'credit') {
+            return;
+        }
+
+        $index = (int) $matches[1];
+
+        if ($this->blankToNull($this->payments[$index]['amount'] ?? null) !== null) {
+            return;
+        }
+
+        $remaining = $this->remainingToCollect();
+
+        if (bccomp($remaining, '0', 2) > 0) {
+            $this->payments[$index]['amount'] = $remaining;
+        }
+    }
+
     public function addPaymentLine(): void
     {
-        $this->payments[] = $this->newPaymentLine();
+        $line = $this->newPaymentLine();
+        $remaining = $this->remainingToCollect();
+
+        // Solo Credito se autocompleta con el restante: para Efectivo/Tarjeta/
+        // Transferencia el cajero SIEMPRE escribe el monto realmente recibido
+        // (casi nunca es el total exacto), asi que empieza en blanco.
+        if ($line['payment_method_code'] === 'credit' && bccomp($remaining, '0', 2) > 0) {
+            $line['amount'] = $remaining;
+        }
+
+        $this->payments[] = $line;
+    }
+
+    protected function prefillBlankPaymentAmounts(): void
+    {
+        foreach ($this->payments as $index => $payment) {
+            if (($payment['payment_method_code'] ?? '') !== 'credit') {
+                continue;
+            }
+
+            if ($this->blankToNull($payment['amount'] ?? null) !== null) {
+                continue;
+            }
+
+            $remaining = $this->remainingToCollect();
+
+            if (bccomp($remaining, '0', 2) > 0) {
+                $this->payments[$index]['amount'] = $remaining;
+            }
+        }
     }
 
     public function removeItemLine(int $lineKey): void
@@ -649,9 +704,7 @@ class PosPage extends Component
         }
 
         // Validacion de limite de credito
-        $creditTotal = collect($this->payments)
-            ->filter(fn ($p) => ($p['payment_method_code'] ?? '') === 'credit')
-            ->reduce(fn ($carry, $p) => bcadd($carry, is_numeric($p['amount'] ?? '') ? (string) $p['amount'] : '0', 2), '0.00');
+        $creditTotal = $this->creditPaymentsTotal();
 
         if (bccomp($creditTotal, '0', 2) > 0) {
             $creditCid = $this->customerId ?? $this->resolvedCustomerId;
@@ -813,6 +866,13 @@ class PosPage extends Component
         $this->resetSaleForm();
         $this->lastCreatedSaleId = $sale->id;
 
+        // Al cobrar (venta queda Confirmada), el ticket se abre solo en una
+        // pestaña nueva — sin esto el cajero tenia que buscar el icono de
+        // "Ticket ultima venta" a mano cada vez.
+        if ($sale->status === SaleStatus::Confirmed->value) {
+            $this->dispatch('open-sale-ticket', url: route('sales.ticket', $sale));
+        }
+
         if ($previousFrozenSaleId) {
             FrozenSale::find($previousFrozenSaleId)?->update([
                 'status' => FrozenSaleStatus::Converted->value,
@@ -821,7 +881,12 @@ class PosPage extends Component
         }
 
         if ($wasModifying) {
-            $this->toast('Venta modificada correctamente: '.$sale->document_number.'. La venta original quedo anulada.');
+            $this->toast(
+                'Venta modificada correctamente: '.$sale->document_number.'. La venta original quedo anulada.',
+                duration: $sale->status === SaleStatus::Confirmed->value ? 10000 : null,
+                actionUrl: $sale->status === SaleStatus::Confirmed->value ? route('sales.ticket', $sale) : null,
+                actionLabel: $sale->status === SaleStatus::Confirmed->value ? 'Ver ticket' : null,
+            );
 
             return;
         }
@@ -831,10 +896,18 @@ class PosPage extends Component
                 ? ($wasEditing
                     ? 'Borrador confirmado correctamente: '.$sale->document_number.'.'
                     : 'Venta confirmada correctamente: '.$sale->document_number.'.')
-                : ($wasEditing ? 'Borrador actualizado correctamente.' : 'Venta en borrador guardada correctamente.')
+                : ($wasEditing ? 'Borrador actualizado correctamente.' : 'Venta en borrador guardada correctamente.'),
+            duration: $sale->status === SaleStatus::Confirmed->value ? 10000 : null,
+            actionUrl: $sale->status === SaleStatus::Confirmed->value ? route('sales.ticket', $sale) : null,
+            actionLabel: $sale->status === SaleStatus::Confirmed->value ? 'Ver ticket' : null,
         );
     }
 
+    // Disparado desde SalesPage (componente hermano dentro del mismo
+    // SalesWorkspacePage) via wire:click="$dispatch('edit-draft-requested', ...)"
+    // — con Ventas y POS montados juntos, ya no hace falta navegar a
+    // sales.pos?edit=X, solo pedirle a esta instancia que cargue la venta.
+    #[On('edit-draft-requested')]
     public function loadDraftSaleForEditing(int $saleId): void
     {
         $this->ensurePermission('sales.create');
@@ -866,6 +939,9 @@ class PosPage extends Component
         $this->resetValidation();
     }
 
+    // Ver el comentario en loadDraftSaleForEditing() — mismo patron,
+    // disparado desde el boton "Modificar venta" de SalesPage.
+    #[On('modify-sale-requested')]
     public function loadSaleForModification(int $saleId): void
     {
         $this->ensurePermission('sales.create');
@@ -1189,6 +1265,50 @@ class PosPage extends Component
         $previewTotal = (string) data_get($this->previewData(), 'totals.grand_total', '0.00');
 
         return bcsub($previewTotal, $this->enteredPaymentsTotal(), 2);
+    }
+
+    public function creditPaymentsTotal(): string
+    {
+        return collect($this->payments)
+            ->filter(fn ($p) => ($p['payment_method_code'] ?? '') === 'credit')
+            ->reduce(fn ($carry, $p) => bcadd($carry, is_numeric($p['amount'] ?? '') ? (string) $p['amount'] : '0', 2), '0.00');
+    }
+
+    public function canManageCredit(): bool
+    {
+        return auth()->user()?->hasCurrentCompanyPermission('credit.manage') ?? false;
+    }
+
+    public function enableCreditForResolvedCustomer(string $creditLimit): void
+    {
+        $this->ensurePermission('credit.manage');
+
+        $customerId = $this->resolvedCustomerId ?? $this->customerId;
+
+        if (! $customerId) {
+            $this->toast('Selecciona un cliente antes de habilitar credito.', 'error');
+
+            return;
+        }
+
+        $company = $this->currentCompany();
+        $customer = Customer::query()->where('company_id', $company->id)->find($customerId);
+
+        if (! $customer) {
+            $this->toast('Cliente no encontrado.', 'error');
+
+            return;
+        }
+
+        try {
+            app(EnableCustomerCredit::class)->handle($company, $customer, $creditLimit);
+        } catch (InvalidArgumentException $exception) {
+            $this->toast($exception->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->toast('Credito habilitado para '.($customer->person?->full_name ?? 'el cliente').'.');
     }
 
     public function creditDueDatePreview(): ?string

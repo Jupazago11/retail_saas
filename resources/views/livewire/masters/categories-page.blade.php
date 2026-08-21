@@ -19,13 +19,13 @@
 
                 <form wire:submit="saveCategory" class="mt-6 space-y-4">
                     <div>
-                        <label for="category-name" class="text-sm font-medium text-gray-700">Nombre</label>
+                        <label for="category-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" id="category-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label for="category-code" class="text-sm font-medium text-gray-700">Codigo</label>
+                        <label for="category-code" class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                         <input wire:model="code" id="category-code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('code') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
@@ -69,7 +69,7 @@
                                 <td class="py-4 text-right">
                                     <div class="flex justify-end gap-2">
                                         @if ($category->deleted_at)
-                                            <button wire:click="restoreCategory({{ $category->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                            <button wire:click="restoreCategory({{ $category->id }})" wire:confirm="¿Restaurar esta categoria?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                 Restaurar
                                             </button>
                                         @else

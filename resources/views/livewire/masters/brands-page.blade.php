@@ -19,7 +19,7 @@
 
                 <form wire:submit="saveBrand" class="mt-6 space-y-4">
                     <div>
-                        <label for="brand-name" class="text-sm font-medium text-gray-700">Nombre</label>
+                        <label for="brand-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" id="brand-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
@@ -61,7 +61,7 @@
                                 <td class="py-4 text-right">
                                     <div class="flex justify-end gap-2">
                                         @if ($brand->deleted_at)
-                                            <button wire:click="restoreBrand({{ $brand->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                            <button wire:click="restoreBrand({{ $brand->id }})" wire:confirm="¿Restaurar esta marca?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                 Restaurar
                                             </button>
                                         @else

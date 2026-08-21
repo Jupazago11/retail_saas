@@ -188,7 +188,7 @@
 
                 <div class="mt-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Plan <span class="text-rose-600">*</span></label>
                         <select wire:model="editPlanId"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Seleccionar plan...</option>
@@ -231,7 +231,7 @@
 
                 <div class="mt-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Plan</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Plan <span class="text-rose-600">*</span></label>
                         <select wire:model="activatePlanId"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Seleccionar plan...</option>

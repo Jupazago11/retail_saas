@@ -21,18 +21,21 @@
                 <div class="flex flex-wrap items-center gap-3">
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por factura o proveedor"
                         class="w-52 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <select wire:model.live="supplierFilterId" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        <option value="">Todos los proveedores</option>
-                        @foreach ($suppliers as $supplier)
-                            @php
-                                $fullName = trim(implode(' ', array_filter([
-                                    $supplier->person?->first_name,
-                                    $supplier->person?->last_name,
-                                ])));
-                            @endphp
-                            <option value="{{ $supplier->id }}">{{ $fullName !== '' ? $fullName : 'Proveedor '.$supplier->id }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        id="purchases-filter-supplier"
+                        model="supplierFilterId"
+                        placeholder="Todos los proveedores"
+                        class="w-56"
+                        live
+                        :options="$suppliers->map(function ($supplier) {
+                            $fullName = trim(implode(' ', array_filter([
+                                $supplier->person?->first_name,
+                                $supplier->person?->last_name,
+                            ])));
+
+                            return ['id' => $supplier->id, 'label' => $fullName !== '' ? $fullName : 'Proveedor '.$supplier->id];
+                        })"
+                    />
                 </div>
             </div>
 
@@ -134,6 +137,7 @@
 
                                         @if ($purchase->deleted_at)
                                             <button wire:click="restorePurchase({{ $purchase->id }})"
+                                                wire:confirm="¿Restaurar esta compra?"
                                                 class="rounded-full border border-emerald-300 px-3 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-50">
                                                 Restaurar
                                             </button>
@@ -207,8 +211,8 @@
         </div>
     </div>
 
-    {{-- Boton flotante + --}}
-    @if ($canCreatePurchases)
+    {{-- Boton flotante + (oculto mientras hay un modal abierto para que no quede flotando sobre el overlay) --}}
+    @if ($canCreatePurchases && ! $showModal && ! $ledgerPurchaseId)
         <button wire:click="openModal" title="Nueva compra"
             style="position:fixed;bottom:2rem;right:2rem;z-index:9999;width:3.5rem;height:3.5rem;border-radius:9999px;background:#2563eb;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,0.25);"
             onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#1c1917'">
@@ -243,7 +247,7 @@
                         <div class="grid gap-3 {{ $showBranch && $showWarehouse ? 'sm:grid-cols-2' : '' }}">
                             @if ($showBranch)
                             <div>
-                                <label for="purchase-branch" class="text-xs font-medium text-gray-700">Sucursal</label>
+                                <label for="purchase-branch" class="text-xs font-medium text-gray-700">Sucursal <span class="text-rose-600">*</span></label>
                                 <select wire:model.live="branchId" id="purchase-branch"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="">Selecciona</option>
@@ -256,7 +260,7 @@
                             @endif
                             @if ($showWarehouse)
                             <div>
-                                <label for="purchase-warehouse" class="text-xs font-medium text-gray-700">Bodega</label>
+                                <label for="purchase-warehouse" class="text-xs font-medium text-gray-700">Bodega <span class="text-rose-600">*</span></label>
                                 <select wire:model="warehouseId" id="purchase-warehouse"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="">Selecciona</option>
@@ -334,7 +338,7 @@
                                 @error('invoiceNumber') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
-                                <label for="purchase-type" class="text-xs font-medium text-gray-700">Tipo</label>
+                                <label for="purchase-type" class="text-xs font-medium text-gray-700">Tipo <span class="text-rose-600">*</span></label>
                                 <select wire:model="purchaseType" id="purchase-type"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                     <option value="invoice">Factura</option>
@@ -347,17 +351,7 @@
                             </div>
                         </div>
 
-                        <div class="grid gap-3 sm:grid-cols-3">
-                            <div>
-                                <label for="purchase-status" class="text-xs font-medium text-gray-700">Estado inicial</label>
-                                <select wire:model.live="purchaseStatus" id="purchase-status"
-                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                    <option value="confirmed">Pendiente</option>
-                                    <option value="partially_paid">Parcialmente pagada</option>
-                                    <option value="paid">Pagada</option>
-                                </select>
-                                @error('purchaseStatus') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label for="purchase-purchased-at" class="text-xs font-medium text-gray-700">Fecha compra</label>
                                 <input wire:model="purchasedAt" id="purchase-purchased-at" type="date"
@@ -372,27 +366,19 @@
                             </div>
                         </div>
 
-                        @if (in_array($purchaseStatus, ['partially_paid', 'paid'], true))
+                        <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label for="purchase-initial-paid-amount" class="text-xs font-medium text-gray-700">Pago inicial</label>
-                                <input wire:model="initialPaidAmount" id="purchase-initial-paid-amount" type="number" min="0" step="0.01"
+                                <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total <span class="text-rose-600">*</span></label>
+                                <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('initialPaidAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                @error('totalAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
-                        @endif
-
-                        <div>
-                            <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total</label>
-                            <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
-                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('totalAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                        </div>
-
-                        <div>
-                            <label for="purchase-notes" class="text-xs font-medium text-gray-700">Notas</label>
-                            <textarea wire:model="notes" id="purchase-notes" rows="3"
-                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
-                            @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            <div>
+                                <label for="purchase-notes" class="text-xs font-medium text-gray-700">Notas</label>
+                                <textarea wire:model="notes" id="purchase-notes" rows="1"
+                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
+                                @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                            </div>
                         </div>
 
                     </div>{{-- /scrollable body --}}
@@ -437,7 +423,7 @@
                             <p class="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Registrar pago</p>
                             <div class="flex flex-col gap-3 md:flex-row md:items-end">
                                 <div class="flex-1" x-data="digitGroupInput({ path: 'paymentAmount', live: false })">
-                                    <label class="text-xs font-medium text-gray-700">Monto</label>
+                                    <label class="text-xs font-medium text-gray-700">Monto <span class="text-rose-600">*</span></label>
                                     <input type="text" inputmode="numeric" @input="onInput($event)"
                                         value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">

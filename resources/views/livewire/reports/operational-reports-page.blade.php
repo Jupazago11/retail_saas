@@ -3,81 +3,82 @@
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
             <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Filtros</p>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Reportes</p>
                     <h3 class="mt-2 text-2xl font-black text-gray-900">Corte operativo</h3>
                 </div>
 
                 <div class="grid gap-3 md:grid-cols-[160px_160px_220px]">
                     <input wire:model.live="dateFrom" type="date" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     <input wire:model.live="dateTo" type="date" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    <select wire:model.live="branchId" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        <option value="">Todas las sucursales</option>
-                        @foreach ($branches as $branch)
-                            <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-searchable-select
+                        id="operational-reports-filter-branch"
+                        model="branchId"
+                        placeholder="Todas las sucursales"
+                        live
+                        :options="$branches->map(fn ($branch) => ['id' => $branch->id, 'label' => $branch->name])"
+                    />
                 </div>
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-4">
-            <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+            <div class="rounded-xl bg-blue-600 px-5 py-5 text-white">
+                <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Facturacion</p>
+                <p class="mt-2 text-2xl font-black">${{ $summaryCards['sales_total'] }}</p>
+            </div>
+            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-gray-200">
                 <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Ventas</p>
-                <p class="mt-2 text-3xl font-black text-gray-900">{{ $summaryCards['confirmed_sales_count'] }}/{{ $summaryCards['sales_count'] }}</p>
-                <p class="mt-1 text-xs text-gray-500">confirmadas / visibles</p>
+                <p class="mt-2 text-2xl font-black text-gray-900">{{ $summaryCards['confirmed_sales_count'] }}/{{ $summaryCards['sales_count'] }}</p>
+                <p class="mt-1 text-xs text-gray-400">confirmadas / visibles</p>
             </div>
-            <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Facturacion</p>
-                <p class="mt-2 text-3xl font-black text-emerald-700">${{ $summaryCards['sales_total'] }}</p>
-            </div>
-            <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Recaudo</p>
-                <p class="mt-2 text-3xl font-black text-sky-700">${{ $summaryCards['payments_total'] }}</p>
+            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-sky-200">
+                <p class="text-xs uppercase tracking-[0.18em] text-sky-600">Recaudo</p>
+                <p class="mt-2 text-2xl font-black text-sky-700">${{ $summaryCards['payments_total'] }}</p>
             </div>
             @if ($creditEnabled)
-                <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Cartera</p>
-                    <p class="mt-2 text-3xl font-black text-rose-700">${{ $summaryCards['credit_balance_due'] }}</p>
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Cartera</p>
+                    <p class="mt-2 text-2xl font-black text-rose-700">${{ $summaryCards['credit_balance_due'] }}</p>
                 </div>
             @endif
             @if ($loyaltyEnabled)
-                <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Puntos vigentes</p>
-                    <p class="mt-2 text-3xl font-black text-gray-900">{{ $summaryCards['loyalty_points_balance'] }}</p>
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-violet-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-violet-600">Puntos vigentes</p>
+                    <p class="mt-2 text-2xl font-black text-violet-700">{{ $summaryCards['loyalty_points_balance'] }}</p>
                 </div>
             @endif
             @if ($promotionsEnabled)
-                <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Promociones</p>
-                    <p class="mt-2 text-3xl font-black text-blue-700">{{ $summaryCards['active_promotions_count'] }}</p>
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-blue-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-blue-600">Promociones</p>
+                    <p class="mt-2 text-2xl font-black text-blue-700">{{ $summaryCards['active_promotions_count'] }}</p>
                 </div>
             @endif
-            <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-gray-200">
                 <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Sesiones abiertas</p>
-                <p class="mt-2 text-3xl font-black text-gray-900">{{ $summaryCards['open_cash_sessions_count'] }}</p>
+                <p class="mt-2 text-2xl font-black text-gray-900">{{ $summaryCards['open_cash_sessions_count'] }}</p>
             </div>
             @if (isset($summaryCards['gross_margin_total']))
-                <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Margen bruto</p>
-                    <p class="mt-2 text-3xl font-black text-emerald-700">${{ $summaryCards['gross_margin_total'] }}</p>
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-emerald-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">Margen bruto</p>
+                    <p class="mt-2 text-2xl font-black text-emerald-700">${{ $summaryCards['gross_margin_total'] }}</p>
                 </div>
             @endif
-            <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Ventas devueltas</p>
-                <p class="mt-2 text-3xl font-black text-sky-700">{{ $summaryCards['returned_sales_count'] }}</p>
+            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-sky-200">
+                <p class="text-xs uppercase tracking-[0.18em] text-sky-600">Ventas devueltas</p>
+                <p class="mt-2 text-2xl font-black text-sky-700">{{ $summaryCards['returned_sales_count'] }}</p>
             </div>
-            <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Ventas anuladas</p>
-                <p class="mt-2 text-3xl font-black text-rose-700">{{ $summaryCards['cancelled_sales_count'] }}</p>
+            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
+                <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Ventas anuladas</p>
+                <p class="mt-2 text-2xl font-black text-rose-700">{{ $summaryCards['cancelled_sales_count'] }}</p>
             </div>
             @if ($creditEnabled)
-                <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
-                    <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Cartera vencida</p>
-                    <p class="mt-2 text-3xl font-black text-rose-700">${{ $summaryCards['credit_overdue_balance'] }}</p>
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Cartera vencida</p>
+                    <p class="mt-2 text-2xl font-black text-rose-700">${{ $summaryCards['credit_overdue_balance'] }}</p>
                 </div>
-                <div class="min-w-[200px] flex-1 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-gray-200">
                     <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Docs vencidos</p>
-                    <p class="mt-2 text-3xl font-black text-gray-900">{{ $summaryCards['credit_overdue_sales_count'] }}</p>
+                    <p class="mt-2 text-2xl font-black text-gray-900">{{ $summaryCards['credit_overdue_sales_count'] }}</p>
                 </div>
             @endif
         </div>
@@ -95,16 +96,11 @@
             </div>
         </div>
 
-        <div class="grid gap-6 xl:grid-cols-[1fr_1fr]">
+        <div class="grid gap-6 {{ $branches->count() > 1 ? 'xl:grid-cols-[1fr_1fr]' : '' }}">
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Productos</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Top vendidos</h3>
-                    </div>
-                    <a href="{{ $this->exportUrl('products') }}" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
-                        Exportar CSV
-                    </a>
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Productos</p>
+                    <h3 class="mt-2 text-2xl font-black text-gray-900">Top vendidos</h3>
                 </div>
 
                 <div class="mt-6 space-y-3">
@@ -132,58 +128,50 @@
                 </div>
             </div>
 
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <div class="flex items-center justify-between gap-4">
+            @if ($branches->count() > 1)
+                <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Sucursales</p>
                         <h3 class="mt-2 text-2xl font-black text-gray-900">Desempeno por sede</h3>
                     </div>
-                    <a href="{{ $this->exportUrl('branches') }}" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
-                        Exportar CSV
-                    </a>
-                </div>
 
-                @if ($branchBreakdown->count() > 1)
-                    <div class="mt-6">
-                        <x-charts.bar-chart :data="$branchBreakdown" label-key="branch_name" value-key="sales_total"
-                            :colors="['#2a78d6', '#eb6834', '#1baf7a', '#eda100']" :money="true"
-                            aria-label="Ventas por sucursal" height="180" />
-                    </div>
-                @endif
+                    @if ($branchBreakdown->count() > 1)
+                        <div class="mt-6">
+                            <x-charts.bar-chart :data="$branchBreakdown" label-key="branch_name" value-key="sales_total"
+                                :colors="['#2a78d6', '#eb6834', '#1baf7a', '#eda100']" :money="true"
+                                aria-label="Ventas por sucursal" height="180" />
+                        </div>
+                    @endif
 
-                <div class="mt-6 space-y-3">
-                    @forelse ($branchBreakdown as $branch)
-                        <div class="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
-                            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                                <div>
-                                    <p class="text-sm font-black text-gray-900">{{ $branch['branch_name'] }}</p>
-                                    <p class="mt-1 text-sm text-gray-600">{{ $branch['sales_count'] }} ventas · {{ $branch['payments_count'] }} pagos</p>
-                                </div>
-                                <div class="grid gap-2 text-sm text-gray-600 md:grid-cols-2">
-                                    <p>Ventas: <span class="font-medium text-gray-900">${{ $branch['sales_total'] }}</span></p>
-                                    <p>Pagos: <span class="font-medium text-gray-900">${{ $branch['payments_total'] }}</span></p>
+                    <div class="mt-6 space-y-3">
+                        @forelse ($branchBreakdown as $branch)
+                            <div class="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
+                                <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                                    <div>
+                                        <p class="text-sm font-black text-gray-900">{{ $branch['branch_name'] }}</p>
+                                        <p class="mt-1 text-sm text-gray-600">{{ $branch['sales_count'] }} ventas · {{ $branch['payments_count'] }} pagos</p>
+                                    </div>
+                                    <div class="grid gap-2 text-sm text-gray-600 md:grid-cols-2">
+                                        <p>Ventas: <span class="font-medium text-gray-900">${{ $branch['sales_total'] }}</span></p>
+                                        <p>Pagos: <span class="font-medium text-gray-900">${{ $branch['payments_total'] }}</span></p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    @empty
-                        <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-500">
-                            No hay sucursales para el filtro actual.
-                        </div>
-                    @endforelse
+                        @empty
+                            <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-500">
+                                No hay sucursales para el filtro actual.
+                            </div>
+                        @endforelse
+                    </div>
                 </div>
-            </div>
+            @endif
         </div>
 
         <div class="grid gap-6 xl:grid-cols-[1fr_1fr]">
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Recaudo</p>
-                        <h3 class="mt-2 text-2xl font-black text-gray-900">Medios de pago</h3>
-                    </div>
-                    <a href="{{ $this->exportUrl('payment-methods') }}" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
-                        Exportar CSV
-                    </a>
+                <div>
+                    <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Recaudo</p>
+                    <h3 class="mt-2 text-2xl font-black text-gray-900">Medios de pago</h3>
                 </div>
 
                 @if ($paymentMethodBreakdown->count() > 1)
@@ -215,14 +203,9 @@
 
             @if ($creditEnabled)
                 <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
-                    <div class="flex items-center justify-between gap-4">
-                        <div>
-                            <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Credito</p>
-                            <h3 class="mt-2 text-2xl font-black text-gray-900">Aging de cartera</h3>
-                        </div>
-                        <a href="{{ $this->exportUrl('credit-aging') }}" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
-                            Exportar CSV
-                        </a>
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Credito</p>
+                        <h3 class="mt-2 text-2xl font-black text-gray-900">Aging de cartera</h3>
                     </div>
 
                     <div class="mt-6">

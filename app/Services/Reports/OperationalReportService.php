@@ -55,7 +55,7 @@ class OperationalReportService
 
         if ($includeLoyalty) {
             $loyaltyAccounts = $this->loyaltyAccountsQuery($company)->get();
-            $cards['loyalty_points_balance'] = number_format((float) $loyaltyAccounts->sum(fn (LoyaltyAccount $account) => (float) $account->points_balance), 4, '.', ',');
+            $cards['loyalty_points_balance'] = number_format((float) $loyaltyAccounts->sum(fn (LoyaltyAccount $account) => (float) $account->points_balance), 0, ',', '.');
         }
 
         if ($includePromotions) {

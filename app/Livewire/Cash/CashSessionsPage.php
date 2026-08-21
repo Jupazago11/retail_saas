@@ -1007,7 +1007,8 @@ class CashSessionsPage extends Component
 
     public function canEditHistoricalCuadres(): bool
     {
-        return $this->canManageRules();
+        return $this->canManageRules()
+            || (auth()->user()?->hasCurrentCompanyPermission('cash.edit_closed') ?? false);
     }
 
     public function cuadreSession(): ?CashSession

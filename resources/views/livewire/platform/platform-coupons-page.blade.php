@@ -105,21 +105,21 @@
 
                 <div class="mt-5 grid grid-cols-2 gap-4">
                     <div class="col-span-2 sm:col-span-1">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="code" type="text" placeholder="DESC20"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600 uppercase">
                         @error('code') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="col-span-2 sm:col-span-1">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" type="text"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('name') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de descuento</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de descuento <span class="text-rose-600">*</span></label>
                         <select wire:model="discountType"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="percentage">Porcentaje (%)</option>
@@ -128,7 +128,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Valor</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Valor <span class="text-rose-600">*</span></label>
                         <input wire:model="discountValue" type="number" min="0" step="0.01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('discountValue') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
@@ -172,7 +172,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Estado</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Estado <span class="text-rose-600">*</span></label>
                         <select wire:model="status"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="active">Activo</option>

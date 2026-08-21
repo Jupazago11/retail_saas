@@ -123,7 +123,8 @@
         </div>
     </div>
 
-    {{-- Boton flotante + --}}
+    {{-- Boton flotante + (oculto mientras hay un modal abierto para que no quede flotando sobre el overlay) --}}
+    @if (! $showModal)
     <button wire:click="openModal" title="Nuevo cliente"
         style="position:fixed;bottom:2rem;right:2rem;z-index:9999;width:3.5rem;height:3.5rem;border-radius:9999px;background:#2563eb;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,0.25);"
         onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#1c1917'">
@@ -131,6 +132,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
         </svg>
     </button>
+    @endif
 
     {{-- Modal crear / editar cliente --}}
     @if ($showModal)
@@ -171,7 +173,7 @@
 
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label for="customer-first-name" class="text-xs font-medium text-gray-700">Nombre</label>
+                                <label for="customer-first-name" class="text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                                 <input wire:model="firstName" id="customer-first-name" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 @error('firstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

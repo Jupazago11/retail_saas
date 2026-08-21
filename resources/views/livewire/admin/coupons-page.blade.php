@@ -22,23 +22,23 @@
 
                 <form wire:submit="saveCoupon" class="mt-6 space-y-4">
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Codigo</label>
+                        <label class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                         <input wire:model="code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Nombre</label>
+                        <label class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     </div>
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Tipo</label>
+                            <label class="text-sm font-medium text-gray-700">Tipo <span class="text-rose-600">*</span></label>
                             <select wire:model="discountType" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="percentage">Porcentaje</option>
                                 <option value="fixed_amount">Monto fijo</option>
                             </select>
                         </div>
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Valor</label>
+                            <label class="text-sm font-medium text-gray-700">Valor <span class="text-rose-600">*</span></label>
                             <input wire:model="discountValue" type="number" step="0.01" min="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         </div>
                     </div>
@@ -67,7 +67,7 @@
                         </div>
                     </div>
                     <div>
-                        <label class="text-sm font-medium text-gray-700">Estado</label>
+                        <label class="text-sm font-medium text-gray-700">Estado <span class="text-rose-600">*</span></label>
                         <select wire:model="status" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="active">Activo</option>
                             <option value="inactive">Inactivo</option>

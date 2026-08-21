@@ -200,7 +200,7 @@
                             @if ($branches->count() > 1 || $cashRegisters->count() > 1)
                                 <div class="grid gap-4 sm:grid-cols-2">
                                     <div>
-                                        <label class="text-sm font-medium text-gray-700">Sucursal</label>
+                                        <label class="text-sm font-medium text-gray-700">Sucursal <span class="text-rose-600">*</span></label>
                                         <select wire:model.live="branchId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canOpenCashSessions)>
                                             <option value="">Selecciona</option>
                                             @foreach ($branches as $branch)
@@ -211,7 +211,7 @@
                                     </div>
 
                                     <div>
-                                        <label class="text-sm font-medium text-gray-700">Caja</label>
+                                        <label class="text-sm font-medium text-gray-700">Caja <span class="text-rose-600">*</span></label>
                                         <select wire:model="cashRegisterId" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canOpenCashSessions)>
                                             <option value="">Selecciona</option>
                                             @foreach ($cashRegisters as $cashRegister)
@@ -450,7 +450,7 @@
                         </label>
 
                         <div x-data="digitGroupInput({ path: 'ruleDefaultOpeningAmount', live: false })">
-                            <label class="text-sm font-medium text-gray-700">Monto por defecto de apertura</label>
+                            <label class="text-sm font-medium text-gray-700">Monto por defecto de apertura <span class="text-rose-600">*</span></label>
                             <input type="text" inputmode="numeric" @input="onInput($event)"
                                 value="{{ $ruleDefaultOpeningAmount !== '' ? number_format((int) $ruleDefaultOpeningAmount, 0, ',', '.') : '' }}"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">

@@ -41,9 +41,10 @@ class CompanyStructurePageTest extends TestCase
             ->call('saveWarehouse')
             ->assertHasNoErrors()
             ->assertSee('Bodega Norte')
-            ->set('cashRegisterBranchId', $primaryBranch->id)
-            ->set('cashRegisterName', 'Caja Norte')
-            ->set('cashRegisterCode', 'caja_norte')
+            ->set('cajaBranchId', $primaryBranch->id)
+            ->set('cajaName', 'Caja Norte')
+            ->set('cajaCode', 'caja_norte')
+            ->set('cajaPrinterType', 'thermal_58mm')
             ->call('saveCashRegister')
             ->assertHasNoErrors()
             ->assertSee('Caja Norte');
@@ -86,11 +87,12 @@ class CompanyStructurePageTest extends TestCase
             ->set('warehouseCode', 'bod_dos')
             ->call('saveWarehouse')
             ->assertHasErrors(['warehouseName'])
-            ->set('cashRegisterBranchId', $primaryBranch->id)
-            ->set('cashRegisterName', 'Caja Dos')
-            ->set('cashRegisterCode', 'caja_dos')
+            ->set('cajaBranchId', $primaryBranch->id)
+            ->set('cajaName', 'Caja Dos')
+            ->set('cajaCode', 'caja_dos')
+            ->set('cajaPrinterType', 'thermal_58mm')
             ->call('saveCashRegister')
-            ->assertHasErrors(['cashRegisterName']);
+            ->assertHasErrors(['cajaName']);
 
         $this->assertDatabaseMissing('branches', [
             'company_id' => $company->id,

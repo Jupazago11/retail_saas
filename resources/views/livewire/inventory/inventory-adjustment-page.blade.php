@@ -117,20 +117,22 @@
             <div class="rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-200">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                     <div class="flex flex-wrap gap-3">
-                        <select wire:model.live="branchId"
-                            class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            <option value="">Sucursal</option>
-                            @foreach ($branches as $branch)
-                                <option value="{{ $branch->id }}">{{ $branch->name }}</option>
-                            @endforeach
-                        </select>
-                        <select wire:model.live="warehouseId"
-                            class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            <option value="">Bodega</option>
-                            @foreach ($warehouses as $warehouse)
-                                <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-searchable-select
+                            id="inventory-adjustment-filter-branch"
+                            model="branchId"
+                            placeholder="Sucursal"
+                            class="w-48"
+                            live
+                            :options="$branches->map(fn ($branch) => ['id' => $branch->id, 'label' => $branch->name])"
+                        />
+                        <x-searchable-select
+                            id="inventory-adjustment-filter-warehouse"
+                            model="warehouseId"
+                            placeholder="Bodega"
+                            class="w-48"
+                            live
+                            :options="$warehouses->map(fn ($warehouse) => ['id' => $warehouse->id, 'label' => $warehouse->name])"
+                        />
                         <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar producto o codigo"
                             class="flex-1 min-w-[200px] rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                     </div>
@@ -211,7 +213,7 @@
                                                 </p>
                                                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                                     <div>
-                                                        <label class="mb-1 block text-xs font-medium text-gray-700">Tipo</label>
+                                                        <label class="mb-1 block text-xs font-medium text-gray-700">Tipo <span class="text-rose-600">*</span></label>
                                                         <select wire:model.live="adjustmentType"
                                                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                                             <option value="increase">Entrada</option>
@@ -220,7 +222,7 @@
                                                         @error('adjustmentType') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                     </div>
                                                     <div>
-                                                        <label class="mb-1 block text-xs font-medium text-gray-700">Cantidad</label>
+                                                        <label class="mb-1 block text-xs font-medium text-gray-700">Cantidad <span class="text-rose-600">*</span></label>
                                                         <input wire:model="quantity" type="number" min="0.001" step="0.001"
                                                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"
                                                             placeholder="0">
@@ -236,7 +238,7 @@
                                                         </div>
                                                     @endif
                                                     <div class="{{ $adjustmentType === 'increase' ? '' : 'sm:col-span-2' }}">
-                                                        <label class="mb-1 block text-xs font-medium text-gray-700">Motivo</label>
+                                                        <label class="mb-1 block text-xs font-medium text-gray-700">Motivo <span class="text-rose-600">*</span></label>
                                                         <input wire:model="reason" type="text"
                                                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"
                                                             placeholder="Ej: Conteo fisico, merma...">

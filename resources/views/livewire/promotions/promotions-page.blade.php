@@ -35,7 +35,7 @@
                 <div class="mt-6 space-y-5">
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Nombre</label>
+                            <label class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -49,7 +49,7 @@
 
                     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Estado</label>
+                            <label class="text-sm font-medium text-gray-700">Estado <span class="text-rose-600">*</span></label>
                             <select wire:model.live="status" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="active">Activa</option>
                                 <option value="inactive">Inactiva</option>
@@ -59,7 +59,7 @@
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Tipo</label>
+                            <label class="text-sm font-medium text-gray-700">Tipo <span class="text-rose-600">*</span></label>
                             <select wire:model.live="promotionType" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 <option value="product_discount">Descuento por producto</option>
                                 <option value="combo_price">Combo a precio fijo</option>
@@ -68,7 +68,7 @@
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Descuento</label>
+                            <label class="text-sm font-medium text-gray-700">Descuento <span class="text-rose-600">*</span></label>
                             <select wire:model.live="discountType" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                                 @if ($promotionType === 'combo_price')
                                     <option value="fixed_price">Precio fijo</option>
@@ -81,7 +81,7 @@
                         </div>
 
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Valor</label>
+                            <label class="text-sm font-medium text-gray-700">Valor <span class="text-rose-600">*</span></label>
                             <input wire:model="discountValue" type="number" min="0.0001" step="0.0001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @error('discountValue') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -89,7 +89,7 @@
 
                     <div class="grid gap-4 md:grid-cols-3">
                         <div>
-                            <label class="text-sm font-medium text-gray-700">Prioridad</label>
+                            <label class="text-sm font-medium text-gray-700">Prioridad <span class="text-rose-600">*</span></label>
                             <input wire:model="priority" type="number" min="0" step="1" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @error('priority') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -244,25 +244,40 @@
 
                     <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_190px_180px]">
                         <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por nombre o codigo" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        <select wire:model.live="statusFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Todos los estados</option>
-                            <option value="active">Activas</option>
-                            <option value="inactive">Inactivas</option>
-                            <option value="archived">Archivadas</option>
-                        </select>
-                        <select wire:model.live="typeFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Todos los tipos</option>
-                            <option value="product_discount">Descuento por producto</option>
-                            <option value="combo_price">Combo a precio fijo</option>
-                        </select>
-                        <select wire:model.live="effectiveStateFilter" class="rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Todas las vigencias</option>
-                            <option value="running">Vigentes</option>
-                            <option value="upcoming">Programadas</option>
-                            <option value="expired">Vencidas</option>
-                            <option value="inactive">Inactivas</option>
-                            <option value="archived">Archivadas</option>
-                        </select>
+                        <x-searchable-select
+                            id="promotions-filter-status"
+                            model="statusFilter"
+                            placeholder="Todos los estados"
+                            live
+                            :options="[
+                                ['id' => 'active', 'label' => 'Activas'],
+                                ['id' => 'inactive', 'label' => 'Inactivas'],
+                                ['id' => 'archived', 'label' => 'Archivadas'],
+                            ]"
+                        />
+                        <x-searchable-select
+                            id="promotions-filter-type"
+                            model="typeFilter"
+                            placeholder="Todos los tipos"
+                            live
+                            :options="[
+                                ['id' => 'product_discount', 'label' => 'Descuento por producto'],
+                                ['id' => 'combo_price', 'label' => 'Combo a precio fijo'],
+                            ]"
+                        />
+                        <x-searchable-select
+                            id="promotions-filter-effective-state"
+                            model="effectiveStateFilter"
+                            placeholder="Todas las vigencias"
+                            live
+                            :options="[
+                                ['id' => 'running', 'label' => 'Vigentes'],
+                                ['id' => 'upcoming', 'label' => 'Programadas'],
+                                ['id' => 'expired', 'label' => 'Vencidas'],
+                                ['id' => 'inactive', 'label' => 'Inactivas'],
+                                ['id' => 'archived', 'label' => 'Archivadas'],
+                            ]"
+                        />
                     </div>
                 </div>
 

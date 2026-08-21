@@ -240,13 +240,13 @@
                 <h3 class="text-lg font-black text-gray-900">Nueva sucursal</h3>
                 <div class="mt-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="branchName" type="text" autocomplete="new-password" autofocus
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('branchName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="branchCode" type="text" inputmode="text" autocomplete="new-password"
                             placeholder="Ej: SUC01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm uppercase shadow-sm focus:border-blue-600 focus:ring-blue-600">
@@ -268,7 +268,7 @@
                 <h3 class="text-lg font-black text-gray-900">Nueva bodega</h3>
                 <div class="mt-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Sucursal</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Sucursal <span class="text-rose-600">*</span></label>
                         <select wire:model="warehouseBranchId"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @foreach ($branches as $branch)
@@ -278,13 +278,13 @@
                         @error('warehouseBranchId') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="warehouseName" type="text" autocomplete="new-password"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('warehouseName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="warehouseCode" type="text" inputmode="text" autocomplete="new-password"
                             placeholder="Ej: BOD01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm uppercase shadow-sm focus:border-blue-600 focus:ring-blue-600">
@@ -306,7 +306,7 @@
                 <h3 class="text-lg font-black text-gray-900">Nueva caja</h3>
                 <div class="mt-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Sucursal</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Sucursal <span class="text-rose-600">*</span></label>
                         <select wire:model="cajaBranchId"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             @foreach ($branches as $branch)
@@ -316,17 +316,27 @@
                         @error('cajaBranchId') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="cajaName" type="text" autocomplete="new-password"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('cajaName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="cajaCode" type="text" autocomplete="new-password"
                             placeholder="Ej: CAJA01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm uppercase shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('cajaCode') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de impresora <span class="text-rose-600">*</span></label>
+                        <select wire:model="cajaPrinterType"
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                            @foreach (\App\Models\CashRegister::PRINTER_TYPES as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('cajaPrinterType') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">

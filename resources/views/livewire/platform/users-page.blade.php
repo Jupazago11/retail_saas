@@ -105,7 +105,7 @@
                     </p>
 
                     <div class="mt-5">
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Contraseña nueva</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Contraseña nueva <span class="text-rose-600">*</span></label>
                         <div class="mt-1 flex items-center gap-2">
                             <div class="relative flex-1">
                                 <input wire:model="newPassword" type="{{ $showPasswordText ? 'text' : 'password' }}"
@@ -182,21 +182,21 @@
 
                 <div class="mt-5 space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="editName" type="text"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('editName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Usuario</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Usuario <span class="text-rose-600">*</span></label>
                         <input wire:model="editUsername" type="text"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('editUsername') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Correo</label>
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Correo <span class="text-rose-600">*</span></label>
                         <input wire:model="editEmail" type="email"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         @error('editEmail') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror

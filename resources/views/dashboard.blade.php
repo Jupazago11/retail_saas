@@ -1,4 +1,6 @@
 <x-app-layout>
+    <livewire:company.printer-setup-gate />
+
     @php
         $snapshot = app(\App\Services\Plans\CompanyPlanResolver::class)->snapshot($company);
         $plan = $snapshot['plan'];

@@ -30,7 +30,7 @@ class SaleTicketViewTest extends TestCase
         app(CompanySettings::class)->set($company, 'general', 'phone', '3001234567');
         app(CompanySettings::class)->set($company, 'general', 'address', 'Calle 123 #45-67');
         app(CompanySettings::class)->set($company, 'general', 'logo_path', 'https://cdn.test/logo-retail.png');
-        app(CompanySettings::class)->set($company, 'printing', 'ticket_format', 'letter_a4');
+        $company->cashRegisters()->where('is_primary', true)->update(['printer_type' => 'letter_a4']);
         app(CompanySettings::class)->set($company, 'printing', 'show_logo', true);
         app(CompanySettings::class)->set($company, 'printing', 'show_saas_branding', true);
 
@@ -52,7 +52,7 @@ class SaleTicketViewTest extends TestCase
         [$owner, $company, $sale] = $this->saleTicketFixture();
 
         app(CompanySettings::class)->set($company, 'general', 'logo_path', 'https://cdn.test/logo-retail.png');
-        app(CompanySettings::class)->set($company, 'printing', 'ticket_format', 'thermal_80mm');
+        $company->cashRegisters()->where('is_primary', true)->update(['printer_type' => 'thermal_80mm']);
         app(CompanySettings::class)->set($company, 'printing', 'show_logo', false);
         app(CompanySettings::class)->set($company, 'printing', 'show_saas_branding', false);
 

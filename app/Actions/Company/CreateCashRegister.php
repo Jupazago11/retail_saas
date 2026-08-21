@@ -44,6 +44,12 @@ class CreateCashRegister
             throw new InvalidArgumentException('Ya existe una caja activa con ese codigo en la empresa.');
         }
 
+        $printerType = (string) ($attributes['printer_type'] ?? '');
+
+        if (! array_key_exists($printerType, CashRegister::PRINTER_TYPES)) {
+            throw new InvalidArgumentException('Selecciona un tipo de impresora valido.');
+        }
+
         $cashRegister = CashRegister::query()->create([
             'company_id' => $company->id,
             'branch_id' => $branch->id,
@@ -51,6 +57,7 @@ class CreateCashRegister
             'code' => $code,
             'status' => RecordStatus::Active->value,
             'is_primary' => false,
+            'printer_type' => $printerType,
         ]);
 
         $this->auditLogger->logCreated($company, 'cash_register.created', $cashRegister, $actor);

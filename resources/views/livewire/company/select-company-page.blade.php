@@ -50,7 +50,7 @@
 
             <form wire:submit="createCompany" class="mt-6 space-y-4">
                 <div>
-                    <x-input-label for="legal_name" value="Razon social" />
+                    <x-input-label for="legal_name" value="Razon social" required />
                     <x-text-input wire:model="legalName" id="legal_name" name="legal_name" type="text"
                         class="mt-1 block w-full" required />
                     <x-input-error class="mt-2" :messages="$errors->get('legalName')" />

@@ -11,6 +11,12 @@ class CashRegister extends Model
 {
     use SoftDeletes;
 
+    public const PRINTER_TYPES = [
+        'thermal_58mm' => 'Termica 58mm',
+        'thermal_80mm' => 'Termica 80mm',
+        'letter_a4' => 'Carta / A4',
+    ];
+
     protected $fillable = [
         'company_id',
         'branch_id',
@@ -18,6 +24,7 @@ class CashRegister extends Model
         'code',
         'status',
         'is_primary',
+        'printer_type',
     ];
 
     protected function casts(): array

@@ -43,7 +43,6 @@ class SalesPage extends Component
     public bool $ruleAllowPromotionStacking = false;
     public bool $ruleAllowNegativeStock = false;
     public bool $ruleRequireCustomerForCreditSale = true;
-    public string $ruleTicketFormat = 'thermal_80mm';
     public bool $ruleShowLogo = true;
 
     /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null */
@@ -86,8 +85,12 @@ class SalesPage extends Component
         $this->ruleAllowPromotionStacking = (bool) $companySettings->get($company, 'pos', 'allow_promotion_stacking');
         $this->ruleAllowNegativeStock = (bool) $companySettings->get($company, 'pos', 'allow_negative_stock');
         $this->ruleRequireCustomerForCreditSale = (bool) $companySettings->get($company, 'pos', 'require_customer_for_credit_sale');
-        $this->ruleTicketFormat = (string) $companySettings->get($company, 'printing', 'ticket_format');
-        $this->ruleShowLogo = (bool) $companySettings->get($company, 'printing', 'show_logo');
+
+        // Sin logo cargado no hay nada que mostrar: forzamos el check apagado
+        // aunque la empresa haya tenido "show_logo" en true de antes (p. ej.
+        // si quito el logo en otra sesion sin desmarcar esto primero).
+        $hasLogo = app(UpdateCompanyLogo::class)->currentUrl($company) !== null;
+        $this->ruleShowLogo = $hasLogo && (bool) $companySettings->get($company, 'printing', 'show_logo');
 
         $this->resetErrorBag();
         $this->showRulesModal = true;
@@ -131,7 +134,6 @@ class SalesPage extends Component
                     'require_customer_for_credit_sale' => $this->ruleRequireCustomerForCreditSale,
                 ],
                 'printing' => [
-                    'ticket_format' => $this->ruleTicketFormat,
                     'show_logo' => $this->ruleShowLogo,
                 ],
             ], auth()->user());
@@ -170,6 +172,9 @@ class SalesPage extends Component
         $this->ensurePermission('settings.manage');
 
         $action->remove($this->currentCompany());
+
+        // Sin logo, "mostrar logo en el ticket" deja de tener sentido.
+        $this->ruleShowLogo = false;
 
         $this->toast('Logo eliminado.', 'info');
     }
@@ -419,16 +424,6 @@ class SalesPage extends Component
         }
 
         $this->toast('Venta anulada correctamente.', 'info');
-    }
-
-    public function draftEditUrl(int $saleId): string
-    {
-        return route('sales.pos', ['edit' => $saleId]);
-    }
-
-    public function modifySaleUrl(int $saleId): string
-    {
-        return route('sales.pos', ['modify' => $saleId]);
     }
 
     public function variantSummary($variant): string

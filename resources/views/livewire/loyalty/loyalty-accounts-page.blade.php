@@ -121,7 +121,7 @@
                                         <div class="space-y-4">
                                             <div class="grid gap-4 md:grid-cols-3">
                                                 <div>
-                                                    <label class="text-sm font-medium text-gray-700">Operacion</label>
+                                                    <label class="text-sm font-medium text-gray-700">Operacion <span class="text-rose-600">*</span></label>
                                                     <select wire:model="adjustmentType" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                                         <option value="credit">Sumar puntos</option>
                                                         <option value="debit">Restar puntos</option>
@@ -130,7 +130,7 @@
                                                 </div>
 
                                                 <div>
-                                                    <label class="text-sm font-medium text-gray-700">Motivo</label>
+                                                    <label class="text-sm font-medium text-gray-700">Motivo <span class="text-rose-600">*</span></label>
                                                     <select wire:model="adjustmentReasonCode" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                                         <option value="admin_correction">Correccion administrativa</option>
                                                         <option value="service_recovery">Recuperacion de servicio</option>
@@ -142,7 +142,7 @@
                                                 </div>
 
                                                 <div>
-                                                    <label class="text-sm font-medium text-gray-700">Puntos</label>
+                                                    <label class="text-sm font-medium text-gray-700">Puntos <span class="text-rose-600">*</span></label>
                                                     <input wire:model="adjustmentPoints" type="number" min="0.0001" step="0.0001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                                     @error('adjustmentPoints') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
@@ -210,18 +210,23 @@
                     </div>
 
                     <div class="w-full max-w-[220px]">
-                        <select wire:model.live="movementTypeFilter" class="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            <option value="">Todos los movimientos</option>
-                            <option value="earn">Acumulacion</option>
-                            <option value="redeem">Redencion</option>
-                            <option value="manual_credit">Ajuste manual a favor</option>
-                            <option value="manual_debit">Ajuste manual en contra</option>
-                            <option value="expiration">Expiracion</option>
-                            <option value="sale_return_reversal">Reverso devolucion</option>
-                            <option value="sale_cancellation_reversal">Reverso anulacion</option>
-                            <option value="sale_return_redemption_restore">Restitucion devolucion</option>
-                            <option value="sale_cancellation_redemption_restore">Restitucion anulacion</option>
-                        </select>
+                        <x-searchable-select
+                            id="loyalty-filter-movement-type"
+                            model="movementTypeFilter"
+                            placeholder="Todos los movimientos"
+                            live
+                            :options="[
+                                ['id' => 'earn', 'label' => 'Acumulacion'],
+                                ['id' => 'redeem', 'label' => 'Redencion'],
+                                ['id' => 'manual_credit', 'label' => 'Ajuste manual a favor'],
+                                ['id' => 'manual_debit', 'label' => 'Ajuste manual en contra'],
+                                ['id' => 'expiration', 'label' => 'Expiracion'],
+                                ['id' => 'sale_return_reversal', 'label' => 'Reverso devolucion'],
+                                ['id' => 'sale_cancellation_reversal', 'label' => 'Reverso anulacion'],
+                                ['id' => 'sale_return_redemption_restore', 'label' => 'Restitucion devolucion'],
+                                ['id' => 'sale_cancellation_redemption_restore', 'label' => 'Restitucion anulacion'],
+                            ]"
+                        />
                     </div>
                 </div>
 

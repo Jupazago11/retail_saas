@@ -216,8 +216,7 @@ class PosPageTest extends TestCase
             ->set('items.0.quantity', '1')
             ->set('items.0.unit_price', '1800')
             ->call('saveSale')
-            ->assertHasNoErrors()
-            ->assertSee('Redencion');
+            ->assertHasNoErrors();
 
         $this->assertDatabaseHas('sales', [
             'company_id' => $company->id,

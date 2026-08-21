@@ -29,7 +29,7 @@
                 <form wire:submit="savePresentation" class="mt-6 space-y-5">
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label for="presentation-product" class="text-sm font-medium text-gray-700">Producto</label>
+                            <label for="presentation-product" class="text-sm font-medium text-gray-700">Producto <span class="text-rose-600">*</span></label>
                             <select wire:model="productId" id="presentation-product" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
                                 <option value="">Selecciona</option>
                                 @foreach ($products as $product)
@@ -40,7 +40,7 @@
                         </div>
 
                         <div>
-                            <label for="presentation-unit" class="text-sm font-medium text-gray-700">Unidad de presentacion</label>
+                            <label for="presentation-unit" class="text-sm font-medium text-gray-700">Unidad de presentacion <span class="text-rose-600">*</span></label>
                             <select wire:model="unitId" id="presentation-unit" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
                                 <option value="">Selecciona</option>
                                 @foreach ($units as $unit)
@@ -53,7 +53,7 @@
 
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
-                            <label for="presentation-name" class="text-sm font-medium text-gray-700">Nombre</label>
+                            <label for="presentation-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="name" id="presentation-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
                             @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -67,13 +67,13 @@
 
                     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div>
-                            <label for="presentation-factor" class="text-sm font-medium text-gray-700">Factor de conversion</label>
+                            <label for="presentation-factor" class="text-sm font-medium text-gray-700">Factor de conversion <span class="text-rose-600">*</span></label>
                             <input wire:model.live="conversionFactor" id="presentation-factor" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
                             @error('conversionFactor') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
-                            <label for="presentation-price-1" class="text-sm font-medium text-gray-700">Precio 1</label>
+                            <label for="presentation-price-1" class="text-sm font-medium text-gray-700">Precio 1 <span class="text-rose-600">*</span></label>
                             <input wire:model="price1" id="presentation-price-1" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
                             @error('price1') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -171,7 +171,7 @@
                                 <td class="py-4 align-top text-right">
                                     <div class="flex justify-end gap-2">
                                         @if ($presentation->deleted_at)
-                                            <button wire:click="restorePresentation({{ $presentation->id }})" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
+                                            <button wire:click="restorePresentation({{ $presentation->id }})" wire:confirm="¿Restaurar esta presentacion?" class="rounded-full border border-emerald-300 px-3 py-1 font-medium text-emerald-700">
                                                 Restaurar
                                             </button>
                                         @else

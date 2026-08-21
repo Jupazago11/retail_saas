@@ -4,13 +4,21 @@ namespace App\Livewire\Concerns;
 
 trait InteractsWithToast
 {
-    protected function toast(string $message, string $type = 'success', ?string $title = null, ?int $duration = null): void
-    {
+    protected function toast(
+        string $message,
+        string $type = 'success',
+        ?string $title = null,
+        ?int $duration = null,
+        ?string $actionUrl = null,
+        ?string $actionLabel = null,
+    ): void {
         $payload = array_filter([
             'message' => $message,
             'type' => $type,
             'title' => $title,
             'duration' => $duration,
+            'actionUrl' => $actionUrl,
+            'actionLabel' => $actionLabel,
         ], fn ($value) => $value !== null);
 
         $this->dispatch('toast', ...$payload);
