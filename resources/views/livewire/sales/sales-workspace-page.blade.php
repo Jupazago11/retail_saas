@@ -18,7 +18,7 @@
     x-on:modify-sale-requested.window="tab = 'pos'"
     x-effect="window.history.replaceState(null, '', tab === 'pos' ? @js(route('sales.pos')) : @js(route('sales.index')))"
 >
-    <div class="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl px-4 pt-6 pb-4 sm:px-6 lg:px-8">
         <div class="flex flex-wrap gap-2">
             @if ($this->canViewSales())
                 <button type="button" x-on:click="tab = 'history'"
