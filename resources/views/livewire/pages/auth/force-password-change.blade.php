@@ -45,9 +45,20 @@ new #[Layout('layouts.guest')] class extends Component
         Tu contraseña fue restablecida. Antes de continuar, define una contraseña nueva que solo tu conozcas.
     </div>
 
+    @if ($errors->any())
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <ul class="list-disc space-y-1 pl-5">
+                @foreach ($errors->all() as $message)
+                    <li>{{ $message }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     <form wire:submit="updatePassword">
         <div>
             <x-input-label for="password" value="Contraseña nueva" />
+            <p class="mt-1 text-xs text-gray-500">Debe tener minimo 6 caracteres y ser distinta a la contraseña actual.</p>
             <x-text-input wire:model="password" id="password" class="block mt-1 w-full" type="password" name="password" required autofocus autocomplete="new-password" />
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>

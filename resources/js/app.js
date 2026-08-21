@@ -277,6 +277,7 @@ document.addEventListener('livewire:init', () => {
             responsePreview: String(content ?? '').slice(0, 500),
         }));
     });
+
 });
 
 function findPosWire(input) {

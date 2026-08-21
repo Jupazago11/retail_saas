@@ -45,7 +45,7 @@ use App\Livewire\Reports\OperationalReportsPage;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome');
+Route::redirect('/', '/login');
 
 // Recibo publico del QR del ticket: sin login, la firma de la URL (Laravel
 // URL::signedRoute, sin expiracion) es la unica autorizacion — ver
