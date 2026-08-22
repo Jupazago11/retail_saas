@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cash\OpenCashSession;
 use App\Actions\Companies\CreateCompany;
 use App\Actions\Customers\CreateCustomer;
 use App\Actions\Inventory\CreateInventoryAdjustment;
-use App\Actions\Cash\OpenCashSession;
 use App\Actions\Promotions\CreatePromotion;
+use App\Actions\Sales\CancelSale;
 use App\Actions\Sales\CreateSale;
+use App\Enums\CreditMovementType;
 use App\Enums\InventoryAdjustmentType;
 use App\Enums\PromotionDiscountType;
 use App\Enums\PromotionTargetType;
@@ -19,13 +21,15 @@ use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\Category;
 use App\Models\CompanyRole;
-use App\Models\Sale;
+use App\Models\CreditMovement;
+use App\Models\Customer;
+use App\Models\LoyaltyMovement;
 use App\Models\Permission;
 use App\Models\Product;
+use App\Models\Sale;
 use App\Models\Unit;
 use App\Models\User;
 use App\Models\Warehouse;
-use App\Models\LoyaltyMovement;
 use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -249,7 +253,7 @@ class PosPageTest extends TestCase
             'opening_amount' => '50000',
         ]);
 
-        $draftSale = \App\Actions\Sales\CreateSale::class;
+        $draftSale = CreateSale::class;
         $draftSale = app($draftSale)->handle($company, [
             'branch_id' => $branch->id,
             'warehouse_id' => $warehouse->id,
@@ -388,6 +392,110 @@ class PosPageTest extends TestCase
             ->assertSet('modifyingSaleId', null);
     }
 
+    public function test_pos_page_hides_credit_payment_method_when_plan_lacks_credit_module(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister] = $this->posFixture();
+        $this->assignCompanyPlan($company, 'basic');
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $component = Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id);
+
+        $this->assertArrayNotHasKey('credit', $component->instance()->paymentMethodOptions());
+    }
+
+    public function test_pos_page_charges_only_the_credit_portion_of_a_mixed_payment(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+        app(CompanySettings::class)->set($company, 'credit', 'credit_enabled', true);
+        $customer = app(CreateCustomer::class)->handle($company, [
+            'first_name' => 'Cliente',
+            'last_name' => 'Mixto',
+            'credit_enabled' => true,
+            'credit_limit' => '100000',
+        ]);
+        $cashSession = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '50000',
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        // Venta de 3600: 1000 en efectivo y el resto (2600) a credito.
+        // El cliente se elige desde el buscador del modal (selectPaymentCustomer),
+        // el mismo camino que antes dejaba sales.customer_id vacio.
+        Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('cashSessionId', $cashSession->id)
+            ->set('saleStatus', SaleStatus::Confirmed->value)
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '2')
+            ->set('items.0.unit_price', '1800')
+            ->call('selectPaymentCustomer', $customer->id)
+            ->set('payments.0.payment_method_code', 'cash')
+            ->set('payments.0.amount', '1000')
+            ->call('addPaymentLine')
+            ->set('payments.1.payment_method_code', 'credit')
+            ->set('payments.1.amount', '2600')
+            ->call('saveSale')
+            ->assertHasNoErrors();
+
+        $sale = Sale::query()->where('company_id', $company->id)->firstOrFail();
+        $account = $customer->creditAccount()->firstOrFail()->fresh();
+
+        $this->assertSame('pos', $sale->sale_type);
+        $this->assertSame($customer->id, $sale->customer_id);
+        $this->assertSame($account->id, $sale->credit_account_id);
+        $this->assertNotNull($sale->credit_due_at);
+
+        $this->assertDatabaseHas('payments', [
+            'sale_id' => $sale->id,
+            'payment_method_code' => 'cash',
+            'amount' => '1000.00',
+        ]);
+        $this->assertDatabaseHas('payments', [
+            'sale_id' => $sale->id,
+            'payment_method_code' => 'credit',
+            'amount' => '2600.00',
+        ]);
+
+        // Solo se carga al cupo la porcion a credito, no el total de la venta.
+        $this->assertSame('2600.00', $account->balance_due);
+        $this->assertSame('97400.00', $account->available_credit);
+        $this->assertDatabaseHas('credit_movements', [
+            'credit_account_id' => $account->id,
+            'sale_id' => $sale->id,
+            'movement_type' => CreditMovementType::SaleCharge->value,
+            'amount' => '2600.00',
+        ]);
+        $this->assertSame(1, CreditMovement::query()->where('sale_id', $sale->id)->count());
+
+        // Anular la venta debe revertir solo la porcion cargada al credito
+        // (2600), no el grand_total completo (3600) — antes de este fix,
+        // CancelSale reversaba siempre grand_total y esto habria lanzado
+        // "El movimiento excede el saldo pendiente de la venta.".
+        app(CancelSale::class)->handle($company, $sale, 'Prueba de anulacion mixta');
+
+        $account = $account->fresh();
+        $this->assertSame('0.00', $account->balance_due);
+        $this->assertSame('100000.00', $account->available_credit);
+        $this->assertDatabaseHas('credit_movements', [
+            'credit_account_id' => $account->id,
+            'sale_id' => $sale->id,
+            'movement_type' => CreditMovementType::SaleCancellationAdjustment->value,
+            'amount' => '2600.00',
+        ]);
+    }
+
     public function test_pos_page_resolves_new_customer_from_nickname_without_polluting_document_number(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
@@ -453,7 +561,38 @@ class PosPageTest extends TestCase
         $sales = Sale::query()->where('company_id', $company->id)->get();
         $this->assertCount(2, $sales);
         $this->assertSame($sales[0]->customer_id, $sales[1]->customer_id);
-        $this->assertSame(1, \App\Models\Customer::query()->where('company_id', $company->id)->count());
+        $this->assertSame(1, Customer::query()->where('company_id', $company->id)->count());
+    }
+
+    public function test_pos_page_hides_freeze_option_and_warns_when_plan_lacks_frozen_sales(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+        $this->assignCompanyPlan($company, 'basic');
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $component = Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_price', '1800');
+
+        // Antes de este fix, el modal de "salida con carrito sin terminar"
+        // siempre ofrecia "congelar y salir" sin importar si el plan/permiso
+        // realmente lo permitian: al hacer clic no pasaba nada (ni error ni
+        // navegacion) porque freezeCurrentSale() retornaba en silencio.
+        $this->assertFalse($component->instance()->canFreezeCurrentSale());
+        $component->assertDontSee('Sí, congelar venta y salir');
+
+        $component->call('freezeCurrentSale')
+            ->assertDispatched('toast', function (string $eventName, array $params): bool {
+                return ($params['type'] ?? null) === 'error';
+            });
+
+        $this->assertDatabaseCount('frozen_sales', 0);
     }
 
     public function test_pos_page_shows_real_preview_with_promotions_before_confirming(): void

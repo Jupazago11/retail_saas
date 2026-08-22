@@ -1,11 +1,14 @@
 <?php
 
 use App\Livewire\Actions\Logout;
+use App\Livewire\Concerns\InteractsWithToast;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Volt\Component;
 
 new class extends Component
 {
+    use InteractsWithToast;
+
     public string $password = '';
 
     /**
@@ -62,7 +65,6 @@ new class extends Component
                     placeholder="{{ __('Password') }}"
                 />
 
-                <x-input-error :messages="$errors->get('password')" class="mt-2" />
             </div>
 
             <div class="mt-6 flex justify-end">

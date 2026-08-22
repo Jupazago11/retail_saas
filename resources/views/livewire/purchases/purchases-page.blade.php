@@ -255,7 +255,6 @@
                                         <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                     @endforeach
                                 </select>
-                                @error('branchId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             @endif
                             @if ($showWarehouse)
@@ -268,7 +267,6 @@
                                         <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                     @endforeach
                                 </select>
-                                @error('warehouseId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             @endif
                         </div>
@@ -326,8 +324,6 @@
                                         x-text="s.name"></button>
                                 </template>
                             </div>
-                            @error('supplierId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-                            @error('supplierName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="grid gap-3 sm:grid-cols-2">
@@ -335,7 +331,6 @@
                                 <label for="purchase-invoice-number" class="text-xs font-medium text-gray-700">Factura</label>
                                 <input wire:model="invoiceNumber" id="purchase-invoice-number" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('invoiceNumber') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="purchase-type" class="text-xs font-medium text-gray-700">Tipo <span class="text-rose-600">*</span></label>
@@ -347,7 +342,6 @@
                                     <option value="expense">Gasto</option>
                                     <option value="other">Otro</option>
                                 </select>
-                                @error('purchaseType') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -356,13 +350,11 @@
                                 <label for="purchase-purchased-at" class="text-xs font-medium text-gray-700">Fecha compra</label>
                                 <input wire:model="purchasedAt" id="purchase-purchased-at" type="date"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('purchasedAt') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="purchase-due-at" class="text-xs font-medium text-gray-700">Vence</label>
                                 <input wire:model="dueAt" id="purchase-due-at" type="date"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('dueAt') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -371,13 +363,11 @@
                                 <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total <span class="text-rose-600">*</span></label>
                                 <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('totalAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="purchase-notes" class="text-xs font-medium text-gray-700">Notas</label>
                                 <textarea wire:model="notes" id="purchase-notes" rows="1"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
-                                @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -427,13 +417,11 @@
                                     <input type="text" inputmode="numeric" @input="onInput($event)"
                                         value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                    @error('paymentAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                 </div>
                                 <div class="flex-1">
                                     <label class="text-xs font-medium text-gray-700">Referencia</label>
                                     <input wire:model="paymentReference" type="text"
                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                    @error('paymentReference') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                 </div>
                                 <div class="flex gap-2">
                                     <button wire:click="registerPayment"

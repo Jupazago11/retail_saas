@@ -55,12 +55,11 @@ class CreditLedger
             ->leftJoin('credit_movements', 'credit_movements.sale_id', '=', 'sales.id')
             ->where('sales.company_id', $account->company_id)
             ->where('sales.credit_account_id', $account->id)
-            ->where('sales.sale_type', 'credit')
             ->whereNotNull('sales.credit_due_at')
             ->where('sales.credit_due_at', '<', $asOf)
             ->groupBy('sales.id')
             ->havingRaw(
-                "COALESCE(SUM(CASE WHEN credit_movements.movement_type = ? THEN credit_movements.amount ELSE -credit_movements.amount END), 0) > 0",
+                'COALESCE(SUM(CASE WHEN credit_movements.movement_type = ? THEN credit_movements.amount ELSE -credit_movements.amount END), 0) > 0',
                 [CreditMovementType::SaleCharge->value]
             )
             ->exists();

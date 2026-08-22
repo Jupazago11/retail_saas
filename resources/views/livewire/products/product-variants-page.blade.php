@@ -35,27 +35,23 @@
                                 <option value="{{ $product->id }}">{{ $product->name }}</option>
                             @endforeach
                         </select>
-                        @error('productId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label for="variant-sku" class="text-sm font-medium text-gray-700">SKU</label>
                             <input wire:model="sku" id="variant-sku" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateVariants)>
-                            @error('sku') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="variant-barcode" class="text-sm font-medium text-gray-700">Codigo de barras</label>
                             <input wire:model="barcode" id="variant-barcode" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateVariants)>
-                            @error('barcode') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     <div>
                         <label for="variant-price-override" class="text-sm font-medium text-gray-700">Precio override</label>
                         <input wire:model="priceOverride" id="variant-price-override" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateVariants)>
-                        @error('priceOverride') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4">
@@ -79,7 +75,6 @@
                                 <p class="text-sm text-gray-500">Aun no hay atributos activos con valores disponibles.</p>
                             @endforelse
                         </div>
-                        @error('selectedAttributeValueIds') <p class="mt-3 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60" @disabled(! $canCreateVariants)>

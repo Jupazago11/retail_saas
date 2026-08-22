@@ -180,7 +180,6 @@
                                     :options="$categories->map(fn ($category) => ['id' => $category->id, 'label' => $category->name])"
                                 />
                                 <p class="mt-1 text-[11px] text-gray-400">Si escribes un nombre que no existe, se crea al guardar.</p>
-                                @error('categoryId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
                             <div>
@@ -193,7 +192,6 @@
                                     :options="$brands->map(fn ($brand) => ['id' => $brand->id, 'label' => $brand->name])"
                                 />
                                 <p class="mt-1 text-[11px] text-gray-400">Si escribes un nombre que no existe, se crea al guardar.</p>
-                                @error('brandId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -222,7 +220,6 @@
                                         </div>
                                     @endif
                                 </div>
-                                @error('barcode') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div class="sm:col-span-2">
                                 <label for="product-name" class="mb-1 block text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
@@ -230,7 +227,6 @@
                                     wire:loading.attr="disabled" wire:target="lookupBarcode"
                                     x-on:blur="$wire.set('name', $capitalize($event.target.value), false)"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm disabled:bg-gray-50 disabled:text-gray-400">
-                                @error('name') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -270,7 +266,6 @@
                                     value="{{ $cost !== '' ? number_format((int) $cost, 0, ',', '.') : '' }}"
                                     id="product-cost"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('cost') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div wire:key="product-tax-rate-stepper" x-data="{
                                 step(delta) {
@@ -307,7 +302,6 @@
                                     </div>
                                 </div>
                                 <p class="mt-0.5 min-h-[1rem] text-xs text-gray-400">Incluido en el costo</p>
-                                @error('taxRate') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="product-price-1" class="mb-1 block text-xs font-medium text-gray-700">Precio 1 <span class="text-rose-600">*</span></label>
@@ -318,7 +312,6 @@
                                 <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price1))">
                                     <span x-text="margin($wire.price1) !== null ? margin($wire.price1) + '% margen' : ''"></span>
                                 </p>
-                                @error('price1') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="product-price-2" class="mb-1 block text-xs font-medium text-gray-700">Precio 2</label>
@@ -329,7 +322,6 @@
                                 <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price2))">
                                     <span x-text="$wire.price2 > 0 && margin($wire.price2) !== null ? margin($wire.price2) + '% margen' : ''"></span>
                                 </p>
-                                @error('price2') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="product-price-3" class="mb-1 block text-xs font-medium text-gray-700">Precio 3</label>
@@ -340,7 +332,6 @@
                                 <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price3))">
                                     <span x-text="$wire.price3 > 0 && margin($wire.price3) !== null ? margin($wire.price3) + '% margen' : ''"></span>
                                 </p>
-                                @error('price3') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -358,7 +349,6 @@
                                     <label for="product-minimum-stock" class="mb-1 block text-xs font-medium text-gray-700">Stock minimo (alerta) <span class="text-rose-600">*</span></label>
                                     <input wire:model="minimumStock" id="product-minimum-stock" type="number" min="0" step="1"
                                         class="block w-full max-w-[200px] rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                    @error('minimumStock') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                 </div>
 
                                 @if ($editingProductId)
@@ -379,7 +369,6 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        @error('initialQuantities') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                     </div>
                                 @endif
                             @endif

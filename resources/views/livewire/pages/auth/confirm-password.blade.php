@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\InteractsWithToast;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
@@ -7,6 +8,8 @@ use Livewire\Volt\Component;
 
 new #[Layout('layouts.guest')] class extends Component
 {
+    use InteractsWithToast;
+
     public string $password = '';
 
     /**
@@ -22,8 +25,12 @@ new #[Layout('layouts.guest')] class extends Component
             'email' => Auth::user()->email,
             'password' => $this->password,
         ])) {
+            $message = __('auth.password');
+
+            $this->toast($message, 'error');
+
             throw ValidationException::withMessages([
-                'password' => __('auth.password'),
+                'password' => $message,
             ]);
         }
 
@@ -50,7 +57,6 @@ new #[Layout('layouts.guest')] class extends Component
                           name="password"
                           required autocomplete="current-password" />
 
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
         <div class="flex justify-end mt-4">

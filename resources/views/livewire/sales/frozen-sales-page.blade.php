@@ -57,7 +57,6 @@
                                             <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('branchId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
@@ -68,7 +67,6 @@
                                             <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('warehouseId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
@@ -79,7 +77,6 @@
                                             <option value="{{ $cashRegister->id }}">{{ $cashRegister->name }}</option>
                                         @endforeach
                                     </select>
-                                    @error('cashRegisterId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                 </div>
                             </div>
 
@@ -87,7 +84,6 @@
                                 <div>
                                     <label class="text-sm font-medium text-gray-700">Etiqueta</label>
                                     <input wire:model="label" type="text" placeholder="Mesa 4, cliente esperando, pedido rapido..." class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateFrozenSales)>
-                                    @error('label') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                 </div>
 
                                 <div>
@@ -104,7 +100,6 @@
                                             <option value="{{ $customer->id }}">{{ $fullName !== '' ? $fullName : 'Cliente '.$customer->id }}</option>
                                         @endforeach
                                     </select>
-                                    @error('customerId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                 </div>
                             </div>
 
@@ -140,7 +135,6 @@
                                                             <option value="{{ $product->id }}">{{ $product->name }}</option>
                                                         @endforeach
                                                     </select>
-                                                    @error('items.'.$index.'.product_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
@@ -151,7 +145,6 @@
                                                             <option value="{{ $presentation->id }}">{{ $presentation->name }}</option>
                                                         @endforeach
                                                     </select>
-                                                    @error('items.'.$index.'.product_presentation_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
@@ -162,43 +155,36 @@
                                                             <option value="{{ $variant->id }}">{{ $this->variantSummary($variant) }}</option>
                                                         @endforeach
                                                     </select>
-                                                    @error('items.'.$index.'.product_variant_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
                                                     <label class="text-sm font-medium text-gray-700">Cantidad</label>
                                                     <input wire:model="items.{{ $index }}.quantity" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateFrozenSales)>
-                                                    @error('items.'.$index.'.quantity') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
                                                     <label class="text-sm font-medium text-gray-700">Precio unitario</label>
                                                     <input wire:model="items.{{ $index }}.unit_price" type="number" min="0" step="0.0001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateFrozenSales)>
-                                                    @error('items.'.$index.'.unit_price') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
                                                     <label class="text-sm font-medium text-gray-700">Descuento manual</label>
                                                     <input wire:model="items.{{ $index }}.discount_amount" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateFrozenSales)>
-                                                    @error('items.'.$index.'.discount_amount') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
                                                     <label class="text-sm font-medium text-gray-700">Impuesto %</label>
                                                     <input wire:model="items.{{ $index }}.tax_rate" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateFrozenSales)>
-                                                    @error('items.'.$index.'.tax_rate') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                             </div>
                                         </div>
                                     @endforeach
                                 </div>
-                                @error('items') <p class="mt-2 text-sm text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
                             <div>
                                 <label class="text-sm font-medium text-gray-700">Notas</label>
                                 <textarea wire:model="notes" rows="4" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreateFrozenSales)></textarea>
-                                @error('notes') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
                             <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60" @disabled(! $canCreateFrozenSales)>

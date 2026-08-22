@@ -21,13 +21,11 @@
                     <div>
                         <label for="attribute-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="name" id="attribute-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label for="attribute-code" class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                         <input wire:model="code" id="attribute-code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('code') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
@@ -61,7 +59,6 @@
                         <div>
                             <label for="attribute-value" class="text-sm font-medium text-gray-700">Valor <span class="text-rose-600">*</span></label>
                             <input wire:model="value" id="attribute-value" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('value') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">

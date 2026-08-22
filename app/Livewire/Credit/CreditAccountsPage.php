@@ -15,6 +15,7 @@ use App\Models\CreditAccount;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Services\Plans\CompanyPlanResolver;
+use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use App\Support\Money;
 use Illuminate\Contracts\View\View;
@@ -30,34 +31,57 @@ class CreditAccountsPage extends Component
     use InteractsWithToast;
 
     public string $search = '';
+
     public string $statusFilter = 'all';
+
     public ?int $selectedCustomerId = null;
+
     public bool $showDetailModal = false;
+
     public bool $showEditModal = false;
 
     public string $editFirstName = '';
+
     public string $editLastName = '';
+
     public string $editPhone = '';
+
     public string $editEmail = '';
+
     public string $editCreditLimit = '';
 
+    public string $editPaymentTermDays = '';
+
     public bool $showPaymentForm = false;
+
     public ?int $cashSessionId = null;
+
     public string $paymentAmount = '';
+
     public string $paymentMethodCode = 'cash';
+
     public string $paymentReference = '';
 
     public bool $showAddCustomerModal = false;
+
     public string $addCustomerSearch = '';
+
     public ?int $addCustomerSelectedId = null;
+
     public string $addCustomerCreditLimit = '';
 
     public bool $addCustomerCreatingNew = false;
+
     public string $newCustomerDocumentType = '';
+
     public string $newCustomerDocumentNumber = '';
+
     public string $newCustomerFirstName = '';
+
     public string $newCustomerLastName = '';
+
     public string $newCustomerPhone = '';
+
     public string $newCustomerEmail = '';
 
     public function mount(): void
@@ -78,7 +102,7 @@ class CreditAccountsPage extends Component
     {
         return $this->accountsQuery()
             ->when($this->search !== '', function (Builder $query) {
-                $search = '%' . trim($this->search) . '%';
+                $search = '%'.trim($this->search).'%';
 
                 $query->where(function (Builder $nested) use ($search) {
                     $nested
@@ -141,7 +165,6 @@ class CreditAccountsPage extends Component
         $oldestDueAt = Sale::query()
             ->where('company_id', $this->currentCompany()->id)
             ->where('credit_account_id', $account->id)
-            ->where('sale_type', 'credit')
             ->where('status', '!=', SaleStatus::Cancelled->value)
             ->whereNotNull('credit_due_at')
             ->orderBy('credit_due_at')
@@ -346,12 +369,18 @@ class CreditAccountsPage extends Component
         }
         $person = $account->customer?->person;
         $this->editFirstName = $person?->first_name ?? '';
-        $this->editLastName  = $person?->last_name  ?? '';
-        $this->editPhone     = $person?->phone      ?? '';
-        $this->editEmail     = $person?->email      ?? '';
+        $this->editLastName = $person?->last_name ?? '';
+        $this->editPhone = $person?->phone ?? '';
+        $this->editEmail = $person?->email ?? '';
         $this->editCreditLimit = (string) ($account->credit_limit ?? '');
+        $this->editPaymentTermDays = $account->payment_term_days !== null ? (string) $account->payment_term_days : '';
         $this->showEditModal = true;
         $this->resetValidation();
+    }
+
+    public function defaultTermDays(): int
+    {
+        return (int) app(CompanySettings::class)->get($this->currentCompany(), 'credit', 'default_term_days');
     }
 
     public function closeEditModal(): void
@@ -365,11 +394,12 @@ class CreditAccountsPage extends Component
         $this->ensurePermission('credit.manage');
 
         $validated = $this->validate([
-            'editFirstName'   => ['required', 'string', 'max:100'],
-            'editLastName'    => ['nullable', 'string', 'max:100'],
-            'editPhone'       => ['nullable', 'string', 'max:30'],
-            'editEmail'       => ['nullable', 'email', 'max:150'],
+            'editFirstName' => ['required', 'string', 'max:100'],
+            'editLastName' => ['nullable', 'string', 'max:100'],
+            'editPhone' => ['nullable', 'string', 'max:30'],
+            'editEmail' => ['nullable', 'email', 'max:150'],
             'editCreditLimit' => ['required', 'numeric', 'min:0'],
+            'editPaymentTermDays' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
         $account = $this->accounts()->firstWhere('customer_id', $this->selectedCustomerId);
@@ -381,17 +411,21 @@ class CreditAccountsPage extends Component
         if ($person) {
             $person->update([
                 'first_name' => trim($validated['editFirstName']),
-                'last_name'  => trim($validated['editLastName'] ?? ''),
-                'phone'      => $this->blankToNull($validated['editPhone']),
-                'email'      => $this->blankToNull($validated['editEmail']),
+                'last_name' => trim($validated['editLastName'] ?? ''),
+                'phone' => $this->blankToNull($validated['editPhone']),
+                'email' => $this->blankToNull($validated['editEmail']),
             ]);
         }
 
         $newLimit = (string) $validated['editCreditLimit'];
-        if (bccomp($newLimit, (string) $account->credit_limit, 2) !== 0) {
+        $newTermDays = $this->blankToNull($validated['editPaymentTermDays'] ?? null);
+        $newTermDays = $newTermDays !== null ? (int) $newTermDays : null;
+
+        if (bccomp($newLimit, (string) $account->credit_limit, 2) !== 0 || $newTermDays !== $account->payment_term_days) {
             $account->update([
-                'credit_limit'     => $newLimit,
+                'credit_limit' => $newLimit,
                 'available_credit' => bcsub($newLimit, (string) $account->balance_due, 2),
+                'payment_term_days' => $newTermDays,
             ]);
         }
 
@@ -402,7 +436,7 @@ class CreditAccountsPage extends Component
     public function selectedCustomerSales(): Collection
     {
         if (! $this->selectedCustomerId) {
-            return new Collection();
+            return new Collection;
         }
 
         return $this->creditSalesQuery()
@@ -511,11 +545,11 @@ class CreditAccountsPage extends Component
     public function render(): View
     {
         return view('livewire.credit.credit-accounts-page', [
-            'accounts'             => $this->accounts(),
-            'selectedAccount'      => $this->selectedAccount(),
+            'accounts' => $this->accounts(),
+            'selectedAccount' => $this->selectedAccount(),
             'selectedCustomerSales' => $this->selectedCustomerSales(),
-            'openCashSessions'     => $this->showPaymentForm ? $this->openCashSessions() : new Collection(),
-            'statusCards'          => $this->summaryCards(),
+            'openCashSessions' => $this->showPaymentForm ? $this->openCashSessions() : new Collection,
+            'statusCards' => $this->summaryCards(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [
                 'title' => 'Credito',
@@ -534,7 +568,7 @@ class CreditAccountsPage extends Component
     {
         return Sale::query()
             ->where('company_id', $this->currentCompany()->id)
-            ->where('sale_type', 'credit');
+            ->whereNotNull('credit_account_id');
     }
 
     protected function accountsQuery(): Builder

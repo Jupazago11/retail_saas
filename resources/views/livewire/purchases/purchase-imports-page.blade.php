@@ -17,7 +17,6 @@
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach
                             </select>
-                            @error('branchId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -28,7 +27,6 @@
                                     <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                 @endforeach
                             </select>
-                            @error('warehouseId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -41,25 +39,21 @@
                                     </option>
                                 @endforeach
                             </select>
-                            @error('supplierId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="purchase-import-supplier-name" class="text-sm font-medium text-gray-700">Nombre proveedor libre</label>
                             <input wire:model="supplierName" id="purchase-import-supplier-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('supplierName') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="purchase-import-invoice-number" class="text-sm font-medium text-gray-700">Factura</label>
                             <input wire:model="invoiceNumber" id="purchase-import-invoice-number" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('invoiceNumber') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="purchase-import-type" class="text-sm font-medium text-gray-700">Tipo</label>
                             <input wire:model="purchaseType" id="purchase-import-type" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('purchaseType') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -69,38 +63,32 @@
                                 <option value="partially_paid">Parcialmente pagada</option>
                                 <option value="paid">Pagada</option>
                             </select>
-                            @error('purchaseStatus') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="purchase-import-paid-amount" class="text-sm font-medium text-gray-700">Pago inicial</label>
                             <input wire:model="initialPaidAmount" id="purchase-import-paid-amount" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('initialPaidAmount') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="purchase-import-purchased-at" class="text-sm font-medium text-gray-700">Fecha compra</label>
                             <input wire:model="purchasedAt" id="purchase-import-purchased-at" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('purchasedAt') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="purchase-import-due-at" class="text-sm font-medium text-gray-700">Vencimiento</label>
                             <input wire:model="dueAt" id="purchase-import-due-at" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('dueAt') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     <div>
                         <label for="purchase-import-notes" class="text-sm font-medium text-gray-700">Notas</label>
                         <textarea wire:model="notes" id="purchase-import-notes" rows="3" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
-                        @error('notes') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label for="purchase-import-file" class="text-sm font-medium text-gray-700">Archivo CSV</label>
                         <input wire:model="importFile" id="purchase-import-file" type="file" accept=".csv,text/csv,.txt" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('importFile') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">

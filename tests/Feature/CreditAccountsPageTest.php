@@ -13,6 +13,7 @@ use App\Enums\SaleStatus;
 use App\Livewire\Credit\CreditAccountsPage;
 use App\Models\Category;
 use App\Models\CompanyRole;
+use App\Models\Customer;
 use App\Models\Permission;
 use App\Models\Product;
 use App\Models\Unit;
@@ -137,7 +138,7 @@ class CreditAccountsPageTest extends TestCase
             ->assertHasNoErrors()
             ->assertSet('showAddCustomerModal', false);
 
-        $customer = \App\Models\Customer::query()
+        $customer = Customer::query()
             ->where('company_id', $company->id)
             ->whereHas('person', fn ($query) => $query->where('document_number', '1099887766'))
             ->with(['person', 'creditAccount'])
@@ -260,6 +261,52 @@ class CreditAccountsPageTest extends TestCase
             'cash_session_id' => $foreignSession->id,
             'amount' => '1000.00',
         ]);
+    }
+
+    public function test_credit_page_can_set_a_custom_payment_term_for_one_customer(): void
+    {
+        [$owner, $company, , $customer] = $this->creditUiFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(CreditAccountsPage::class)
+            ->call('editCustomer', $customer->id)
+            ->assertSet('editPaymentTermDays', '')
+            ->set('editPaymentTermDays', '15')
+            ->call('saveCustomerEdit')
+            ->assertHasNoErrors();
+
+        $this->assertSame(15, $customer->creditAccount()->firstOrFail()->fresh()->payment_term_days);
+    }
+
+    public function test_new_credit_sale_uses_the_customers_custom_payment_term(): void
+    {
+        [$owner, $company, , $customer] = $this->creditUiFixture();
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+        $product = Product::query()->where('company_id', $company->id)->firstOrFail();
+
+        // 15 dias en vez del plazo general de la empresa (30, default del
+        // catalogo de settings) para este cliente puntual.
+        $customer->creditAccount()->firstOrFail()->update(['payment_term_days' => 15]);
+
+        $sale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'customer_id' => $customer->id,
+            'user_id' => $owner->id,
+            'sale_type' => 'credit',
+            'status' => SaleStatus::Confirmed->value,
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '1800'],
+            ],
+        ]);
+
+        $this->assertSame(
+            now()->addDays(15)->toDateString(),
+            $sale->credit_due_at->toDateString(),
+        );
     }
 
     protected function creditUiFixture(): array

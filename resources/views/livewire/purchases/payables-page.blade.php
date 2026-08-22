@@ -318,13 +318,11 @@
                                                     <input type="text" inputmode="numeric" @input="onInput($event)"
                                                         value="{{ $creditAmount !== '' ? number_format((int) $creditAmount, 0, ',', '.') : '' }}"
                                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                                    @error('creditAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                                 <div class="flex-1">
                                                     <label class="text-xs font-medium text-gray-700">Referencia <span class="text-rose-600">*</span></label>
                                                     <input wire:model="creditReference" type="text"
                                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                                    @error('creditReference') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                                 <div class="flex gap-2">
                                                     <button wire:click="applySupplierCredit"

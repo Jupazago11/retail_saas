@@ -831,7 +831,7 @@
             </p>
         @endif
         <div class="mt-6 flex flex-col gap-2">
-            @unless ($modifyingSaleId)
+            @if (! $modifyingSaleId && $this->canFreezeCurrentSale())
                 <button
                     type="button"
                     x-bind:disabled="freezing"
@@ -849,7 +849,7 @@
                     <span x-show="!freezing">Sí, congelar venta y salir</span>
                     <span x-show="freezing" x-cloak>Congelando venta...</span>
                 </button>
-            @endunless
+            @endif
             <button
                 type="button"
                 x-on:click="window.location.href = window.posPendingHomeHref"

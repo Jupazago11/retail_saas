@@ -15,45 +15,55 @@ class AuthenticatedSessionController
 {
     public function store(Request $request): RedirectResponse
     {
-        $credentials = $request->validate([
-            'username' => ['required', 'string', 'max:255'],
-            'password' => ['required', 'string'],
-            'remember' => ['nullable', 'boolean'],
-        ]);
-
-        $credentials['username'] = Str::lower(trim($credentials['username']));
-        $remember = (bool) ($credentials['remember'] ?? false);
-        $throttleKey = Str::transliterate($credentials['username'].'|'.$request->ip());
-
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
-            event(new Lockout($request));
-
-            $seconds = RateLimiter::availableIn($throttleKey);
-
-            throw ValidationException::withMessages([
-                'username' => trans('auth.throttle', [
-                    'seconds' => $seconds,
-                    'minutes' => ceil($seconds / 60),
-                ]),
+        try {
+            $credentials = $request->validate([
+                'username' => ['required', 'string', 'max:255'],
+                'password' => ['required', 'string'],
+                'remember' => ['nullable', 'boolean'],
             ]);
-        }
 
-        if (! Auth::attempt([
-            'username' => $credentials['username'],
-            'password' => $credentials['password'],
-        ], $remember)) {
-            RateLimiter::hit($throttleKey);
+            $credentials['username'] = Str::lower(trim($credentials['username']));
+            $remember = (bool) ($credentials['remember'] ?? false);
+            $throttleKey = Str::transliterate($credentials['username'].'|'.$request->ip());
 
-            throw ValidationException::withMessages([
-                'username' => trans('auth.failed'),
-            ]);
-        }
+            if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+                event(new Lockout($request));
 
-        if (Auth::user()->status !== RecordStatus::Active->value) {
-            Auth::logout();
+                $seconds = RateLimiter::availableIn($throttleKey);
 
-            throw ValidationException::withMessages([
-                'username' => 'Tu cuenta esta inactiva. Contacta al administrador.',
+                throw ValidationException::withMessages([
+                    'username' => trans('auth.throttle', [
+                        'seconds' => $seconds,
+                        'minutes' => ceil($seconds / 60),
+                    ]),
+                ]);
+            }
+
+            if (! Auth::attempt([
+                'username' => $credentials['username'],
+                'password' => $credentials['password'],
+            ], $remember)) {
+                RateLimiter::hit($throttleKey);
+
+                throw ValidationException::withMessages([
+                    'username' => trans('auth.failed'),
+                ]);
+            }
+
+            if (Auth::user()->status !== RecordStatus::Active->value) {
+                Auth::logout();
+
+                throw ValidationException::withMessages([
+                    'username' => 'Tu cuenta esta inactiva. Contacta al administrador.',
+                ]);
+            }
+        } catch (ValidationException $e) {
+            // Los errores de login se avisan como notificacion (toast), no
+            // debajo del input: se flashea el toast en sesion en vez de
+            // usar withErrors(), que es lo que alimentaria <x-input-error>.
+            return back()->withInput($request->except('password'))->with('toast', [
+                'type' => 'error',
+                'message' => collect($e->errors())->flatten()->unique()->implode("\n"),
             ]);
         }
 

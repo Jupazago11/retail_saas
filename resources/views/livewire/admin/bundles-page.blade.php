@@ -62,12 +62,6 @@
                         </div>
                     </div>
 
-                    @error('name') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('planId') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('status') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('maxCompanies') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('discountType') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('discountValue') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
                         {{ $editingMembershipId ? 'Actualizar paquete' : 'Guardar paquete' }}

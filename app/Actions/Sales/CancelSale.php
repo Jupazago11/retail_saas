@@ -20,8 +20,7 @@ class CancelSale
         protected CreditLedger $creditLedger,
         protected LoyaltyLedger $loyaltyLedger,
         protected AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function handle(Company $company, Sale $sale, ?string $reason = null): Sale
     {
@@ -77,12 +76,19 @@ class CancelSale
                 $sale = $this->returnSaleToInventory->handle($sale, $remainingItems, SaleStatus::Cancelled);
             }
 
-            if ($sale->sale_type === 'credit' && $sale->creditAccount) {
-                $this->creditLedger->recordSaleCancellationAdjustment(
-                    $sale->creditAccount,
-                    $sale,
-                    (string) $sale->grand_total
-                );
+            if ($sale->creditAccount) {
+                // No siempre es el grand_total: una venta POS puede tener
+                // solo una porcion a credito (pago mixto), o ya haber
+                // recibido una devolucion parcial que redujo lo pendiente.
+                $outstanding = $this->creditLedger->outstandingForSale($sale);
+
+                if (bccomp($outstanding, '0.00', 2) > 0) {
+                    $this->creditLedger->recordSaleCancellationAdjustment(
+                        $sale->creditAccount,
+                        $sale,
+                        $outstanding
+                    );
+                }
             }
 
             if ($sale->customer?->loyaltyAccount) {

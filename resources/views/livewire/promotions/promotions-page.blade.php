@@ -37,13 +37,11 @@
                         <div>
                             <label class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="text-sm font-medium text-gray-700">Codigo</label>
                             <input wire:model="code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('code') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
@@ -55,7 +53,6 @@
                                 <option value="inactive">Inactiva</option>
                                 <option value="archived">Archivada</option>
                             </select>
-                            @error('status') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -64,7 +61,6 @@
                                 <option value="product_discount">Descuento por producto</option>
                                 <option value="combo_price">Combo a precio fijo</option>
                             </select>
-                            @error('promotionType') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -77,13 +73,11 @@
                                     <option value="fixed_amount">Monto fijo</option>
                                 @endif
                             </select>
-                            @error('discountType') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="text-sm font-medium text-gray-700">Valor <span class="text-rose-600">*</span></label>
                             <input wire:model="discountValue" type="number" min="0.0001" step="0.0001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('discountValue') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
@@ -91,19 +85,16 @@
                         <div>
                             <label class="text-sm font-medium text-gray-700">Prioridad <span class="text-rose-600">*</span></label>
                             <input wire:model="priority" type="number" min="0" step="1" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('priority') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="text-sm font-medium text-gray-700">Inicia</label>
                             <input wire:model="startsAt" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('startsAt') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="text-sm font-medium text-gray-700">Termina</label>
                             <input wire:model="endsAt" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('endsAt') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
@@ -120,7 +111,6 @@
                                 </button>
                             </div>
 
-                            @error('targets') <p class="mt-3 text-sm text-rose-600">{{ $message }}</p> @enderror
 
                             <div class="mt-4 space-y-4">
                                 @foreach ($targets as $index => $target)
@@ -133,7 +123,6 @@
                                                     <option value="category">Categoria</option>
                                                     <option value="variant">Variante</option>
                                                 </select>
-                                                @error('targets.'.$index.'.target_type') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div>
@@ -144,13 +133,11 @@
                                                         <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
                                                     @endforeach
                                                 </select>
-                                                @error('targets.'.$index.'.target_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div>
                                                 <label class="text-sm font-medium text-gray-700">Minimo</label>
                                                 <input wire:model="targets.{{ $index }}.min_quantity" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                                @error('targets.'.$index.'.min_quantity') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div class="flex items-end">
@@ -178,7 +165,6 @@
                                 </button>
                             </div>
 
-                            @error('comboItems') <p class="mt-3 text-sm text-rose-600">{{ $message }}</p> @enderror
 
                             <div class="mt-4 space-y-4">
                                 @foreach ($comboItems as $index => $comboItem)
@@ -195,7 +181,6 @@
                                                         <option value="{{ $product->id }}">{{ $product->name }}</option>
                                                     @endforeach
                                                 </select>
-                                                @error('comboItems.'.$index.'.product_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div>
@@ -206,13 +191,11 @@
                                                         <option value="{{ $variant->id }}">{{ $variant->sku ?: 'Variante '.$variant->id }}</option>
                                                     @endforeach
                                                 </select>
-                                                @error('comboItems.'.$index.'.product_variant_id') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div>
                                                 <label class="text-sm font-medium text-gray-700">Cantidad</label>
                                                 <input wire:model="comboItems.{{ $index }}.required_quantity" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                                @error('comboItems.'.$index.'.required_quantity') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div class="flex items-end">

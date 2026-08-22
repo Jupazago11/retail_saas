@@ -30,31 +30,50 @@
                     @endif
                     <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por documento, cliente o vendedor"
                         class="w-64 rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                    <x-searchable-select
-                        id="sales-filter-status"
-                        model="statusFilter"
-                        placeholder="Todos los estados"
-                        class="w-48"
-                        live
-                        :options="[
-                            ['id' => 'draft', 'label' => 'Borrador'],
-                            ['id' => 'confirmed', 'label' => 'Confirmada'],
-                            ['id' => 'partially_returned', 'label' => 'Parcialmente devuelta'],
-                            ['id' => 'returned', 'label' => 'Devuelta'],
-                            ['id' => 'cancelled', 'label' => 'Anulada'],
-                        ]"
-                    />
-                    <x-searchable-select
-                        id="sales-filter-type"
-                        model="saleTypeFilter"
-                        placeholder="Todos los tipos"
-                        class="w-40"
-                        live
-                        :options="[
-                            ['id' => 'pos', 'label' => 'POS'],
-                            ['id' => 'credit', 'label' => 'Credito'],
-                        ]"
-                    />
+                </div>
+            </div>
+
+            {{-- Filtros --}}
+            <div class="mt-4 flex flex-wrap items-center gap-3">
+                <div class="inline-flex flex-wrap rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setStatusFilter('')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todos
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('draft')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'draft' ? 'bg-gray-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Borrador
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('confirmed')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'confirmed' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Confirmada
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('partially_returned')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'partially_returned' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Dev. parcial
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('returned')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'returned' ? 'bg-sky-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Devuelta
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('cancelled')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'cancelled' ? 'bg-rose-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Anulada
+                    </button>
+                </div>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setSaleTypeFilter('')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $saleTypeFilter === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todos
+                    </button>
+                    <button type="button" wire:click="setSaleTypeFilter('pos')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $saleTypeFilter === 'pos' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        POS
+                    </button>
+                    <button type="button" wire:click="setSaleTypeFilter('credit')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $saleTypeFilter === 'credit' ? 'bg-fuchsia-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Credito
+                    </button>
                 </div>
             </div>
 
@@ -174,7 +193,6 @@
                                                 <label class="text-xs text-gray-600">Motivo <span class="text-rose-600">*</span></label>
                                                 <textarea wire:model="returnReason" rows="2"
                                                     class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-sky-400 focus:ring-0"></textarea>
-                                                @error('returnReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
                                             </div>
                                             @foreach ($returnItems as $index => $returnItem)
                                                 @php $saleItem = $sale->items->firstWhere('id', $returnItem['sale_item_id']); @endphp
@@ -188,7 +206,6 @@
                                                     </div>
                                                 @endif
                                             @endforeach
-                                            @error('returnItems') <p class="mt-1 text-[11px] text-rose-500 sm:col-span-2 lg:col-span-3">{{ $message }}</p> @enderror
                                         </div>
                                         <button wire:click="registerReturn"
                                             class="mt-3 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
@@ -210,7 +227,6 @@
                                             <label class="text-xs text-gray-600">Motivo <span class="text-rose-600">*</span></label>
                                             <textarea wire:model="cancellationReason" rows="2"
                                                 class="mt-1 block w-full rounded-lg border-gray-200 text-xs focus:border-rose-400 focus:ring-0"></textarea>
-                                            @error('cancellationReason') <p class="mt-0.5 text-[11px] text-rose-500">{{ $message }}</p> @enderror
                                         </div>
                                         <button wire:click="cancelSaleDocument({{ $sale->id }})"
                                             class="mt-3 rounded-full bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white">
@@ -346,7 +362,6 @@
                                             <input type="file" wire:model="newLogo" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp"
                                                 {{ $this->isLogoStorageConfigured() ? '' : 'disabled' }}
                                                 class="block w-full text-xs text-gray-600 file:mr-2 file:rounded-full file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50">
-                                            @error('newLogo') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
 
                                             <div class="mt-1.5 flex gap-2">
                                                 @if ($newLogo)

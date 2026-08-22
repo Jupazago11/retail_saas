@@ -23,7 +23,6 @@
                         <div>
                             <label for="role-code" class="text-sm font-medium text-gray-700">Codigo <span class="text-rose-600">*</span></label>
                             <input wire:model="roleCode" id="role-code" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('roleCode') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -32,14 +31,12 @@
                                 <option value="active">Activo</option>
                                 <option value="inactive">Inactivo</option>
                             </select>
-                            @error('roleStatus') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     <div>
                         <label for="role-display-name" class="text-sm font-medium text-gray-700">Nombre visible <span class="text-rose-600">*</span></label>
                         <input wire:model="displayName" id="role-display-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('displayName') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -96,7 +93,6 @@
                                 </div>
                             @endforeach
                         </div>
-                        @error('selectedPermissionCodes') <p class="mt-2 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
@@ -179,19 +175,16 @@
                         <div>
                             <label class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="newInternalName" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="Ej: Laura Gomez">
-                            @error('newInternalName') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="text-sm font-medium text-gray-700">Username <span class="text-rose-600">*</span></label>
                             <input wire:model="newInternalUsername" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="vendedor01">
-                            @error('newInternalUsername') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label class="text-sm font-medium text-gray-700">Contrasena inicial <span class="text-rose-600">*</span></label>
                             <input wire:model="newInternalPassword" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="Minimo 8 caracteres">
-                            @error('newInternalPassword') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -202,7 +195,6 @@
                                     <option value="{{ $role->id }}">{{ $role->display_name }}</option>
                                 @endforeach
                             </select>
-                            @error('newInternalCompanyRoleId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="md:col-span-2">
@@ -218,7 +210,6 @@
                         <div>
                             <label class="text-sm font-medium text-gray-700">Correo o username <span class="text-rose-600">*</span></label>
                             <input wire:model="newUserIdentifier" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" placeholder="usuario@empresa.com o vendedor01">
-                            @error('newUserIdentifier') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -229,7 +220,6 @@
                                     <option value="{{ $role->id }}">{{ $role->display_name }}</option>
                                 @endforeach
                             </select>
-                            @error('newUserCompanyRoleId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div class="flex items-end">
@@ -280,7 +270,6 @@
                                         </select>
                                     </div>
 
-                                    @error('memberships.'.$user->id.'.company_role_id') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
 
                                     <button wire:click="saveMembership({{ $user->id }})" class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
                                         Guardar asignacion

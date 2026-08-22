@@ -97,7 +97,6 @@
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="editName" type="text"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('editName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
@@ -105,7 +104,6 @@
                             <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Precio base (COP) <span class="text-rose-600">*</span></label>
                             <input wire:model="editPrice" type="number" min="0" step="1000"
                                 class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('editPrice') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -171,7 +169,6 @@
                                 <label class="block text-xs font-semibold text-gray-500">{{ $label }} <span class="text-rose-600">*</span></label>
                                 <input wire:model="editLimits.{{ $key }}" type="number" min="0" step="1"
                                     class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                @error('editLimits.'.$key) <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                             </div>
                         @endforeach
                     </div>

@@ -48,9 +48,6 @@
                             <input wire:model="moduleEndsAt" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         </div>
                     </div>
-                    @error('moduleId') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('moduleStartsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('moduleEndsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar excepcion</button>
                 </form>
             </div>
@@ -93,9 +90,6 @@
                             <input wire:model="featureEndsAt" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         </div>
                     </div>
-                    @error('featureId') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('featureStartsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('featureEndsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar excepcion</button>
                 </form>
             </div>
@@ -135,10 +129,6 @@
                             <input wire:model="limitEndsAt" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         </div>
                     </div>
-                    @error('limitKey') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('limitValue') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('limitStartsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('limitEndsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">Guardar excepcion</button>
                 </form>
             </div>

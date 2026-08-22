@@ -53,21 +53,18 @@
                     <x-input-label for="legal_name" value="Razon social" required />
                     <x-text-input wire:model="legalName" id="legal_name" name="legal_name" type="text"
                         class="mt-1 block w-full" required />
-                    <x-input-error class="mt-2" :messages="$errors->get('legalName')" />
                 </div>
 
                 <div>
                     <x-input-label for="display_name" value="Nombre comercial" />
                     <x-text-input wire:model="displayName" id="display_name" name="display_name" type="text"
                         class="mt-1 block w-full" />
-                    <x-input-error class="mt-2" :messages="$errors->get('displayName')" />
                 </div>
 
                 <div>
                     <x-input-label for="tax_id" value="NIT" />
                     <x-text-input wire:model="taxId" id="tax_id" name="tax_id" type="text"
                         class="mt-1 block w-full" />
-                    <x-input-error class="mt-2" :messages="$errors->get('taxId')" />
                 </div>
 
                 <button type="submit"

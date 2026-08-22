@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Actions\Settings\UpdateCompanySettings;
+use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Settings\CompanySettings;
@@ -14,6 +15,8 @@ use Livewire\Component;
 
 class SettingsPage extends Component
 {
+    use InteractsWithToast;
+
     public array $settings = [];
 
     public function mount(): void

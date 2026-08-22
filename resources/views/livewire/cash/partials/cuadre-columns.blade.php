@@ -53,14 +53,12 @@
                     <div>
                         <input wire:model="newFundLabel" type="text" placeholder="Nueva base (ej: refuerzo de caja)"
                             class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('newFundLabel') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="flex items-start gap-2">
                         <div class="flex-1" x-data="digitGroupInput({ path: 'newFundAmount', live: false })">
                             <input type="text" inputmode="numeric" placeholder="Valor" @input="onInput($event)"
                                 value="{{ $newFundAmount !== '' ? number_format((int) $newFundAmount, 0, ',', '.') : '' }}"
                                 class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('newFundAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -99,14 +97,12 @@
                 <div>
                     <input wire:model="newExpenseDescription" type="text" placeholder="Descripcion"
                         class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('newExpenseDescription') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div class="flex items-start gap-2">
                     <div class="flex-1" x-data="digitGroupInput({ path: 'newExpenseAmount', live: false })">
                         <input type="text" inputmode="numeric" placeholder="Valor" @input="onInput($event)"
                             value="{{ $newExpenseAmount !== '' ? number_format((int) $newExpenseAmount, 0, ',', '.') : '' }}"
                             class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('newExpenseAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <button type="submit" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -179,7 +175,6 @@
                 <input type="text" inputmode="numeric" placeholder="0" @input="onInput($event)"
                     value="{{ $closingCountedAmount !== '' ? number_format((int) $closingCountedAmount, 0, ',', '.') : '' }}"
                     class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                @error('closingCountedAmount') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
             </div>
 
             @if ($this->canViewDifference())

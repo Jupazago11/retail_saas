@@ -18,12 +18,6 @@
                 </button>
             </div>
 
-            @error('settings')
-                <div class="mx-6 mt-4 rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-rose-200">
-                    {{ $message }}
-                </div>
-            @enderror
-
             {{-- Step tabs: solo tiene sentido elegir cuando hay mas de un grupo disponible --}}
             @if (count($groups) > 1)
                 <div class="flex flex-wrap gap-1.5 border-b border-stone-100 px-6 py-4">

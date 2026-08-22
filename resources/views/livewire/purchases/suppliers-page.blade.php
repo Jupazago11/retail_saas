@@ -147,13 +147,11 @@
                                 <label for="supplier-document-type" class="text-xs font-medium text-gray-700">Tipo documento</label>
                                 <input wire:model="documentType" id="supplier-document-type" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('documentType') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="supplier-document-number" class="text-xs font-medium text-gray-700">Numero documento</label>
                                 <input wire:model="documentNumber" id="supplier-document-number" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('documentNumber') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -162,13 +160,11 @@
                                 <label for="supplier-first-name" class="text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                                 <input wire:model="firstName" id="supplier-first-name" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('firstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="supplier-last-name" class="text-xs font-medium text-gray-700">Apellido</label>
                                 <input wire:model="lastName" id="supplier-last-name" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('lastName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -177,13 +173,11 @@
                                 <label for="supplier-phone" class="text-xs font-medium text-gray-700">Telefono</label>
                                 <input wire:model="phone" id="supplier-phone" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('phone') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label for="supplier-email" class="text-xs font-medium text-gray-700">Email</label>
                                 <input wire:model="email" id="supplier-email" type="email"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('email') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
 
@@ -194,14 +188,12 @@
                             <label for="supplier-payment-term-days" class="text-xs font-medium text-gray-700">Plazo de pago (dias)</label>
                             <input wire:model="paymentTermDays" id="supplier-payment-term-days" type="number" min="0"
                                 class="mt-1 block w-full max-w-[200px] rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('paymentTermDays') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="supplier-notes" class="text-xs font-medium text-gray-700">Notas</label>
                             <textarea wire:model="notes" id="supplier-notes" rows="3"
                                 class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
-                            @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                     </div>{{-- /scrollable body --}}

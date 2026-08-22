@@ -22,7 +22,6 @@
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
-                                @error('printerTypes.' . $cashRegister->id) <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                             </div>
                         @endforeach
 

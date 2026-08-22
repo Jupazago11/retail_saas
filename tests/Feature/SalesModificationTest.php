@@ -8,22 +8,28 @@ use App\Actions\Customers\CreateCustomer;
 use App\Actions\Inventory\CreateInventoryAdjustment;
 use App\Actions\Sales\CreateSale;
 use App\Actions\Sales\ModifySale;
+use App\Actions\Sales\RegisterSalePayments;
 use App\Enums\InventoryAdjustmentType;
 use App\Enums\RecordStatus;
 use App\Enums\SaleStatus;
+use App\Models\Branch;
 use App\Models\Category;
+use App\Models\Company;
 use App\Models\InventoryBalance;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\Unit;
 use App\Models\User;
+use App\Models\Warehouse;
 use App\Services\Settings\CompanySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class SalesModificationTest extends TestCase
 {
+    use InteractsWithCompanyPlans;
     use RefreshDatabase;
 
     public function test_it_modifies_confirmed_pos_sale_cancelling_original_and_linking_replacement(): void
@@ -144,6 +150,7 @@ class SalesModificationTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Modificacion Credito SAS',
         ]);
+        $this->assignCompanyPlan($company, 'pro');
         app(CompanySettings::class)->set($company, 'credit', 'credit_enabled', true);
         $branch = $company->branches()->firstOrFail();
         $warehouse = $company->warehouses()->firstOrFail();
@@ -258,7 +265,7 @@ class SalesModificationTest extends TestCase
             ],
         ]);
 
-        app(\App\Actions\Sales\RegisterSalePayments::class)->handle($company, $sale, [
+        app(RegisterSalePayments::class)->handle($company, $sale, [
             'cash_session_id' => $cashSession->id,
             'received_by' => $owner->id,
             'payments' => [
@@ -269,7 +276,7 @@ class SalesModificationTest extends TestCase
         return [$owner, $company, $branch, $warehouse, $cashRegister, $product, $sale->fresh(['payments', 'items']), $cashSession];
     }
 
-    protected function stockedProduct(\App\Models\Company $company, \App\Models\Branch $branch, \App\Models\Warehouse $warehouse, string $quantity): array
+    protected function stockedProduct(Company $company, Branch $branch, Warehouse $warehouse, string $quantity): array
     {
         $unit = Unit::query()->create([
             'company_id' => $company->id,

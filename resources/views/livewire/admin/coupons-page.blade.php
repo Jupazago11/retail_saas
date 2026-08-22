@@ -98,15 +98,6 @@
                         </div>
                     </div>
 
-                    @error('code') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('name') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('discountType') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('discountValue') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('startsAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('expiresAt') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('totalUsesLimit') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('perUserLimit') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
-                    @error('perCompanyLimit') <p class="text-sm text-rose-600">{{ $message }}</p> @enderror
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">
                         {{ $editingCouponId ? 'Actualizar cupon' : 'Guardar cupon' }}

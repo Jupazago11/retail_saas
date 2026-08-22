@@ -24,13 +24,14 @@ use App\Models\ProductVariant;
 use App\Models\Sale;
 use App\Models\Warehouse;
 use App\Services\Plans\CompanyPlanResolver;
-use App\Services\Settings\CompanySettings;
 use App\Services\Sales\SalePreviewService;
+use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -40,31 +41,57 @@ class PosPage extends Component
     use InteractsWithToast;
 
     public ?int $branchId = null;
+
     public ?int $warehouseId = null;
+
     public ?int $cashRegisterId = null;
+
     public ?int $customerId = null;
+
     public ?int $quickProductId = null;
+
     public string $productLookup = '';
+
     public string $auditReference = '';
+
     public string $loyaltyPointsToRedeem = '';
+
     public string $saleType = 'pos';
+
     public string $saleStatus = SaleStatus::Confirmed->value;
+
     public string $soldAt = '';
+
     public string $notes = '';
+
     public array $items = [];
+
     public ?int $cashSessionId = null;
+
     public array $payments = [];
+
     public int $nextLineKey = 0;
+
     public ?int $lastCreatedSaleId = null;
+
     public ?int $editingSaleId = null;
+
     public ?int $modifyingSaleId = null;
+
     public ?int $resumingFrozenSaleId = null;
+
     public bool $showFrozenModal = false;
+
     public array $frozenSalesForModal = [];
+
     public bool $showPaymentModal = false;
+
     public string $paymentCustomerDocument = '';
+
     public ?int $resolvedCustomerId = null;
+
     public ?string $resolvedCustomerName = null;
+
     protected ?array $previewCache = null;
 
     public function mount(): void
@@ -284,6 +311,8 @@ class PosPage extends Component
     public function freezeCurrentSale(CreateFrozenSale $createFrozenSale): void
     {
         if (! $this->canFreezeCurrentSale()) {
+            $this->toast('No tienes permiso o el plan actual no incluye ventas congeladas.', 'error');
+
             return;
         }
 
@@ -433,7 +462,7 @@ class PosPage extends Component
                     'cash_register_id' => $this->cashRegisterId,
                     'customer_id' => $this->customerId,
                     'created_by' => auth()->id(),
-                    'label' => 'Auto-congelada ' . $this->auditReference,
+                    'label' => 'Auto-congelada '.$this->auditReference,
                     'sale_type' => 'pos',
                     'notes' => $this->blankToNull($this->notes),
                     'items' => $currentItems,
@@ -442,7 +471,7 @@ class PosPage extends Component
                 if ($previousFrozenSaleId) {
                     FrozenSale::find($previousFrozenSaleId)?->update(['status' => FrozenSaleStatus::Cancelled->value]);
                 }
-                $this->toast('Venta actual congelada: ' . $auto->label);
+                $this->toast('Venta actual congelada: '.$auto->label);
             } catch (InvalidArgumentException $exception) {
                 // No se pudo auto-congelar, continuamos de todas formas
             }
@@ -483,7 +512,7 @@ class PosPage extends Component
         }
 
         $this->closeFrozenSalesModal();
-        $this->toast('Retomando: ' . $label);
+        $this->toast('Retomando: '.$label);
     }
 
     public function switchPriceTier(int $lineKey, string $tier): void
@@ -701,6 +730,13 @@ class PosPage extends Component
 
                 return;
             }
+        } elseif ($this->resolvedCustomerId && ! $this->customerId) {
+            // selectPaymentCustomer() (buscar-y-elegir de la lista) deja el
+            // cliente en resolvedCustomerId y limpia paymentCustomerDocument
+            // — sin este fallback, customerId (el campo que realmente se
+            // persiste en sales.customer_id) nunca se llenaba por ese
+            // camino y el ticket quedaba sin cliente pese a haberlo elegido.
+            $this->customerId = $this->resolvedCustomerId;
         }
 
         // Validacion de limite de credito
@@ -710,20 +746,24 @@ class PosPage extends Component
             $creditCid = $this->customerId ?? $this->resolvedCustomerId;
             if (! $creditCid) {
                 $this->toast('Para pagar con crédito debes seleccionar un cliente.', 'error');
+
                 return;
             }
             $creditCustomer = Customer::with('creditAccount')->find($creditCid);
             if (! $creditCustomer?->credit_enabled) {
                 $this->toast('Este cliente no tiene crédito habilitado.', 'error');
+
                 return;
             }
             if (! $creditCustomer->creditAccount) {
                 $this->toast('Este cliente no tiene cuenta de crédito configurada.', 'error');
+
                 return;
             }
             if (bccomp($creditTotal, (string) $creditCustomer->creditAccount->available_credit, 2) > 0) {
                 $avail = number_format((float) $creditCustomer->creditAccount->available_credit, 0, '.', '.');
                 $this->toast("Crédito insuficiente. Disponible: {$avail}.", 'error');
+
                 return;
             }
         }
@@ -732,72 +772,72 @@ class PosPage extends Component
 
         try {
             $validated = $this->validate([
-            'branchId' => [
-                'required',
-                Rule::exists('branches', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
-            ],
-            'warehouseId' => [
-                'required',
-                Rule::exists('warehouses', 'id')->where(fn ($query) => $query
-                    ->where('company_id', $company->id)
-                    ->where('branch_id', $this->branchId)
-                    ->whereNull('deleted_at')),
-            ],
-            'cashRegisterId' => [
-                'nullable',
-                Rule::exists('cash_registers', 'id')->where(fn ($query) => $query
-                    ->where('company_id', $company->id)
-                    ->where('branch_id', $this->branchId)
-                    ->whereNull('deleted_at')),
-            ],
-            'customerId' => [
-                'nullable',
-                Rule::exists('customers', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
-            ],
-            'loyaltyPointsToRedeem' => ['nullable', 'numeric', 'gte:0'],
-            'saleStatus' => ['required', Rule::in([
-                SaleStatus::Draft->value,
-                SaleStatus::Confirmed->value,
-            ])],
-            'soldAt' => ['nullable', 'date'],
-            'notes' => ['nullable', 'string'],
-            'items' => ['required', 'array', 'min:1'],
-            'cashSessionId' => [
-                'nullable',
-                Rule::exists('cash_sessions', 'id')->where(fn ($query) => $query
-                    ->where('company_id', $company->id)
-                    ->where('branch_id', $this->branchId)
-                    ->where('status', CashSessionStatus::Open->value)
-                    ->when($this->cashRegisterId, fn ($cashSessionQuery) => $cashSessionQuery
-                        ->where('cash_register_id', $this->cashRegisterId))),
-            ],
-            'payments' => [Rule::requiredIf($this->requiresImmediatePayments()), 'array'],
-            'payments.*.payment_method_code' => [
-                Rule::requiredIf($this->requiresImmediatePayments()),
-                'nullable',
-                'string',
-                'max:50',
-            ],
-            'payments.*.amount' => ['nullable', 'numeric', 'gt:0'],
-            'payments.*.reference' => ['nullable', 'string', 'max:120'],
-            'items.*.product_id' => [
-                'required',
-                Rule::exists('products', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
-            ],
-            'items.*.product_presentation_id' => [
-                'nullable',
-                Rule::exists('product_presentations', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
-            ],
-            'items.*.product_variant_id' => [
-                'nullable',
-                Rule::exists('product_variants', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
-            ],
-            'items.*.quantity' => ['required', 'numeric', 'gt:0'],
-            'items.*.unit_price' => ['required', 'numeric', 'min:0'],
-            'items.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
-            'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
-        ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+                'branchId' => [
+                    'required',
+                    Rule::exists('branches', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
+                ],
+                'warehouseId' => [
+                    'required',
+                    Rule::exists('warehouses', 'id')->where(fn ($query) => $query
+                        ->where('company_id', $company->id)
+                        ->where('branch_id', $this->branchId)
+                        ->whereNull('deleted_at')),
+                ],
+                'cashRegisterId' => [
+                    'nullable',
+                    Rule::exists('cash_registers', 'id')->where(fn ($query) => $query
+                        ->where('company_id', $company->id)
+                        ->where('branch_id', $this->branchId)
+                        ->whereNull('deleted_at')),
+                ],
+                'customerId' => [
+                    'nullable',
+                    Rule::exists('customers', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
+                ],
+                'loyaltyPointsToRedeem' => ['nullable', 'numeric', 'gte:0'],
+                'saleStatus' => ['required', Rule::in([
+                    SaleStatus::Draft->value,
+                    SaleStatus::Confirmed->value,
+                ])],
+                'soldAt' => ['nullable', 'date'],
+                'notes' => ['nullable', 'string'],
+                'items' => ['required', 'array', 'min:1'],
+                'cashSessionId' => [
+                    'nullable',
+                    Rule::exists('cash_sessions', 'id')->where(fn ($query) => $query
+                        ->where('company_id', $company->id)
+                        ->where('branch_id', $this->branchId)
+                        ->where('status', CashSessionStatus::Open->value)
+                        ->when($this->cashRegisterId, fn ($cashSessionQuery) => $cashSessionQuery
+                            ->where('cash_register_id', $this->cashRegisterId))),
+                ],
+                'payments' => [Rule::requiredIf($this->requiresImmediatePayments()), 'array'],
+                'payments.*.payment_method_code' => [
+                    Rule::requiredIf($this->requiresImmediatePayments()),
+                    'nullable',
+                    'string',
+                    'max:50',
+                ],
+                'payments.*.amount' => ['nullable', 'numeric', 'gt:0'],
+                'payments.*.reference' => ['nullable', 'string', 'max:120'],
+                'items.*.product_id' => [
+                    'required',
+                    Rule::exists('products', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
+                ],
+                'items.*.product_presentation_id' => [
+                    'nullable',
+                    Rule::exists('product_presentations', 'id')->where(fn ($query) => $query->where('company_id', $company->id)->whereNull('deleted_at')),
+                ],
+                'items.*.product_variant_id' => [
+                    'nullable',
+                    Rule::exists('product_variants', 'id')->where(fn ($query) => $query->where('company_id', $company->id)),
+                ],
+                'items.*.quantity' => ['required', 'numeric', 'gt:0'],
+                'items.*.unit_price' => ['required', 'numeric', 'min:0'],
+                'items.*.discount_amount' => ['nullable', 'numeric', 'min:0'],
+                'items.*.tax_rate' => ['nullable', 'numeric', 'min:0'],
+            ]);
+        } catch (ValidationException $e) {
             $this->toast(collect($e->errors())->flatten()->first() ?? 'Revisa los datos de la venta antes de confirmar.', 'error');
 
             return;
@@ -1011,7 +1051,7 @@ class PosPage extends Component
     public function warehouses(): Collection
     {
         if (! $this->branchId) {
-            return new Collection();
+            return new Collection;
         }
 
         return Warehouse::query()
@@ -1027,7 +1067,7 @@ class PosPage extends Component
     public function cashRegisters(): Collection
     {
         if (! $this->branchId) {
-            return new Collection();
+            return new Collection;
         }
 
         return CashRegister::query()
@@ -1043,7 +1083,7 @@ class PosPage extends Component
     public function openCashSessions(): Collection
     {
         if (! $this->branchId) {
-            return new Collection();
+            return new Collection;
         }
 
         return CashSession::query()
@@ -1092,7 +1132,7 @@ class PosPage extends Component
         $term = mb_strtolower(trim($this->productLookup));
 
         if ($term === '') {
-            return new Collection();
+            return new Collection;
         }
 
         return $products
@@ -1185,12 +1225,30 @@ class PosPage extends Component
 
     public function paymentMethodOptions(): array
     {
-        return [
-            'cash'     => 'Efectivo',
-            'card'     => 'Tarjeta',
+        $options = [
+            'cash' => 'Efectivo',
+            'card' => 'Tarjeta',
             'transfer' => 'Transferencia',
-            'credit'   => 'Credito',
         ];
+
+        if ($this->creditPaymentMethodAvailable()) {
+            $options['credit'] = 'Credito';
+        }
+
+        return $options;
+    }
+
+    // El plan puede no incluir el modulo de credito (ej. Basic) o la
+    // empresa puede tenerlo apagado operativamente aunque el plan lo
+    // permita; en ninguno de los dos casos tiene sentido ofrecer "Credito"
+    // como metodo de pago en el POS.
+    public function creditPaymentMethodAvailable(): bool
+    {
+        $company = $this->currentCompany();
+
+        return app(CompanyPlanResolver::class)->hasModule($company, 'credit')
+            && app(CompanyPlanResolver::class)->hasFeature($company, 'credit.enabled')
+            && (bool) app(CompanySettings::class)->get($company, 'credit', 'credit_enabled');
     }
 
     public function selectedCustomer(): ?Customer
@@ -1389,13 +1447,13 @@ class PosPage extends Component
         }
 
         $parts = $variant->attributeValues
-            ->sortBy(fn ($value) => ($value->attribute->name ?? '') . '-' . $value->value)
-            ->map(fn ($value) => ($value->attribute->name ?? 'Atributo') . ': ' . $value->value)
+            ->sortBy(fn ($value) => ($value->attribute->name ?? '').'-'.$value->value)
+            ->map(fn ($value) => ($value->attribute->name ?? 'Atributo').': '.$value->value)
             ->values()
             ->all();
 
         if ($parts === []) {
-            return $variant->sku ?: 'Variante #' . $variant->id;
+            return $variant->sku ?: 'Variante #'.$variant->id;
         }
 
         return implode(' / ', $parts);
@@ -1701,10 +1759,10 @@ class PosPage extends Component
 
         if (! $person) {
             $person = Person::create([
-                'document_type'   => 'CC',
+                'document_type' => 'CC',
                 'document_number' => $looksLikeDocument ? $document : null,
-                'first_name'      => $document,
-                'last_name'       => '',
+                'first_name' => $document,
+                'last_name' => '',
             ]);
         }
 

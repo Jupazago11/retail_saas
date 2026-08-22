@@ -15,7 +15,6 @@
                     <div>
                         <label for="supplier-import-file" class="text-sm font-medium text-gray-700">Archivo CSV</label>
                         <input wire:model="importFile" id="supplier-import-file" type="file" accept=".csv,text/csv,.txt" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('importFile') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">

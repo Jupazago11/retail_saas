@@ -25,7 +25,6 @@
                     <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Banco</label>
                     <input wire:model="bankName" type="text" placeholder="Bancolombia"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('bankName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
@@ -43,21 +42,18 @@
                     <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Número de cuenta</label>
                     <input wire:model="bankAccount" type="text" placeholder="123-456789-12"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('bankAccount') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Titular</label>
                     <input wire:model="bankHolder" type="text" placeholder="Mi Empresa SAS"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('bankHolder') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">NIT titular</label>
                     <input wire:model="bankNit" type="text" placeholder="900.123.456-7"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('bankNit') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                 </div>
             </div>
         </div>
@@ -80,14 +76,12 @@
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Email de soporte</label>
                         <input wire:model="contactEmail" type="email" placeholder="soporte@miempresa.com"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('contactEmail') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Teléfono / WhatsApp</label>
                         <input wire:model="contactPhone" type="text" placeholder="+57 310 000 0000"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('contactPhone') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
             </div>
@@ -121,7 +115,6 @@
                             <p class="mt-1 text-xs text-gray-400">
                                 Imagen cuadrada (ej. 512x512px). Si no subes nada, o si eliminas el que tenias, se usa el logo por defecto.
                             </p>
-                            @error('newLogo') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
 
                             <div class="mt-2 flex gap-2">
                                 @if ($newLogo)
@@ -146,7 +139,6 @@
                     <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre de la plataforma</label>
                     <input wire:model="appName" type="text" placeholder="{{ \App\Models\PlatformSetting::appName() }}"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    @error('appName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                 </div>
 
                 <div class="mt-4">
@@ -154,7 +146,6 @@
                     <input wire:model="ownerNotificationEmail" type="email" placeholder="jupazago11@gmail.com"
                         class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                     <p class="mt-1 text-xs text-gray-400">Recibe un aviso cada vez que alguien crea una cuenta nueva.</p>
-                    @error('ownerNotificationEmail') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                 </div>
             </div>
         </div>

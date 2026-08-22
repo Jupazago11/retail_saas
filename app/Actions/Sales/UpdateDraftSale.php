@@ -6,7 +6,6 @@ use App\Enums\SaleStatus;
 use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\Company;
-use App\Models\CreditAccount;
 use App\Models\Customer;
 use App\Models\LoyaltyAccount;
 use App\Models\Product;
@@ -16,6 +15,7 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Models\Warehouse;
 use App\Services\Audit\AuditLogger;
+use App\Services\Credit\CreditAccountResolver;
 use App\Services\Credit\CreditLedger;
 use App\Services\Inventory\PostSaleToInventory;
 use App\Services\Loyalty\LoyaltyLedger;
@@ -35,13 +35,13 @@ class UpdateDraftSale
         protected PostSaleToInventory $postSaleToInventory,
         protected CompanySettings $companySettings,
         protected CreditLedger $creditLedger,
+        protected CreditAccountResolver $creditAccountResolver,
         protected LoyaltyLedger $loyaltyLedger,
         protected CompanyOperationalLimitGuard $companyOperationalLimitGuard,
         protected CompanyPlanResolver $companyPlanResolver,
         protected PromotionEngine $promotionEngine,
         protected AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     public function handle(Company $company, Sale $sale, array $attributes): Sale
     {
@@ -61,7 +61,9 @@ class UpdateDraftSale
         $user = $this->resolveUser($company, $attributes['user_id'] ?? null);
         $saleType = $this->blankToDefault($attributes['sale_type'] ?? null, 'pos');
         $customer = $this->resolveCustomer($company, $attributes['customer_id'] ?? null);
-        $creditAccount = $this->resolveCreditAccountForSale($company, $saleType, $customer);
+        $creditAccount = $saleType === 'credit'
+            ? $this->creditAccountResolver->resolveActiveAccount($company, $customer)
+            : null;
         $loyaltyAccount = $this->resolveLoyaltyAccountForSale($company, $customer);
         $items = $attributes['items'] ?? [];
 
@@ -143,7 +145,7 @@ class UpdateDraftSale
                 'notes' => $this->blankToNull($attributes['notes'] ?? null),
                 'sold_at' => $attributes['sold_at'] ?? null,
                 'credit_due_at' => $saleType === 'credit'
-                    ? now()->addDays((int) $this->companySettings->get($company, 'credit', 'default_term_days'))
+                    ? now()->addDays($this->creditAccountResolver->resolveTermDays($company, $creditAccount))
                     : null,
                 ...$totals,
             ]);
@@ -417,48 +419,6 @@ class UpdateDraftSale
         return Customer::query()
             ->where('company_id', $company->id)
             ->findOrFail((int) $customerId);
-    }
-
-    protected function resolveCreditAccountForSale(Company $company, string $saleType, ?Customer $customer): ?CreditAccount
-    {
-        if ($saleType !== 'credit') {
-            return null;
-        }
-
-        if (! $this->companySettings->get($company, 'credit', 'credit_enabled')) {
-            throw new InvalidArgumentException('La empresa no tiene habilitado el modulo de credito.');
-        }
-
-        if ($this->companySettings->get($company, 'pos', 'require_customer_for_credit_sale') && ! $customer) {
-            throw new InvalidArgumentException('La venta a credito requiere un cliente.');
-        }
-
-        if (! $customer) {
-            throw new InvalidArgumentException('La venta a credito requiere un cliente.');
-        }
-
-        if (! $customer->credit_enabled) {
-            throw new InvalidArgumentException('El cliente no tiene credito habilitado.');
-        }
-
-        $creditAccount = $customer->creditAccount()->first();
-
-        if (! $creditAccount) {
-            throw new InvalidArgumentException('El cliente no tiene una cuenta de credito creada.');
-        }
-
-        if ($creditAccount->status !== 'active') {
-            throw new InvalidArgumentException('La cuenta de credito del cliente no esta activa.');
-        }
-
-        if (
-            $this->companySettings->get($company, 'credit', 'block_new_credit_if_overdue')
-            && $this->creditLedger->hasOverdueBalance($creditAccount)
-        ) {
-            throw new InvalidArgumentException('El cliente tiene cartera vencida y la empresa bloquea nuevos creditos.');
-        }
-
-        return $creditAccount;
     }
 
     protected function resolveLoyaltyAccountForSale(Company $company, ?Customer $customer): ?LoyaltyAccount

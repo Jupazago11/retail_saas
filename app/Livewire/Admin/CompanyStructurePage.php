@@ -150,6 +150,21 @@ class CompanyStructurePage extends Component
         $this->toast('Caja guardada correctamente.');
     }
 
+    public function updatePrinterType(int $id, string $printerType): void
+    {
+        $this->ensurePermission('settings.manage');
+
+        if (! array_key_exists($printerType, CashRegister::PRINTER_TYPES)) {
+            return;
+        }
+
+        /** @var CashRegister $cashRegister */
+        $cashRegister = $this->findRecord('cash', $id);
+        $cashRegister->update(['printer_type' => $printerType]);
+
+        $this->toast('Tipo de impresora actualizado.');
+    }
+
     // ─── Toggle estado ────────────────────────────────────────────────────────
 
     public function toggleStatus(string $type, int $id): void

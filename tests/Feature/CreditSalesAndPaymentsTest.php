@@ -13,25 +13,21 @@ use App\Actions\Sales\RegisterSalePayments;
 use App\Actions\Sales\ReturnSale;
 use App\Enums\CreditMovementType;
 use App\Enums\InventoryAdjustmentType;
-use App\Enums\PaymentStatus;
 use App\Enums\RecordStatus;
 use App\Enums\SaleStatus;
 use App\Models\Category;
-use App\Models\CreditAccount;
-use App\Models\CreditMovement;
-use App\Models\Customer;
-use App\Models\Payment;
 use App\Models\Product;
-use App\Models\Sale;
 use App\Models\Unit;
 use App\Models\User;
 use App\Services\Settings\CompanySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class CreditSalesAndPaymentsTest extends TestCase
 {
+    use InteractsWithCompanyPlans;
     use RefreshDatabase;
 
     public function test_it_creates_confirmed_credit_sale_and_registers_charge_on_customer_account(): void
@@ -466,6 +462,7 @@ class CreditSalesAndPaymentsTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Credito Retail SAS',
         ]);
+        $this->assignCompanyPlan($company, 'pro');
         app(CompanySettings::class)->set($company, 'credit', 'credit_enabled', true);
         $branch = $company->branches()->firstOrFail();
         $warehouse = $company->warehouses()->firstOrFail();

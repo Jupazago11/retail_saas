@@ -189,7 +189,6 @@
                                             <input type="text" inputmode="numeric" @input="onInput($event)"
                                                 value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
                                                 class="mt-0.5 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
-                                            @error('paymentAmount') <p class="mt-0.5 text-xs text-rose-600">{{ $message }}</p> @enderror
                                         </div>
                                         <div>
                                             <label class="text-xs font-medium text-gray-700">Metodo <span class="text-rose-600">*</span></label>
@@ -319,32 +318,35 @@
                             <label class="mb-1 block text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="editFirstName" type="text"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('editFirstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-gray-700">Apellido</label>
                             <input wire:model="editLastName" type="text"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('editLastName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-gray-700">Telefono</label>
                             <input wire:model="editPhone" type="text"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('editPhone') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-gray-700">Email</label>
                             <input wire:model="editEmail" type="email"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('editEmail') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
-                    <div>
+                    <div x-data="creditLimitField('{{ $editCreditLimit }}')">
                         <label class="mb-1 block text-xs font-medium text-gray-700">Cupo de credito <span class="text-rose-600">*</span></label>
-                        <input wire:model="editCreditLimit" type="number" min="0" step="1"
+                        <input type="text" x-ref="input" inputmode="numeric"
+                            x-on:focus="onFocus" x-on:input="onInput" x-on:blur="onBlur"
                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                        @error('editCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-medium text-gray-700">Dias para mora</label>
+                        <input wire:model="editPaymentTermDays" type="number" min="1" max="365" step="1"
+                            placeholder="Usa el plazo general de la empresa ({{ $this->defaultTermDays() }} dias)"
+                            class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                        <p class="mt-1 text-xs text-gray-400">Dejar en blanco usa el plazo general de la empresa. Solo aplica a compras nuevas, no cambia el vencimiento de facturas ya generadas.</p>
                     </div>
                     <div class="flex gap-2 border-t border-stone-100 pt-3">
                         <button wire:click="closeEditModal"
@@ -382,44 +384,37 @@
                                 <label class="mb-1 block text-xs font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                                 <input wire:model="newCustomerFirstName" type="text"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('newCustomerFirstName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-gray-700">Apellido</label>
                                 <input wire:model="newCustomerLastName" type="text"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('newCustomerLastName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-gray-700">Tipo documento</label>
                                 <input wire:model="newCustomerDocumentType" type="text" placeholder="CC, NIT..."
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('newCustomerDocumentType') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-gray-700">Numero documento</label>
                                 <input wire:model="newCustomerDocumentNumber" type="text"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('newCustomerDocumentNumber') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-gray-700">Telefono</label>
                                 <input wire:model="newCustomerPhone" type="text"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('newCustomerPhone') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                             <div>
                                 <label class="mb-1 block text-xs font-medium text-gray-700">Email</label>
                                 <input wire:model="newCustomerEmail" type="email"
                                     class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                @error('newCustomerEmail') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
                         </div>
                         <div>
                             <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito <span class="text-rose-600">*</span></label>
                             <input wire:model="addCustomerCreditLimit" type="number" min="0" step="1"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('addCustomerCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="flex gap-2 border-t border-stone-100 pt-3">
                             <button wire:click="cancelCreatingCustomerForCredit"
@@ -452,7 +447,6 @@
                                 </li>
                             </ul>
                         </div>
-                        @error('addCustomerSelectedId') <p class="text-xs text-rose-600">{{ $message }}</p> @enderror
                         <button type="button" wire:click="startCreatingCustomerForCredit"
                             class="text-sm font-semibold text-blue-700 hover:text-blue-800">
                             + Crear cliente nuevo
@@ -474,7 +468,6 @@
                             <label class="mb-1 block text-xs font-medium text-gray-700">Limite de credito <span class="text-rose-600">*</span></label>
                             <input wire:model="addCustomerCreditLimit" type="number" min="0" step="1"
                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                            @error('addCustomerCreditLimit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div class="flex gap-2 border-t border-stone-100 pt-3">
                             <button wire:click="closeAddCustomerModal"
@@ -494,6 +487,58 @@
 </div>
 
 <script>
+    // Mismo patron de paymentAmount() en pos-page.blade.php: input type="text"
+    // formateado en vivo con separador de miles, en vez de type="number" —
+    // ese ultimo deja que el navegador (segun el idioma/region del SO) le
+    // dibuje una coma decimal encima sin separador de miles, inconsistente
+    // con el resto de montos de la app (Money::format ya usa "$1.000.000").
+    function creditLimitField(initialValue) {
+        return {
+            // initialValue llega como decimal de BD, ej. "1000000.00" — quitar
+            // solo los digitos (regex previa) borraba el punto y pegaba las
+            // partes ("1000000" + "00" = 100000000). parseFloat() respeta el
+            // punto decimal antes de quedarnos con los pesos enteros.
+            raw: initialValue && !isNaN(parseFloat(String(initialValue)))
+                ? String(Math.round(parseFloat(String(initialValue))))
+                : '',
+            fmt: function(n) {
+                var num = parseFloat(String(n).replace(/[^\d.]/g, ''));
+                if (!n || isNaN(num)) return '';
+                return new Intl.NumberFormat('es-CO', { maximumFractionDigits: 0 }).format(num);
+            },
+            init: function() {
+                this.$refs.input.value = this.raw ? this.fmt(this.raw) : '';
+            },
+            onFocus: function() {
+                var self = this;
+                this.$nextTick(function() { self.$refs.input.select(); });
+            },
+            onInput: function() {
+                var input = this.$refs.input;
+                var digitsBeforeCursor = input.value.slice(0, input.selectionStart).replace(/[^\d]/g, '').length;
+
+                var raw = input.value.replace(/[^\d]/g, '');
+                input.value = raw ? this.fmt(raw) : '';
+
+                var pos = 0, digitsSeen = 0;
+                while (pos < input.value.length && digitsSeen < digitsBeforeCursor) {
+                    if (/\d/.test(input.value[pos])) digitsSeen++;
+                    pos++;
+                }
+                input.setSelectionRange(pos, pos);
+
+                this.raw = raw;
+                this.$wire.set('editCreditLimit', raw || '', false);
+            },
+            onBlur: function() {
+                var raw = this.$refs.input.value.replace(/[^\d]/g, '');
+                this.raw = raw;
+                this.$refs.input.value = raw ? this.fmt(raw) : '';
+                this.$wire.set('editCreditLimit', raw || '', false);
+            },
+        };
+    }
+
     function creditCustomerSearch(catalog) {
         return {
             catalog: catalog,

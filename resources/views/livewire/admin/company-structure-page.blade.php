@@ -181,6 +181,7 @@
                             <th class="pb-2">Código</th>
                             <th class="pb-2">Sucursal</th>
                             <th class="pb-2 w-px whitespace-nowrap">Tipo</th>
+                            <th class="pb-2 w-px whitespace-nowrap">Impresora</th>
                             <th class="pb-2 w-px whitespace-nowrap">Estado</th>
                             <th class="pb-2 w-px whitespace-nowrap text-right">Acciones</th>
                         </tr>
@@ -197,6 +198,18 @@
                                     @else
                                         <x-status-badge color="stone">Operativa</x-status-badge>
                                     @endif
+                                </td>
+                                <td class="py-3 w-px whitespace-nowrap">
+                                    <select
+                                        wire:change="updatePrinterType({{ $cashRegister->id }}, $event.target.value)"
+                                        class="rounded-lg border-gray-300 text-xs shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                        @if (is_null($cashRegister->printer_type))
+                                            <option value="" selected disabled>Sin definir</option>
+                                        @endif
+                                        @foreach (\App\Models\CashRegister::PRINTER_TYPES as $value => $label)
+                                            <option value="{{ $value }}" @selected($cashRegister->printer_type === $value)>{{ $label }}</option>
+                                        @endforeach
+                                    </select>
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
                                     @if ($cashRegister->status === 'active')
@@ -224,7 +237,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="6" class="py-6 text-center text-xs text-gray-400">Sin cajas registradas.</td></tr>
+                            <tr><td colspan="7" class="py-6 text-center text-xs text-gray-400">Sin cajas registradas.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -243,14 +256,12 @@
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="branchName" type="text" autocomplete="new-password" autofocus
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('branchName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="branchCode" type="text" inputmode="text" autocomplete="new-password"
                             placeholder="Ej: SUC01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm uppercase shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('branchCode') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
@@ -275,20 +286,17 @@
                                 <option value="{{ $branch->id }}">{{ $branch->name }} ({{ $branch->code }})</option>
                             @endforeach
                         </select>
-                        @error('warehouseBranchId') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="warehouseName" type="text" autocomplete="new-password"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('warehouseName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="warehouseCode" type="text" inputmode="text" autocomplete="new-password"
                             placeholder="Ej: BOD01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm uppercase shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('warehouseCode') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">
@@ -313,20 +321,17 @@
                                 <option value="{{ $branch->id }}">{{ $branch->name }} ({{ $branch->code }})</option>
                             @endforeach
                         </select>
-                        @error('cajaBranchId') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre <span class="text-rose-600">*</span></label>
                         <input wire:model="cajaName" type="text" autocomplete="new-password"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('cajaName') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Código <span class="text-rose-600">*</span></label>
                         <input wire:model="cajaCode" type="text" autocomplete="new-password"
                             placeholder="Ej: CAJA01"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm uppercase shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('cajaCode') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Tipo de impresora <span class="text-rose-600">*</span></label>
@@ -336,7 +341,6 @@
                                 <option value="{{ $value }}">{{ $label }}</option>
                             @endforeach
                         </select>
-                        @error('cajaPrinterType') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
                 <div class="mt-6 flex justify-end gap-3">

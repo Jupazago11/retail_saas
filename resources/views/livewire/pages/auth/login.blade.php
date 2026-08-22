@@ -16,7 +16,6 @@ new #[Layout('layouts.guest')] class extends Component
         <div>
             <x-input-label for="username" value="Usuario" />
             <x-text-input id="username" class="block mt-1 w-full" type="text" name="username" :value="old('username')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('username')" class="mt-2" />
         </div>
 
         <div class="mt-4">
@@ -27,7 +26,6 @@ new #[Layout('layouts.guest')] class extends Component
                             name="password"
                             required autocomplete="current-password" />
 
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
         <div class="block mt-4">

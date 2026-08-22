@@ -85,14 +85,12 @@
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Nombre / modelo <span class="text-rose-600">*</span></label>
                         <input wire:model="title" type="text" placeholder="Xprinter XP-58"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('title') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Instrucciones <span class="text-rose-600">*</span></label>
                         <textarea wire:model="instructions" rows="6" placeholder="Pasos para resolver el problema, en orden..."
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
-                        @error('instructions') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -106,7 +104,6 @@
                                 <p class="mt-1 text-xs text-gray-500">Ya tiene un archivo cargado ({{ $existingGuide->original_filename }}). Sube uno nuevo para reemplazarlo.</p>
                             @endif
                         @endif
-                        @error('file') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                         <div wire:loading wire:target="file" class="mt-1 text-xs text-blue-600">Subiendo archivo...</div>
                     </div>
 

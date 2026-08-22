@@ -56,7 +56,7 @@ document.addEventListener('alpine:init', () => {
             return digits ? digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : '';
         },
         onInput(event) {
-            const digits = event.target.value.replace(/\D+/g, '');
+            const digits = event.target.value.replace(/\D+/g, '').replace(/^0+(?=\d)/, '');
             const formatted = this.group(digits);
             event.target.value = formatted;
             this.$wire.set(path, digits, live);

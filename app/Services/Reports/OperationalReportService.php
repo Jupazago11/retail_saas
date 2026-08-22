@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\Promotion;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Support\Money;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -193,7 +194,6 @@ class OperationalReportService
         $asOf ??= now();
 
         $sales = $this->salesQuery($company, $filters)
-            ->where('sale_type', 'credit')
             ->whereNotNull('credit_account_id')
             ->whereNotIn('status', ['cancelled'])
             ->with(['creditMovements:id,sale_id,movement_type,amount'])
@@ -361,6 +361,6 @@ class OperationalReportService
 
     protected function money(float $value): string
     {
-        return \App\Support\Money::format($value);
+        return Money::format($value);
     }
 }

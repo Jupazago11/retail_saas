@@ -196,7 +196,6 @@
                                 <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                             @endforeach
                         </select>
-                        @error('editPlanId') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -204,7 +203,6 @@
                         <input wire:model="editEndsAt" type="date"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         <p class="mt-1 text-xs text-gray-400">Dejar vacío para sin vencimiento.</p>
-                        @error('editEndsAt') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
 
@@ -239,14 +237,12 @@
                                 <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                             @endforeach
                         </select>
-                        @error('activatePlanId') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Fecha de inicio</label>
                         <input wire:model="activateStartsAt" type="date"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('activateStartsAt') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -254,7 +250,6 @@
                         <input wire:model="activateEndsAt" type="date"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         <p class="mt-1 text-xs text-gray-400">Se sugiere 31 dias desde hoy. Dejar vacío a proposito para que no venza nunca.</p>
-                        @error('activateEndsAt') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
@@ -262,7 +257,6 @@
                         <input wire:model="activatePaymentReference" type="text" placeholder="Ej: Transferencia Bancolombia, comprobante por WhatsApp"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         <p class="mt-1 text-xs text-gray-400">Al activar queda marcado como pagado hoy. Opcional, para dejar una nota de que comprobante lo confirma.</p>
-                        @error('activatePaymentReference') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
                     </div>
                 </div>
 
@@ -434,8 +428,6 @@
                     <p class="mt-1 text-xs text-rose-500" x-show="uploadFailed" x-cloak>
                         No se pudo subir la foto. Lo mas probable es que pese mas de 20MB — comprimela o recortala e intenta de nuevo.
                     </p>
-                    @error('newAttachments') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
-                    @error('newAttachments.*') <p class="mt-1 text-xs text-rose-500">{{ $message }}</p> @enderror
 
                     @if (! empty($newAttachments))
                         <div class="mt-3 flex justify-end">

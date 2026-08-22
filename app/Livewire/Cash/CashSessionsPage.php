@@ -57,6 +57,7 @@ class CashSessionsPage extends Component
     public bool $ruleOpeningRequired = true;
     public string $ruleDefaultOpeningAmount = '0';
     public string $newRegisterName = '';
+    public string $newRegisterPrinterType = 'thermal_58mm';
 
     public function mount(): void
     {
@@ -270,6 +271,7 @@ class CashSessionsPage extends Component
         $this->ruleOpeningRequired = (bool) $companySettings->get($company, 'cash', 'opening_required');
         $this->ruleDefaultOpeningAmount = $this->trimDecimalZeros((string) $companySettings->get($company, 'cash', 'default_opening_amount'));
         $this->newRegisterName = '';
+        $this->newRegisterPrinterType = 'thermal_58mm';
 
         $this->resetErrorBag();
         $this->showRulesModal = true;
@@ -350,6 +352,7 @@ class CashSessionsPage extends Component
 
         $validated = $this->validate([
             'newRegisterName' => ['required', 'string', 'max:255'],
+            'newRegisterPrinterType' => ['required', Rule::in(array_keys(CashRegister::PRINTER_TYPES))],
         ]);
 
         $company = $this->currentCompany();
@@ -366,6 +369,7 @@ class CashSessionsPage extends Component
                 'branch_id' => $branch->id,
                 'name' => $validated['newRegisterName'],
                 'code' => $validated['newRegisterName'],
+                'printer_type' => $validated['newRegisterPrinterType'],
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
             $this->addError('newRegisterName', $exception->getMessage());
@@ -374,6 +378,7 @@ class CashSessionsPage extends Component
         }
 
         $this->newRegisterName = '';
+        $this->newRegisterPrinterType = 'thermal_58mm';
         $this->toast('Caja creada correctamente.');
     }
 

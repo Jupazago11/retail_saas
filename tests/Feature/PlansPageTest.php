@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Livewire\Platform\PlansPage;
+use App\Models\Company;
 use App\Models\Feature;
 use App\Models\Module;
 use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Plans\PlanCatalogBootstrapper;
+use App\Services\Settings\CompanySettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -76,8 +79,8 @@ class PlansPageTest extends TestCase
             ->call('saveEdit')
             ->assertHasNoErrors();
 
-        $company = \App\Models\Company::factory()->create();
-        \App\Models\Subscription::query()->create([
+        $company = Company::factory()->create();
+        Subscription::query()->create([
             'company_id' => $company->id,
             'plan_id' => $basic->id,
             'status' => 'active',
@@ -85,5 +88,72 @@ class PlansPageTest extends TestCase
         ]);
 
         $this->assertSame(77, app(CompanyPlanResolver::class)->limit($company, 'max_users'));
+    }
+
+    public function test_enabling_credit_on_a_plan_turns_it_on_for_subscribed_companies(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+        $this->actingAs($platformAdmin);
+
+        $basic = Plan::query()->where('code', 'basic')->firstOrFail();
+        $creditModule = Module::query()->where('code', 'credit')->firstOrFail();
+        $creditFeature = Feature::query()->where('code', 'credit.enabled')->firstOrFail();
+
+        $company = Company::factory()->create();
+        Subscription::query()->create([
+            'company_id' => $company->id,
+            'plan_id' => $basic->id,
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+        ]);
+
+        $this->assertFalse((bool) app(CompanySettings::class)->get($company, 'credit', 'credit_enabled'));
+
+        Livewire::test(PlansPage::class)
+            ->call('startEdit', $basic->id)
+            ->call('toggleModule', $creditModule->id)
+            ->call('toggleFeature', $creditFeature->id)
+            ->call('saveEdit')
+            ->assertHasNoErrors();
+
+        $this->assertTrue((bool) app(CompanySettings::class)->get($company, 'credit', 'credit_enabled'));
+    }
+
+    public function test_resaving_a_plan_does_not_reenable_credit_for_a_company_that_turned_it_off(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+        $this->actingAs($platformAdmin);
+
+        $basic = Plan::query()->where('code', 'basic')->firstOrFail();
+        $creditModule = Module::query()->where('code', 'credit')->firstOrFail();
+        $creditFeature = Feature::query()->where('code', 'credit.enabled')->firstOrFail();
+
+        $company = Company::factory()->create();
+        Subscription::query()->create([
+            'company_id' => $company->id,
+            'plan_id' => $basic->id,
+            'status' => 'active',
+            'starts_at' => now()->subDay(),
+        ]);
+
+        Livewire::test(PlansPage::class)
+            ->call('startEdit', $basic->id)
+            ->call('toggleModule', $creditModule->id)
+            ->call('toggleFeature', $creditFeature->id)
+            ->call('saveEdit')
+            ->assertHasNoErrors();
+
+        // La empresa decide apagarlo manualmente despues del cascade inicial.
+        app(CompanySettings::class)->set($company, 'credit', 'credit_enabled', false);
+
+        // Guardar el plan de nuevo sin tocar credito (sigue prendido en el
+        // plan) no debe reencenderlo por la empresa.
+        Livewire::test(PlansPage::class)
+            ->call('startEdit', $basic->id)
+            ->set('editLimits.max_users', '15')
+            ->call('saveEdit')
+            ->assertHasNoErrors();
+
+        $this->assertFalse((bool) app(CompanySettings::class)->get($company, 'credit', 'credit_enabled'));
     }
 }

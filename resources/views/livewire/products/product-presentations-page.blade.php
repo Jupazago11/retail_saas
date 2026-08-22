@@ -36,7 +36,6 @@
                                     <option value="{{ $product->id }}">{{ $product->name }}</option>
                                 @endforeach
                             </select>
-                            @error('productId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -47,7 +46,6 @@
                                     <option value="{{ $unit->id }}">{{ $unit->name }} ({{ $unit->code }})</option>
                                 @endforeach
                             </select>
-                            @error('unitId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
@@ -55,13 +53,11 @@
                         <div>
                             <label for="presentation-name" class="text-sm font-medium text-gray-700">Nombre <span class="text-rose-600">*</span></label>
                             <input wire:model="name" id="presentation-name" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
-                            @error('name') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="presentation-barcode" class="text-sm font-medium text-gray-700">Codigo de barras</label>
                             <input wire:model="barcode" id="presentation-barcode" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
-                            @error('barcode') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
@@ -69,25 +65,21 @@
                         <div>
                             <label for="presentation-factor" class="text-sm font-medium text-gray-700">Factor de conversion <span class="text-rose-600">*</span></label>
                             <input wire:model.live="conversionFactor" id="presentation-factor" type="number" min="0.000001" step="0.000001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
-                            @error('conversionFactor') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="presentation-price-1" class="text-sm font-medium text-gray-700">Precio 1 <span class="text-rose-600">*</span></label>
                             <input wire:model="price1" id="presentation-price-1" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
-                            @error('price1') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="presentation-price-2" class="text-sm font-medium text-gray-700">Precio 2</label>
                             <input wire:model="price2" id="presentation-price-2" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
-                            @error('price2') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="presentation-price-3" class="text-sm font-medium text-gray-700">Precio 3</label>
                             <input wire:model="price3" id="presentation-price-3" type="number" min="0" step="0.01" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600" @disabled(! $canCreatePresentations)>
-                            @error('price3') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 

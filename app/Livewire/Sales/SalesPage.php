@@ -59,13 +59,23 @@ class SalesPage extends Component
         $this->resetPage();
     }
 
-    public function updatedStatusFilter(): void
+    public function setStatusFilter(string $status): void
     {
+        if ($status !== '' && ! in_array($status, ['draft', 'confirmed', 'partially_returned', 'returned', 'cancelled'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $status;
         $this->resetPage();
     }
 
-    public function updatedSaleTypeFilter(): void
+    public function setSaleTypeFilter(string $type): void
     {
+        if ($type !== '' && ! in_array($type, ['pos', 'credit'], true)) {
+            return;
+        }
+
+        $this->saleTypeFilter = $type;
         $this->resetPage();
     }
 

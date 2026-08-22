@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Concerns\InteractsWithToast;
 use App\Mail\PasswordRecoveredMail;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,8 @@ use Livewire\Volt\Component;
 
 new #[Layout('layouts.guest')] class extends Component
 {
+    use InteractsWithToast;
+
     public string $login = '';
 
     /**
@@ -80,7 +83,6 @@ new #[Layout('layouts.guest')] class extends Component
         <div>
             <x-input-label for="login" value="Usuario o correo electronico" />
             <x-text-input wire:model="login" id="login" class="block mt-1 w-full" type="text" name="login" required autofocus />
-            <x-input-error :messages="$errors->get('login')" class="mt-2" />
         </div>
 
         <div class="flex items-center justify-end mt-4">

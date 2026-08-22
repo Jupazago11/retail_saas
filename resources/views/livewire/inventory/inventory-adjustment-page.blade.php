@@ -219,14 +219,12 @@
                                                             <option value="increase">Entrada</option>
                                                             <option value="decrease">Salida</option>
                                                         </select>
-                                                        @error('adjustmentType') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                     </div>
                                                     <div>
                                                         <label class="mb-1 block text-xs font-medium text-gray-700">Cantidad <span class="text-rose-600">*</span></label>
                                                         <input wire:model="quantity" type="number" min="0.001" step="0.001"
                                                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"
                                                             placeholder="0">
-                                                        @error('quantity') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                     </div>
                                                     @if ($adjustmentType === 'increase')
                                                         <div>
@@ -234,7 +232,6 @@
                                                             <input wire:model="unitCost" type="number" min="0" step="0.01"
                                                                 class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"
                                                                 placeholder="0.00">
-                                                            @error('unitCost') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                         </div>
                                                     @endif
                                                     <div class="{{ $adjustmentType === 'increase' ? '' : 'sm:col-span-2' }}">
@@ -242,7 +239,6 @@
                                                         <input wire:model="reason" type="text"
                                                             class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"
                                                             placeholder="Ej: Conteo fisico, merma...">
-                                                        @error('reason') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                                                     </div>
                                                 </div>
                                                 <div class="mt-3 flex gap-2">

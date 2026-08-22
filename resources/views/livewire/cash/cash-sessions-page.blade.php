@@ -119,7 +119,6 @@
                                 </button>
                             @endforeach
                         </div>
-                        @error('activeCashRegisterId') <p class="mt-3 text-sm text-rose-600">{{ $message }}</p> @enderror
 
                     {{-- Paso: elegir --}}
                     @elseif ($cashStep === 'choice')
@@ -207,7 +206,6 @@
                                                 <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                             @endforeach
                                         </select>
-                                        @error('branchId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                     </div>
 
                                     <div>
@@ -218,7 +216,6 @@
                                                 <option value="{{ $cashRegister->id }}">{{ $cashRegister->name }}</option>
                                             @endforeach
                                         </select>
-                                        @error('cashRegisterId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                     </div>
                                 </div>
                             @elseif ($canOpenCashSessions)
@@ -264,7 +261,6 @@
                                         la sesion abre en $0.00.
                                     @endif
                                 </p>
-                                @error('openingAmount') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                             </div>
 
                             <button type="submit" class="w-full rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60" @disabled(! $canOpenCashSessions)>
@@ -454,7 +450,6 @@
                             <input type="text" inputmode="numeric" @input="onInput($event)"
                                 value="{{ $ruleDefaultOpeningAmount !== '' ? number_format((int) $ruleDefaultOpeningAmount, 0, ',', '.') : '' }}"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('ruleDefaultOpeningAmount') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         @if ($cashRegisterPlanLimit === null || $cashRegisterPlanLimit > 1)
@@ -491,7 +486,14 @@
                                             <input wire:model="newRegisterName" type="text" placeholder="Nombre de la nueva caja (ej: Caja 2)"
                                                 wire:keydown.enter.prevent="addCashRegister"
                                                 class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                                            @error('newRegisterName') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                                        </div>
+                                        <div class="w-40 flex-shrink-0">
+                                            <select wire:model="newRegisterPrinterType"
+                                                class="w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                                                @foreach (\App\Models\CashRegister::PRINTER_TYPES as $value => $label)
+                                                    <option value="{{ $value }}">{{ $label }}</option>
+                                                @endforeach
+                                            </select>
                                         </div>
                                         <button type="button" wire:click="addCashRegister" class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -499,6 +501,7 @@
                                             </svg>
                                         </button>
                                     </div>
+                                    <p class="mt-1 text-xs text-gray-400">Podras cambiar el tipo de impresora despues desde Estructura de empresa.</p>
                                 @else
                                     <p class="mt-2 text-xs text-gray-400">Ya creaste el maximo de cajas que permite tu plan.</p>
                                 @endif

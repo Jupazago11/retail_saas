@@ -135,6 +135,7 @@ class CashSessionsPageTest extends TestCase
             'branch_id' => $branch->id,
             'name' => 'Caja 2',
             'code' => 'CAJA-2',
+            'printer_type' => 'thermal_58mm',
         ], $cashier);
 
         $this->actingAs($cashier);
@@ -356,6 +357,28 @@ class CashSessionsPageTest extends TestCase
         $this->assertSame(635000.0, $registerSummary['difference']);
     }
 
+    public function test_a_user_can_create_a_cash_register_from_the_cash_module_choosing_a_printer(): void
+    {
+        [$company, $manager] = $this->companyWithCustomCashPermissions(['cash.open', 'cash.close', 'cash.view_difference', 'settings.manage']);
+        $this->assignCompanyPlan($company, 'pro');
+
+        $this->actingAs($manager);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(CashSessionsPage::class)
+            ->call('openRulesModal')
+            ->set('newRegisterName', 'Caja 2')
+            ->set('newRegisterPrinterType', 'thermal_80mm')
+            ->call('addCashRegister')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('cash_registers', [
+            'company_id' => $company->id,
+            'name' => 'Caja 2',
+            'printer_type' => 'thermal_80mm',
+        ]);
+    }
+
     public function test_closing_a_register_opened_today_keeps_it_visible_in_todays_cell(): void
     {
         [$company, $cashier] = $this->companyWithTemplateUser('cashier');
@@ -365,6 +388,7 @@ class CashSessionsPageTest extends TestCase
             'branch_id' => $branch->id,
             'name' => 'Caja 2',
             'code' => 'CAJA-2',
+            'printer_type' => 'thermal_58mm',
         ], $cashier);
 
         $this->actingAs($cashier);

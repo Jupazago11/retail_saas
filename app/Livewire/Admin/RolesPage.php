@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Actions\Companies\AttachUserToCompany;
 use App\Actions\Companies\CreateInternalUserForCompany;
 use App\Enums\RecordStatus;
+use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
 use App\Models\CompanyRole;
 use App\Models\Permission;
@@ -22,6 +23,8 @@ use Livewire\Component;
 
 class RolesPage extends Component
 {
+    use InteractsWithToast;
+
     public ?int $editingRoleId = null;
     public string $roleCode = '';
     public string $displayName = '';

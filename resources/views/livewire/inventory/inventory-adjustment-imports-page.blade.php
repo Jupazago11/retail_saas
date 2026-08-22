@@ -18,7 +18,6 @@
                                     <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                                 @endforeach
                             </select>
-                            @error('branchId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -29,7 +28,6 @@
                                     <option value="{{ $warehouse->id }}">{{ $warehouse->name }}</option>
                                 @endforeach
                             </select>
-                            @error('warehouseId') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
@@ -38,32 +36,27 @@
                                 <option value="increase">Ingreso</option>
                                 <option value="decrease">Salida</option>
                             </select>
-                            @error('adjustmentType') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
 
                         <div>
                             <label for="inventory-adjusted-at" class="text-sm font-medium text-gray-700">Fecha operativa</label>
                             <input wire:model="adjustedAt" id="inventory-adjusted-at" type="datetime-local" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                            @error('adjustedAt') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                         </div>
                     </div>
 
                     <div>
                         <label for="inventory-reason" class="text-sm font-medium text-gray-700">Motivo</label>
                         <input wire:model="reason" id="inventory-reason" type="text" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('reason') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label for="inventory-notes" class="text-sm font-medium text-gray-700">Notas</label>
                         <textarea wire:model="notes" id="inventory-notes" rows="3" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600"></textarea>
-                        @error('notes') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label for="inventory-import-file" class="text-sm font-medium text-gray-700">Archivo CSV</label>
                         <input wire:model="importFile" id="inventory-import-file" type="file" accept=".csv,text/csv,.txt" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                        @error('importFile') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
                     <button type="submit" class="inline-flex rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white">

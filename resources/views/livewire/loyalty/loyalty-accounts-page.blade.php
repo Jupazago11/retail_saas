@@ -36,7 +36,6 @@
                         </div>
                     </div>
 
-                    @error('expirationAsOf') <p class="mt-3 text-sm text-rose-600">{{ $message }}</p> @enderror
 
                     <div class="mt-5 grid gap-4 md:grid-cols-2">
                         <div class="rounded-xl bg-gray-50 p-4 ring-1 ring-gray-200">
@@ -126,7 +125,6 @@
                                                         <option value="credit">Sumar puntos</option>
                                                         <option value="debit">Restar puntos</option>
                                                     </select>
-                                                    @error('adjustmentType') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
@@ -138,13 +136,11 @@
                                                         <option value="migration_adjustment">Ajuste por migracion</option>
                                                         <option value="fraud_correction">Correccion por fraude</option>
                                                     </select>
-                                                    @error('adjustmentReasonCode') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
 
                                                 <div>
                                                     <label class="text-sm font-medium text-gray-700">Puntos <span class="text-rose-600">*</span></label>
                                                     <input wire:model="adjustmentPoints" type="number" min="0.0001" step="0.0001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                    @error('adjustmentPoints') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                                 </div>
                                             </div>
 
@@ -154,7 +150,6 @@
                                                 @if ($adjustmentType === 'debit')
                                                     <p class="mt-1 text-xs text-gray-500">Para restar puntos debes explicar el motivo en la nota.</p>
                                                 @endif
-                                                @error('adjustmentNotes') <p class="mt-1 text-sm text-rose-600">{{ $message }}</p> @enderror
                                             </div>
 
                                             <div class="flex gap-2">

@@ -16,6 +16,7 @@ class CreditAccount extends Model
         'credit_limit',
         'available_credit',
         'balance_due',
+        'payment_term_days',
     ];
 
     protected function casts(): array
