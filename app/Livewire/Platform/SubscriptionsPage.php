@@ -18,10 +18,12 @@ use App\Models\EquipmentRental;
 use App\Models\PaymentAttachment;
 use App\Models\Plan;
 use App\Models\Subscription;
+use App\Support\Money;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use InvalidArgumentException;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 
@@ -31,36 +33,52 @@ class SubscriptionsPage extends Component
 
     public int $perPage = 20;
 
-    public string $search   = '';
-    public string $filter   = 'all';
-    public bool   $showModal = false;
+    public string $search = '';
 
-    public ?int   $editingId  = null;
+    public string $filter = 'all';
+
+    public bool $showModal = false;
+
+    public ?int $editingId = null;
+
     public string $editPlanId = '';
+
     public string $editEndsAt = '';
 
-    public bool   $showActivateModal       = false;
-    public ?int   $activateCompanyId       = null;
-    public string $activatePlanId          = '';
-    public string $activateStartsAt        = '';
-    public string $activateEndsAt          = '';
+    public bool $showActivateModal = false;
+
+    public ?int $activateCompanyId = null;
+
+    public string $activatePlanId = '';
+
+    public string $activateStartsAt = '';
+
+    public string $activateEndsAt = '';
+
     public string $activatePaymentReference = '';
 
-    public bool   $showEquipmentModal = false;
-    public ?int   $equipmentCompanyId = null;
-    public string $equipmentNotes     = '';
+    public bool $showEquipmentModal = false;
 
-    public bool   $showAttachmentsModal    = false;
-    public ?int   $attachmentsSubscriptionId = null;
-    /** @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
-    public array  $newAttachments         = [];
+    public ?int $equipmentCompanyId = null;
+
+    public string $equipmentNotes = '';
+
+    public bool $showAttachmentsModal = false;
+
+    public ?int $attachmentsSubscriptionId = null;
+
+    /** @var array<int, TemporaryUploadedFile> */
+    public array $newAttachments = [];
 
     public function mount(): void
     {
         abort_unless(auth()->user()?->is_platform_admin, 403);
     }
 
-    public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
 
     public function setFilter(string $filter): void
     {
@@ -75,10 +93,10 @@ class SubscriptionsPage extends Component
     public function startEdit(int $id): void
     {
         $sub = Subscription::with('plan')->findOrFail($id);
-        $this->editingId  = $sub->id;
+        $this->editingId = $sub->id;
         $this->editPlanId = (string) ($sub->plan_id ?? '');
         $this->editEndsAt = $sub->ends_at?->format('Y-m-d') ?? '';
-        $this->showModal  = true;
+        $this->showModal = true;
     }
 
     public function saveEdit(ReconcileCompanyStructureLimits $reconcileCompanyStructureLimits, ReconcileCompanyInventoryTracking $reconcileCompanyInventoryTracking): void
@@ -92,8 +110,8 @@ class SubscriptionsPage extends Component
 
         $sub = Subscription::findOrFail($this->editingId);
         $sub->update([
-            'plan_id'  => (int) $this->editPlanId,
-            'ends_at'  => $this->editEndsAt !== '' ? $this->editEndsAt : null,
+            'plan_id' => (int) $this->editPlanId,
+            'ends_at' => $this->editEndsAt !== '' ? $this->editEndsAt : null,
         ]);
 
         $reconcileCompanyStructureLimits->handle($sub->company, auth()->user());
@@ -105,8 +123,8 @@ class SubscriptionsPage extends Component
 
     public function closeModal(): void
     {
-        $this->showModal  = false;
-        $this->editingId  = null;
+        $this->showModal = false;
+        $this->editingId = null;
         $this->editPlanId = '';
         $this->editEndsAt = '';
     }
@@ -126,11 +144,11 @@ class SubscriptionsPage extends Component
     public function startActivate(int $companyId): void
     {
         $this->activateCompanyId = $companyId;
-        $this->activatePlanId    = '';
-        $this->activateStartsAt  = now()->format('Y-m-d');
+        $this->activatePlanId = '';
+        $this->activateStartsAt = now()->format('Y-m-d');
         // Vencimiento sugerido: 31 dias desde hoy. El admin puede cambiarla
         // o dejarla en blanco a proposito para una suscripcion sin vencimiento.
-        $this->activateEndsAt    = now()->addDays(31)->format('Y-m-d');
+        $this->activateEndsAt = now()->addDays(31)->format('Y-m-d');
         $this->activatePaymentReference = '';
         $this->showActivateModal = true;
     }
@@ -145,9 +163,9 @@ class SubscriptionsPage extends Component
         abort_unless(auth()->user()?->is_platform_admin, 403);
 
         $this->validate([
-            'activatePlanId'   => ['required', 'exists:plans,id'],
+            'activatePlanId' => ['required', 'exists:plans,id'],
             'activateStartsAt' => ['nullable', 'date'],
-            'activateEndsAt'   => ['nullable', 'date'],
+            'activateEndsAt' => ['nullable', 'date'],
             'activatePaymentReference' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -155,11 +173,11 @@ class SubscriptionsPage extends Component
 
         try {
             $changeCompanySubscription->handle($company, [
-                'plan_id'   => (int) $this->activatePlanId,
-                'status'    => 'active',
+                'plan_id' => (int) $this->activatePlanId,
+                'status' => 'active',
                 'starts_at' => $this->activateStartsAt !== '' ? $this->activateStartsAt : now(),
-                'ends_at'   => $this->activateEndsAt !== '' ? $this->activateEndsAt : null,
-                'paid_at'   => now(),
+                'ends_at' => $this->activateEndsAt !== '' ? $this->activateEndsAt : null,
+                'paid_at' => now(),
                 'payment_reference' => $this->blankToNull($this->activatePaymentReference),
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
@@ -176,9 +194,9 @@ class SubscriptionsPage extends Component
     {
         $this->showActivateModal = false;
         $this->activateCompanyId = null;
-        $this->activatePlanId    = '';
-        $this->activateStartsAt  = '';
-        $this->activateEndsAt    = '';
+        $this->activatePlanId = '';
+        $this->activateStartsAt = '';
+        $this->activateEndsAt = '';
         $this->activatePaymentReference = '';
     }
 
@@ -244,7 +262,7 @@ class SubscriptionsPage extends Component
         abort_unless(auth()->user()?->is_platform_admin, 403);
 
         $this->validate([
-            'newAttachments'   => ['required', 'array', 'min:1'],
+            'newAttachments' => ['required', 'array', 'min:1'],
             'newAttachments.*' => ['image', 'max:20480'],
         ], [
             'newAttachments.required' => 'Elige al menos una foto para subir.',
@@ -261,8 +279,14 @@ class SubscriptionsPage extends Component
             return;
         }
 
-        foreach ($this->newAttachments as $file) {
-            $action->handle($subscription, $file, auth()->user());
+        try {
+            foreach ($this->newAttachments as $file) {
+                $action->handle($subscription, $file, auth()->user());
+            }
+        } catch (InvalidArgumentException $exception) {
+            $this->addError('newAttachments', $exception->getMessage());
+
+            return;
         }
 
         $this->newAttachments = [];
@@ -480,7 +504,7 @@ class SubscriptionsPage extends Component
 
     public function formatMoney(mixed $value): string
     {
-        return \App\Support\Money::format((float) $value);
+        return Money::format((float) $value);
     }
 
     protected function blankToNull(mixed $value): ?string
@@ -520,11 +544,11 @@ class SubscriptionsPage extends Component
         $companyIds = $subscriptions->pluck('company_id')->unique();
 
         return view('livewire.platform.subscriptions-page', [
-            'subscriptions'          => $subscriptions,
-            'plans'                  => $this->plans(),
-            'latestSubscriptionIds'  => $latestSubscriptionIds,
-            'equipmentTypes'         => EquipmentType::cases(),
-            'equipmentByCompany'     => $this->equipmentByCompany($companyIds),
+            'subscriptions' => $subscriptions,
+            'plans' => $this->plans(),
+            'latestSubscriptionIds' => $latestSubscriptionIds,
+            'equipmentTypes' => EquipmentType::cases(),
+            'equipmentByCompany' => $this->equipmentByCompany($companyIds),
             'equipmentDisplaySubscriptionIds' => $this->equipmentDisplaySubscriptionIds($companyIds),
         ])->layout('layouts.platform');
     }

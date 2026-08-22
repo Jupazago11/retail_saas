@@ -20,7 +20,7 @@
     x-data="toastStack(@js($sessionToast))"
     x-init="init()"
     x-on:toast.window="push($event.detail)"
-    class="pointer-events-none fixed bottom-4 right-4 z-50 flex w-full max-w-sm flex-col-reverse gap-3 sm:bottom-6 sm:right-6"
+    class="pointer-events-none fixed bottom-4 right-4 z-[9999] flex w-full max-w-sm flex-col-reverse gap-3 sm:bottom-6 sm:right-6"
 >
     <template x-for="toast in toasts" :key="toast.id">
         <div

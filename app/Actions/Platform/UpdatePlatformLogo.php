@@ -34,7 +34,16 @@ class UpdatePlatformLogo
 
         $path = 'platform/logo/'.Str::uuid().'.'.$file->getClientOriginalExtension();
 
-        Storage::disk('r2')->putFileAs('', $file, $path);
+        // isStorageConfigured() solo verifica que las variables existan, no
+        // que sean correctas ni que R2 sea alcanzable — sin este try/catch,
+        // credenciales invalidas tiraban un 500 crudo del SDK de S3.
+        try {
+            Storage::disk('r2')->putFileAs('', $file, $path);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            throw new InvalidArgumentException('No se pudo subir el logo a Cloudflare R2. Verifica que las credenciales sean correctas o intenta de nuevo.');
+        }
 
         PlatformSetting::set('app_logo_path', $path);
     }
@@ -51,7 +60,11 @@ class UpdatePlatformLogo
         $existing = PlatformSetting::logoPath();
 
         if ($existing !== null && $this->isStorageConfigured()) {
-            Storage::disk('r2')->delete($existing);
+            try {
+                Storage::disk('r2')->delete($existing);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
         }
     }
 }

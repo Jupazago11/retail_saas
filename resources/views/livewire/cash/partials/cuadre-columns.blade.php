@@ -80,10 +80,11 @@
             <p class="text-lg font-black text-gray-900">${{ \App\Support\Money::format((float) $this->dailySalesAmount($session)) }}</p>
         </div>
 
-        <div class="rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 px-3 py-3 text-white">
-            <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Resultado (efectivo esperado)</p>
-            <p class="text-2xl font-black">${{ \App\Support\Money::format((float) $this->expectedCashAmount($session)) }}</p>
-            <p class="mt-1 text-[11px] text-blue-100">Bases + ventas en efectivo − pagos de caja</p>
+        @php($expectedCash = (float) $this->expectedCashAmount($session))
+        <div class="rounded-lg px-3 py-3 text-white {{ $expectedCash < 0 ? 'bg-gradient-to-br from-rose-600 to-red-600' : 'bg-gradient-to-br from-emerald-600 to-teal-600' }}">
+            <p class="text-xs uppercase tracking-[0.18em] {{ $expectedCash < 0 ? 'text-rose-100' : 'text-emerald-100' }}">Resultado (efectivo esperado)</p>
+            <p class="text-2xl font-black">${{ \App\Support\Money::format($expectedCash) }}</p>
+            <p class="mt-1 text-[11px] {{ $expectedCash < 0 ? 'text-rose-100' : 'text-emerald-100' }}">Bases + ventas en efectivo − pagos de caja</p>
         </div>
     </div>
 

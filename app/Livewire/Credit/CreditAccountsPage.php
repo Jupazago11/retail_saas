@@ -12,6 +12,7 @@ use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\CashSession;
 use App\Models\Company;
 use App\Models\CreditAccount;
+use App\Models\CreditMovement;
 use App\Models\Customer;
 use App\Models\Sale;
 use App\Services\Plans\CompanyPlanResolver;
@@ -447,6 +448,29 @@ class CreditAccountsPage extends Component
                 'cashRegister',
             ])
             ->orderByDesc('sold_at')
+            ->orderByDesc('id')
+            ->get();
+    }
+
+    // Historial completo (cargos por venta, abonos y ajustes por devolucion
+    // o anulacion) ordenado por fecha — sin esto, "Facturas a credito" solo
+    // mostraba las compras, nunca los abonos aplicados contra el saldo.
+    public function selectedAccountMovements(): Collection
+    {
+        if (! $this->selectedCustomerId) {
+            return new Collection;
+        }
+
+        $account = $this->accounts()->firstWhere('customer_id', $this->selectedCustomerId);
+
+        if (! $account) {
+            return new Collection;
+        }
+
+        return CreditMovement::query()
+            ->where('credit_account_id', $account->id)
+            ->with('sale:id,document_number')
+            ->orderByDesc('occurred_at')
             ->orderByDesc('id')
             ->get();
     }

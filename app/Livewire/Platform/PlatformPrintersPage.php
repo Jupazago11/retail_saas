@@ -6,12 +6,12 @@ use App\Enums\RecordStatus;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\PrinterGuide;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 
 class PlatformPrintersPage extends Component
@@ -19,12 +19,16 @@ class PlatformPrintersPage extends Component
     use InteractsWithToast, WithFileUploads;
 
     public bool $showModal = false;
+
     public ?int $editingId = null;
+
     public string $title = '';
+
     public string $instructions = '';
+
     public string $status = 'active';
 
-    /** @var \Livewire\Features\SupportFileUploads\TemporaryUploadedFile|null */
+    /** @var TemporaryUploadedFile|null */
     public $file = null;
 
     public function mount(): void
@@ -93,7 +97,20 @@ class PlatformPrintersPage extends Component
             // catalogo compartido que administra solo superadmin.
             $path = 'printer-guides/'.Str::uuid().'.'.$this->file->getClientOriginalExtension();
 
-            Storage::disk('r2')->putFileAs('', $this->file, $path);
+            // isStorageConfigured() solo verifica que las variables R2_*
+            // existan, no que sean correctas ni que R2 sea alcanzable — sin
+            // este try/catch, credenciales presentes pero invalidas (o sin
+            // red hacia R2) tiraban un 500 crudo del SDK de S3 en vez de un
+            // error entendible, y la guia completa (titulo, instrucciones,
+            // todo) se perdia porque el create/update nunca se ejecutaba.
+            try {
+                Storage::disk('r2')->putFileAs('', $this->file, $path);
+            } catch (\Throwable $exception) {
+                report($exception);
+                $this->addError('file', 'No se pudo subir el archivo a Cloudflare R2. Verifica que las credenciales sean correctas o intenta de nuevo.');
+
+                return;
+            }
 
             $payload['disk'] = 'r2';
             $payload['path'] = $path;
@@ -101,7 +118,11 @@ class PlatformPrintersPage extends Component
             $payload['original_filename'] = $this->file->getClientOriginalName();
 
             if ($oldPath) {
-                Storage::disk('r2')->delete($oldPath);
+                try {
+                    Storage::disk('r2')->delete($oldPath);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
             }
         }
 

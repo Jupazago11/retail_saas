@@ -61,6 +61,40 @@ class CreditAccountsPageTest extends TestCase
         $this->assertSame('2600.00', $customer->creditAccount()->firstOrFail()->fresh()->balance_due);
     }
 
+    public function test_credit_page_shows_full_movement_history_for_selected_customer(): void
+    {
+        [$owner, $company, $sale, $customer, $cashSession] = $this->creditUiFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $component = Livewire::test(CreditAccountsPage::class)
+            ->call('selectCustomer', $customer->id)
+            ->call('startRegisteringPayment')
+            ->set('cashSessionId', $cashSession->id)
+            ->set('paymentAmount', '1000')
+            ->set('paymentMethodCode', 'cash')
+            ->set('paymentReference', 'AB-HIST-1')
+            ->call('registerPayment')
+            ->assertHasNoErrors();
+
+        $movements = $component->instance()->selectedAccountMovements();
+
+        $this->assertCount(2, $movements);
+        $this->assertSame('sale_charge', $movements[1]->movement_type);
+        $this->assertSame($sale->id, $movements[1]->sale_id);
+        $this->assertSame('payment', $movements[0]->movement_type);
+        $this->assertSame('1000.00', $movements[0]->amount);
+        $this->assertSame('AB-HIST-1', $movements[0]->notes);
+
+        $component
+            ->assertSee('Historial de movimientos')
+            ->assertSee('Cargo por venta')
+            ->assertSee('Abono')
+            ->assertSee($sale->document_number)
+            ->assertSee('AB-HIST-1');
+    }
+
     public function test_credit_page_filters_accounts_by_mora_status_pill(): void
     {
         [$owner, $company, $sale, $customer] = $this->creditUiFixture();

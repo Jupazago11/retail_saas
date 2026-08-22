@@ -105,6 +105,43 @@ class PlatformPrintersPageTest extends TestCase
         $this->assertDatabaseCount('printer_guides', 0);
     }
 
+    public function test_uploading_fails_gracefully_when_r2_upload_throws(): void
+    {
+        // Reproduce el 500 reportado: isStorageConfigured() solo mira que
+        // las variables existan, no que sean validas ni que R2 sea
+        // alcanzable — con credenciales presentes pero un fallo real de
+        // subida (SDK de S3, red, bucket incorrecto...), antes de este fix
+        // la excepcion cruda del SDK se colaba sin capturar hasta un 500.
+        $this->fakeR2Config();
+
+        // partialMock (no shouldReceive puro): Livewire sube el temp file al
+        // disco "local" por su cuenta antes de que save() corra — con un
+        // mock completo de la fachada, esa llamada tambien quedaria
+        // interceptada y fallaria por falta de expectativa.
+        Storage::partialMock()
+            ->shouldReceive('disk')
+            ->with('r2')
+            ->andReturnUsing(function () {
+                $disk = \Mockery::mock();
+                $disk->shouldReceive('putFileAs')->andThrow(new \RuntimeException('R2 unreachable'));
+
+                return $disk;
+            });
+
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $this->actingAs($admin);
+
+        Livewire::test(PlatformPrintersPage::class)
+            ->call('openCreate')
+            ->set('title', 'Impresora con instalador')
+            ->set('instructions', 'Pasos de prueba')
+            ->set('file', UploadedFile::fake()->create('driver.exe', 500))
+            ->call('save')
+            ->assertHasErrors('file');
+
+        $this->assertDatabaseCount('printer_guides', 0);
+    }
+
     public function test_toggle_status_flips_active_and_inactive(): void
     {
         $admin = User::factory()->create(['is_platform_admin' => true]);

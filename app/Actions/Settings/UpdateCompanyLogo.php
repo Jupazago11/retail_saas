@@ -26,8 +26,7 @@ class UpdateCompanyLogo
 
     public function __construct(
         protected CompanySettings $companySettings,
-    ) {
-    }
+    ) {}
 
     /**
      * Mismo bucket "r2" privado que el logo de plataforma y los comprobantes
@@ -62,10 +61,19 @@ class UpdateCompanyLogo
         $id = (string) Str::uuid();
 
         $originalPath = $folder.'/'.$id.'.'.$file->getClientOriginalExtension();
-        Storage::disk('r2')->putFileAs('', $file, $originalPath);
-
         $printPath = $folder.'/'.$id.'-print.png';
-        Storage::disk('r2')->put($printPath, $this->convertToPrintReadyPng($file->getRealPath()));
+
+        // isStorageConfigured() solo verifica que las variables existan, no
+        // que sean correctas ni que R2 sea alcanzable — sin este try/catch,
+        // credenciales invalidas tiraban un 500 crudo del SDK de S3.
+        try {
+            Storage::disk('r2')->putFileAs('', $file, $originalPath);
+            Storage::disk('r2')->put($printPath, $this->convertToPrintReadyPng($file->getRealPath()));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            throw new InvalidArgumentException('No se pudo subir el logo a Cloudflare R2. Verifica que las credenciales sean correctas o intenta de nuevo.');
+        }
 
         $this->companySettings->set($company, 'general', 'logo_path', $originalPath);
         $this->companySettings->set($company, 'general', 'logo_print_path', $printPath);
@@ -131,8 +139,14 @@ class UpdateCompanyLogo
         }
 
         foreach ([$this->path($company), $this->printPath($company)] as $existing) {
-            if ($existing !== null) {
+            if ($existing === null) {
+                continue;
+            }
+
+            try {
                 Storage::disk('r2')->delete($existing);
+            } catch (\Throwable $exception) {
+                report($exception);
             }
         }
     }

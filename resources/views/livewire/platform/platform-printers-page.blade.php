@@ -122,10 +122,16 @@
                         class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
                         Cancelar
                     </button>
-                    <button wire:click="save" wire:loading.attr="disabled" wire:target="save"
+                    <button wire:click="save" wire:loading.attr="disabled" wire:target="save,file"
                         class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60">
-                        <span wire:loading.remove wire:target="save">{{ $editingId ? 'Actualizar' : 'Crear guia' }}</span>
+                        {{-- El input de archivo sube el temp file en una peticion aparte
+                             (wire:target="file") antes de que exista un $this->file real;
+                             sin deshabilitar aqui tambien por ese target, se podia dar
+                             clic en "Guardar" mientras seguia subiendo y la guia se
+                             guardaba sin el archivo (que llegaba null en save()). --}}
+                        <span wire:loading.remove wire:target="save,file">{{ $editingId ? 'Actualizar' : 'Crear guia' }}</span>
                         <span wire:loading wire:target="save">Guardando...</span>
+                        <span wire:loading wire:target="file">Subiendo archivo...</span>
                     </button>
                 </div>
             </div>

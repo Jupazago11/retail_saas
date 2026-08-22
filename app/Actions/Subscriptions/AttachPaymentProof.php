@@ -17,8 +17,7 @@ class AttachPaymentProof
 {
     public function __construct(
         protected AuditLogger $auditLogger,
-    ) {
-    }
+    ) {}
 
     /**
      * El bucket de R2 se configura despues (las variables R2_* del .env
@@ -44,7 +43,17 @@ class AttachPaymentProof
         // Sin visibilidad publica a proposito: el bucket es privado, las
         // fotos se muestran despues con un link firmado que vence solo
         // (ver PaymentAttachment::temporaryUrl()).
-        Storage::disk('r2')->putFileAs('', $file, $path);
+        //
+        // isStorageConfigured() solo verifica que las variables existan, no
+        // que sean correctas ni que R2 sea alcanzable — sin este try/catch,
+        // credenciales invalidas tiraban un 500 crudo del SDK de S3.
+        try {
+            Storage::disk('r2')->putFileAs('', $file, $path);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            throw new InvalidArgumentException('No se pudo subir el archivo a Cloudflare R2. Verifica que las credenciales sean correctas o intenta de nuevo.');
+        }
 
         $attachment = PaymentAttachment::create([
             'subscription_id' => $subscription->id,
