@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\AliasLoader;
 
 /**
@@ -21,8 +20,12 @@ use Illuminate\Foundation\AliasLoader;
  */
 require __DIR__.'/../vendor/autoload.php';
 
-$app = require __DIR__.'/../bootstrap/app.php';
-$app->make(Kernel::class)->bootstrap();
+// A proposito NO arrancamos el kernel completo (sin bootstrap(), sin
+// arrancar service providers): storage_path() ya funciona con la sola
+// instancia de $app, y esto evita que el script dependa de que la base de
+// datos (CACHE_STORE/SESSION_DRIVER=database) sea alcanzable durante el
+// build de Railway, que corre aislado del contenedor en ejecucion.
+require __DIR__.'/../bootstrap/app.php';
 
 AliasLoader::getInstance()
     ->load('Facades\Livewire\Features\SupportFileUploads\GenerateSignedUploadUrl');
