@@ -5,7 +5,9 @@ namespace App\Livewire\Platform;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
+use App\Models\AuditLog;
 use App\Models\User;
+use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -158,6 +160,59 @@ class UsersPage extends Component
         $this->toast($user->status === RecordStatus::Active->value
             ? 'Usuario activado.'
             : 'Usuario desactivado.');
+    }
+
+    public function impersonate(int $id, CurrentCompany $currentCompany)
+    {
+        abort_unless(auth()->user()?->is_platform_admin, 403);
+
+        $admin  = auth()->user();
+        $target = User::findOrFail($id);
+
+        if ($target->id === $admin->id) {
+            $this->toast('No puedes entrar como tu propia cuenta.', type: 'error');
+
+            return;
+        }
+
+        if ($target->is_platform_admin) {
+            $this->toast('No puedes entrar como otro administrador de plataforma.', type: 'error');
+
+            return;
+        }
+
+        if ($target->status !== RecordStatus::Active->value) {
+            $this->toast('No puedes entrar como un usuario inactivo.', type: 'error');
+
+            return;
+        }
+
+        AuditLog::query()->create([
+            'company_id'      => null,
+            'actor_user_id'   => $admin->id,
+            'action'          => 'platform.user_impersonation_started',
+            'auditable_type'  => User::class,
+            'auditable_id'    => $target->id,
+            'before_snapshot' => null,
+            'after_snapshot'  => [
+                'impersonated_user_id'  => $target->id,
+                'impersonated_username' => $target->username,
+            ],
+            'ip_address' => request()->ip(),
+        ]);
+
+        // El id del admin queda guardado en la propia sesion (no en el
+        // usuario autenticado) para poder volver despues con
+        // StopImpersonationController; auth()->login() reemplaza el usuario
+        // autenticado pero conserva el resto de datos de sesion.
+        session()->put('impersonator_id', $admin->id);
+        $currentCompany->clear();
+        auth()->login($target);
+        session()->regenerate();
+
+        $this->flashToast('Ahora estas viendo la cuenta de '.$target->name.'.');
+
+        return $this->redirectRoute('dashboard', navigate: true);
     }
 
     public function render(): View

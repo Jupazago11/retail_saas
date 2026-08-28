@@ -16,6 +16,7 @@ class PayableMovement extends Model
         'balance_after',
         'supplier_credit_after',
         'reference',
+        'payment_method_code',
         'occurred_at',
     ];
 

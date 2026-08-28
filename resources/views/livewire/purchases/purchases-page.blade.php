@@ -324,11 +324,14 @@
                                         x-text="s.name"></button>
                                 </template>
                             </div>
+                            <p class="mt-1 text-[11px] italic text-gray-400">
+                                Si no lo eliges de la lista, se crea un proveedor nuevo con ese nombre — luego le agregas documento, telefono, etc. desde Proveedores.
+                            </p>
                         </div>
 
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
-                                <label for="purchase-invoice-number" class="text-xs font-medium text-gray-700">Factura</label>
+                                <label for="purchase-invoice-number" class="text-xs font-medium text-gray-700">Codigo</label>
                                 <input wire:model="invoiceNumber" id="purchase-invoice-number" type="text"
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             </div>
@@ -345,6 +348,11 @@
                             </div>
                         </div>
 
+                        {{-- "Vence" ya no vive aqui: hasta que no se responde
+                             si la compra ya se pago, no tiene sentido pedir
+                             fecha de vencimiento ni monto — el resto del
+                             formulario se revela (con animacion) una vez se
+                             elige una de las dos opciones. --}}
                         <div class="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <label for="purchase-purchased-at" class="text-xs font-medium text-gray-700">Fecha compra</label>
@@ -352,24 +360,109 @@
                                     class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                             </div>
                             <div>
-                                <label for="purchase-due-at" class="text-xs font-medium text-gray-700">Vence</label>
-                                <input wire:model="dueAt" id="purchase-due-at" type="date"
-                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                <label class="text-xs font-medium text-gray-700">Esta compra ya se pago <span class="text-rose-600">*</span></label>
+                                <div class="mt-1 flex w-full gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                                    <button type="button" wire:click="$set('paidImmediately', false)"
+                                        class="flex-1 rounded-md px-3 py-2 text-center font-semibold transition {{ $paidImmediately === false ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                        No
+                                    </button>
+                                    <button type="button" wire:click="$set('paidImmediately', true)"
+                                        class="flex-1 rounded-md px-3 py-2 text-center font-semibold transition {{ $paidImmediately === true ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                        Si
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="grid gap-3 sm:grid-cols-2">
-                            <div>
-                                <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total <span class="text-rose-600">*</span></label>
-                                <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
-                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                        @if ($paidImmediately !== null)
+                            @unless ($paidImmediately)
+                                <div wire:transition:enter="transform transition ease-out duration-500" wire:transition:enter-start="-translate-y-4 opacity-0 scale-95" wire:transition:enter-end="translate-y-0 opacity-100 scale-100">
+                                    <label for="purchase-due-at" class="text-xs font-medium text-gray-700">Vence</label>
+                                    <input wire:model="dueAt" id="purchase-due-at" type="date"
+                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                </div>
+                            @endunless
+
+                            <div class="grid gap-3 sm:grid-cols-2" wire:transition:enter="transform transition ease-out duration-500 delay-100" wire:transition:enter-start="-translate-y-4 opacity-0 scale-95" wire:transition:enter-end="translate-y-0 opacity-100 scale-100">
+                                <div>
+                                    <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total <span class="text-rose-600">*</span></label>
+                                    <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
+                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
+                                </div>
+                                <div>
+                                    <label for="purchase-notes" class="text-xs font-medium text-gray-700">Notas</label>
+                                    <textarea wire:model="notes" id="purchase-notes" rows="1"
+                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
+                                </div>
                             </div>
-                            <div>
-                                <label for="purchase-notes" class="text-xs font-medium text-gray-700">Notas</label>
-                                <textarea wire:model="notes" id="purchase-notes" rows="1"
-                                    class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm"></textarea>
+                        @endif
+
+                        @if ($paidImmediately)
+                            <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 space-y-4"
+                                wire:transition:enter="transform transition ease-out duration-500 delay-200" wire:transition:enter-start="-translate-y-4 opacity-0 scale-95" wire:transition:enter-end="translate-y-0 opacity-100 scale-100">
+                                <div class="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-medium text-gray-700">Se pago completo o parcial</label>
+                                        <div class="flex w-full gap-1 rounded-lg border border-emerald-200 bg-white p-1 text-sm">
+                                            <button type="button" wire:click="$set('paymentCompletionMode', 'full')"
+                                                class="flex-1 rounded-md px-3 py-2 text-center font-semibold transition {{ $paymentCompletionMode === 'full' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                                Completo
+                                            </button>
+                                            <button type="button" wire:click="$set('paymentCompletionMode', 'partial')"
+                                                class="flex-1 rounded-md px-3 py-2 text-center font-semibold transition {{ $paymentCompletionMode === 'partial' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                                Parcial
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label class="mb-1.5 block text-xs font-medium text-gray-700">De donde salio el dinero</label>
+                                        <div class="flex w-full gap-1 rounded-lg border border-emerald-200 bg-white p-1 text-sm">
+                                            <button type="button" wire:click="$set('paymentMethodMode', 'cash')"
+                                                class="flex-1 rounded-md px-2 py-2 text-center font-semibold transition {{ $paymentMethodMode === 'cash' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                                Efectivo
+                                            </button>
+                                            <button type="button" wire:click="$set('paymentMethodMode', 'transfer')"
+                                                class="flex-1 rounded-md px-2 py-2 text-center font-semibold transition {{ $paymentMethodMode === 'transfer' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                                Transferencia
+                                            </button>
+                                            <button type="button" wire:click="$set('paymentMethodMode', 'mixed')"
+                                                class="flex-1 rounded-md px-2 py-2 text-center font-semibold transition {{ $paymentMethodMode === 'mixed' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                                                Mixto
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if ($paymentCompletionMode === 'partial')
+                                    <div x-data="digitGroupInput({ path: 'initialPaidAmount', live: false })">
+                                        <label class="text-xs font-medium text-gray-700">Cuanto se pago ahora <span class="text-rose-600">*</span></label>
+                                        <input type="text" inputmode="numeric" @input="onInput($event)"
+                                            value="{{ $initialPaidAmount !== '' ? number_format((int) $initialPaidAmount, 0, ',', '.') : '' }}"
+                                            class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                        <p class="mt-1 text-[11px] text-gray-400">El resto queda pendiente, sin fecha de vencimiento (la puedes registrar despues desde el ledger de la compra).</p>
+                                    </div>
+                                @endif
+
+                                @if ($paymentMethodMode === 'mixed')
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <div x-data="digitGroupInput({ path: 'mixedCashAmount', live: false })">
+                                            <label class="text-xs font-medium text-gray-700">Efectivo <span class="text-rose-600">*</span></label>
+                                            <input type="text" inputmode="numeric" @input="onInput($event)"
+                                                value="{{ $mixedCashAmount !== '' ? number_format((int) $mixedCashAmount, 0, ',', '.') : '' }}"
+                                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                        </div>
+                                        <div x-data="digitGroupInput({ path: 'mixedTransferAmount', live: false })">
+                                            <label class="text-xs font-medium text-gray-700">Transferencia <span class="text-rose-600">*</span></label>
+                                            <input type="text" inputmode="numeric" @input="onInput($event)"
+                                                value="{{ $mixedTransferAmount !== '' ? number_format((int) $mixedTransferAmount, 0, ',', '.') : '' }}"
+                                                class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                        </div>
+                                    </div>
+                                    <p class="text-[11px] text-gray-400">Entre los dos deben sumar {{ $paymentCompletionMode === 'partial' ? 'lo pagado ahora' : 'el monto total' }}.</p>
+                                @endif
                             </div>
-                        </div>
+                        @endif
 
                     </div>{{-- /scrollable body --}}
 
@@ -417,6 +510,14 @@
                                     <input type="text" inputmode="numeric" @input="onInput($event)"
                                         value="{{ $paymentAmount !== '' ? number_format((int) $paymentAmount, 0, ',', '.') : '' }}"
                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                </div>
+                                <div class="flex-1">
+                                    <label class="text-xs font-medium text-gray-700">De donde salio <span class="text-rose-600">*</span></label>
+                                    <select wire:model="paymentMethodCode"
+                                        class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                        <option value="cash">Efectivo</option>
+                                        <option value="transfer">Transferencia</option>
+                                    </select>
                                 </div>
                                 <div class="flex-1">
                                     <label class="text-xs font-medium text-gray-700">Referencia</label>

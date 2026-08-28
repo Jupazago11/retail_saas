@@ -88,6 +88,7 @@ class CreatePurchase
                     $attributes['due_at'] ?? null,
                     $attributes['purchased_at'] ?? null,
                     $supplier,
+                    (bool) ($attributes['skip_default_due_at'] ?? false),
                 ),
                 'amount_paid' => '0.00',
                 'balance_due' => '0.00',
@@ -106,8 +107,14 @@ class CreatePurchase
             $this->payablesLedger->recordPurchaseCharge($purchase, (string) $purchase->total, $purchase->invoice_number);
 
             if ($requestedStatus === PurchaseStatus::PartiallyPaid->value || $requestedStatus === PurchaseStatus::Paid->value) {
-                $paidAmount = $this->resolveInitialPaidAmount($attributes['paid_amount'] ?? null, $purchase, $requestedStatus);
-                $this->payablesLedger->recordPayment($purchase, $paidAmount, 'initial_purchase_payment');
+                foreach ($this->resolveInitialPayments($attributes, $purchase, $requestedStatus) as $payment) {
+                    $this->payablesLedger->recordPayment(
+                        $purchase,
+                        $payment['amount'],
+                        'initial_purchase_payment',
+                        $payment['payment_method_code']
+                    );
+                }
             }
 
             $purchase = $purchase->fresh(['items.product', 'items.presentation', 'items.variant', 'branch', 'warehouse', 'payableMovements']);
@@ -126,16 +133,43 @@ class CreatePurchase
         ], true);
     }
 
-    protected function resolveInitialPaidAmount(mixed $value, Purchase $purchase, string $requestedStatus): string
+    /**
+     * Los pagos iniciales de una compra recien creada. Acepta 'initial_payments'
+     * (lista de {amount, payment_method_code} — usado por el formulario de
+     * Compras cuando el pago fue mixto efectivo+transferencia) o, para
+     * compatibilidad con imports/seed que solo mandan un monto suelto,
+     * 'paid_amount' sin medio de pago especifico.
+     *
+     * @return list<array{amount: string, payment_method_code: ?string}>
+     */
+    protected function resolveInitialPayments(array $attributes, Purchase $purchase, string $requestedStatus): array
     {
-        $value = trim((string) $value);
+        if (isset($attributes['initial_payments']) && is_array($attributes['initial_payments']) && $attributes['initial_payments'] !== []) {
+            $totalPaid = '0.00';
+            $payments = [];
 
-        if (! preg_match('/^-?\d+(?:\.\d+)?$/', $value)) {
-            throw new InvalidArgumentException('La compra con pago inicial requiere un monto valido.');
+            foreach ($attributes['initial_payments'] as $entry) {
+                $amount = $this->normalizePaymentAmount($entry['amount'] ?? null);
+                $totalPaid = bcadd($totalPaid, $amount, 2);
+                $payments[] = [
+                    'amount' => $amount,
+                    'payment_method_code' => $this->blankToNull($entry['payment_method_code'] ?? null),
+                ];
+            }
+
+            $this->assertInitialPaidAmountMatchesStatus($totalPaid, $purchase, $requestedStatus);
+
+            return $payments;
         }
 
-        $paidAmount = bcadd($value, '0', 2);
+        $paidAmount = $this->normalizePaymentAmount($attributes['paid_amount'] ?? null);
+        $this->assertInitialPaidAmountMatchesStatus($paidAmount, $purchase, $requestedStatus);
 
+        return [['amount' => $paidAmount, 'payment_method_code' => null]];
+    }
+
+    protected function assertInitialPaidAmountMatchesStatus(string $paidAmount, Purchase $purchase, string $requestedStatus): void
+    {
         if ($requestedStatus === PurchaseStatus::PartiallyPaid->value) {
             if (bccomp($paidAmount, '0.00', 2) !== 1 || bccomp($paidAmount, (string) $purchase->total, 2) !== -1) {
                 throw new InvalidArgumentException('La compra parcialmente pagada requiere un abono inicial mayor a cero y menor al total.');
@@ -145,8 +179,17 @@ class CreatePurchase
         if ($requestedStatus === PurchaseStatus::Paid->value && bccomp($paidAmount, (string) $purchase->total, 2) !== 0) {
             throw new InvalidArgumentException('La compra pagada requiere un pago inicial igual al total.');
         }
+    }
 
-        return $paidAmount;
+    protected function normalizePaymentAmount(mixed $value): string
+    {
+        $value = trim((string) $value);
+
+        if (! preg_match('/^-?\d+(?:\.\d+)?$/', $value)) {
+            throw new InvalidArgumentException('La compra con pago inicial requiere un monto valido.');
+        }
+
+        return bcadd($value, '0', 2);
     }
 
     protected function resolveBranch(Company $company, int $branchId): Branch
@@ -219,13 +262,13 @@ class CreatePurchase
         return implode(' ', $parts);
     }
 
-    protected function resolveDueAt(mixed $dueAt, mixed $purchasedAt, ?Supplier $supplier): mixed
+    protected function resolveDueAt(mixed $dueAt, mixed $purchasedAt, ?Supplier $supplier, bool $skipDefault = false): mixed
     {
         if ($this->hasValue($dueAt)) {
             return $dueAt;
         }
 
-        if ($supplier?->payment_term_days === null) {
+        if ($skipDefault || $supplier?->payment_term_days === null) {
             return null;
         }
 

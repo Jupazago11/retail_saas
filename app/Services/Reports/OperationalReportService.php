@@ -70,6 +70,16 @@ class OperationalReportService
         return $cards;
     }
 
+    /**
+     * Total de ventas sin formatear, para el contraste "Ingresos vs Gastos"
+     * del reporte (que necesita restar contra el total de compras, no
+     * comparar strings ya formateados).
+     */
+    public function salesTotalRaw(Company $company, array $filters = []): float
+    {
+        return (float) $this->salesQuery($company, $filters)->sum('grand_total');
+    }
+
     public function salesTrend(Company $company, array $filters = []): Collection
     {
         return $this->salesQuery($company, $filters)
@@ -234,6 +244,7 @@ class OperationalReportService
         return Sale::query()
             ->where('company_id', $company->id)
             ->when($this->branchId($filters), fn (Builder $query, int $branchId) => $query->where('branch_id', $branchId))
+            ->when($this->cashRegisterId($filters), fn (Builder $query, int $cashRegisterId) => $query->where('cash_register_id', $cashRegisterId))
             ->when($this->dateFrom($filters), fn (Builder $query, string $dateFrom) => $query->whereDate(DB::raw('coalesce(sold_at, created_at)'), '>=', $dateFrom))
             ->when($this->dateTo($filters), fn (Builder $query, string $dateTo) => $query->whereDate(DB::raw('coalesce(sold_at, created_at)'), '<=', $dateTo));
     }
@@ -244,6 +255,7 @@ class OperationalReportService
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.company_id', $company->id)
             ->when($this->branchId($filters), fn (Builder $query, int $branchId) => $query->where('sales.branch_id', $branchId))
+            ->when($this->cashRegisterId($filters), fn (Builder $query, int $cashRegisterId) => $query->where('sales.cash_register_id', $cashRegisterId))
             ->when($this->dateFrom($filters), fn (Builder $query, string $dateFrom) => $query->whereDate(DB::raw('coalesce(sales.sold_at, sales.created_at)'), '>=', $dateFrom))
             ->when($this->dateTo($filters), fn (Builder $query, string $dateTo) => $query->whereDate(DB::raw('coalesce(sales.sold_at, sales.created_at)'), '<=', $dateTo));
     }
@@ -255,6 +267,9 @@ class OperationalReportService
             ->where('payments.status', 'confirmed')
             ->when($this->branchId($filters), function (Builder $query, int $branchId) {
                 $query->whereHas('sale', fn (Builder $saleQuery) => $saleQuery->where('branch_id', $branchId));
+            })
+            ->when($this->cashRegisterId($filters), function (Builder $query, int $cashRegisterId) {
+                $query->whereHas('sale', fn (Builder $saleQuery) => $saleQuery->where('cash_register_id', $cashRegisterId));
             })
             ->when($this->dateFrom($filters), fn (Builder $query, string $dateFrom) => $query->whereDate(DB::raw('coalesce(payments.paid_at, payments.created_at)'), '>=', $dateFrom))
             ->when($this->dateTo($filters), fn (Builder $query, string $dateTo) => $query->whereDate(DB::raw('coalesce(payments.paid_at, payments.created_at)'), '<=', $dateTo));
@@ -336,6 +351,13 @@ class OperationalReportService
         $branchId = $filters['branch_id'] ?? null;
 
         return $branchId !== null && $branchId !== '' ? (int) $branchId : null;
+    }
+
+    protected function cashRegisterId(array $filters): ?int
+    {
+        $cashRegisterId = $filters['cash_register_id'] ?? null;
+
+        return $cashRegisterId !== null && $cashRegisterId !== '' ? (int) $cashRegisterId : null;
     }
 
     protected function dateFrom(array $filters): ?string

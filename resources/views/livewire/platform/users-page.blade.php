@@ -71,6 +71,14 @@
                                             class="whitespace-nowrap rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
                                             Restablecer contraseña
                                         </button>
+                                        @unless ($user->is_platform_admin || $user->id === auth()->id())
+                                            <button wire:click="impersonate({{ $user->id }})"
+                                                wire:confirm="¿Entrar como {{ $user->name }}? Vas a ver su cuenta tal como la ve; tu sesion queda guardada para volver despues."
+                                                title="Entrar como este usuario"
+                                                class="inline-flex items-center justify-center rounded-full border border-gray-300 p-1.5 text-gray-500 transition hover:border-amber-400 hover:text-amber-700">
+                                                <x-heroicon-o-arrow-right-on-rectangle class="h-4 w-4" />
+                                            </button>
+                                        @endunless
                                     </div>
                                 </td>
                             </tr>
@@ -103,6 +111,16 @@
                         Nueva contraseña para <span class="font-semibold text-gray-600">{{ $resettingUserName }}</span>.
                         Se reemplaza la anterior de inmediato; no hay forma de recuperarla despues.
                     </p>
+
+                    @if ($resettingUserId === auth()->id())
+                        <div class="mt-4 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2.5 text-xs text-amber-800 ring-1 ring-amber-200">
+                            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 flex-shrink-0" />
+                            <span>
+                                Estas restableciendo <span class="font-semibold">tu propia contraseña</span>. Tu sesion actual sigue activa,
+                                pero vas a necesitar esta contraseña nueva la proxima vez que inicies sesion. Copiala antes de cerrar esta ventana.
+                            </span>
+                        </div>
+                    @endif
 
                     <div class="mt-5">
                         <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Contraseña nueva <span class="text-rose-600">*</span></label>

@@ -108,7 +108,7 @@ class OperationalReportsPageTest extends TestCase
             'credit_due_at' => now()->subDays(10),
         ]);
 
-        app(RegisterCreditPayment::class)->handle($company, $creditSale, [
+        app(RegisterCreditPayment::class)->handle($company, $customer->creditAccount, [
             'cash_session_id' => $cashSession->id,
             'received_by' => $owner->id,
             'payment_method_code' => 'transfer',
@@ -137,7 +137,45 @@ class OperationalReportsPageTest extends TestCase
 
         $this->assertNotNull($overdueBucket);
         $this->assertSame(1, $overdueBucket['sales_count']);
-        $this->assertSame('820', $overdueBucket['balance_total']);
+        // El abono de RegisterCreditPayment es contra la cuenta en general,
+        // no contra esta venta puntual (ver CreditAccountsPage::moraStatus()),
+        // asi que el saldo de ESTA venta en el aging queda intacto en 1620.
+        $this->assertSame('1.620', $overdueBucket['balance_total']);
+    }
+
+    public function test_reports_page_shows_purchases_versus_sales_contrast(): void
+    {
+        [$owner, $company, $branch, $warehouse] = $this->fixture();
+        $supplier = app(\App\Actions\Suppliers\CreateSupplier::class)->handle($company, [
+            'first_name' => 'Proveedor',
+            'last_name' => 'Contraste',
+        ]);
+
+        $purchase = app(\App\Actions\Purchases\CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => \App\Enums\PurchaseStatus::Confirmed->value,
+            'total' => '9000',
+        ]);
+        app(\App\Actions\Purchases\RegisterPurchasePayment::class)->handle($company, $purchase, [
+            'amount' => '9000',
+            'payment_method_code' => 'transfer',
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(OperationalReportsPage::class)
+            ->assertSee('Ingresos del periodo')
+            ->assertSee('Gastos del periodo')
+            ->assertSee('Compras')
+            ->assertSee('Compras por dia')
+            ->assertSee('De donde salio el dinero')
+            ->assertSee('9.000')
+            ->assertSee('Transferencia')
+            ->assertSee('Proveedores')
+            ->assertSee('Proveedor Contraste');
     }
 
     public function test_reports_route_is_forbidden_without_reports_permission(): void

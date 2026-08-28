@@ -6,6 +6,7 @@ use App\Actions\Purchases\ApplySupplierCreditToPurchase;
 use App\Actions\Purchases\ListPurchasePayables;
 use App\Actions\Purchases\ListSupplierPayablesSummary;
 use App\Enums\PayableMovementType;
+use App\Enums\PurchaseStatus;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
 use App\Models\PayableMovement;
@@ -159,11 +160,13 @@ class PayablesPage extends Component
             'payables' => $payables,
             'suppliers' => $this->suppliers(),
             'supplierSummary' => $supplierSummary,
-            'openBalanceTotal' => $payables->sum(fn (Purchase $purchase) => (float) $purchase->balance_due),
-            'overdueBalanceTotal' => $supplierSummary->sum(fn (array $row) => (float) $row['overdue_balance_total']),
-            'availableCreditTotal' => $supplierSummary->sum(fn (array $row) => (float) $row['credit_balance']),
+            'statusCards' => $this->statusCards(
+                $payables,
+                (float) $supplierSummary->sum(fn (array $row) => (float) $row['credit_balance'])
+            ),
             'agingChartData' => $this->agingChartData($supplierSummary),
             'topSuppliersChartData' => $this->topSuppliersChartData($supplierSummary),
+            'paymentMethodBreakdown' => $this->paymentMethodBreakdown($payables),
             // Si los filtros activos no dejan ningun proveedor/compra visible, las 3
             // tarjetas quedan en $0 a la vez y parecen rotas; esto distingue ese caso
             // (filtro estrecho) de una empresa que genuinamente no tiene deuda.
@@ -174,6 +177,97 @@ class PayablesPage extends Component
                 'description' => 'Consulta compras pendientes, vencimientos y aplica saldo a favor del proveedor sobre compras abiertas.',
             ]),
         ]);
+    }
+
+    /**
+     * De donde salio el dinero con el que se les pago a proveedores
+     * (efectivo/transferencia), calculado sobre los mismos movimientos de
+     * pago que ya trae cargados $payables — respeta los mismos filtros que
+     * la tabla de abajo (proveedor, estado, vencidas, etc.) sin otra
+     * consulta aparte.
+     *
+     * @return array<int, array{payment_method_code: ?string, payment_method_label: string, payments_count: int, payments_total: string}>
+     */
+    protected function paymentMethodBreakdown(Collection $payables): array
+    {
+        return $payables
+            ->flatMap(fn (Purchase $purchase) => $purchase->payableMovements)
+            ->where('movement_type', PayableMovementType::Payment->value)
+            ->groupBy(fn (PayableMovement $movement) => $movement->payment_method_code ?? '')
+            ->map(fn (SupportCollection $group, string $code) => [
+                'payment_method_code' => $code !== '' ? $code : null,
+                'payment_method_label' => $this->paymentMethodLabel($code !== '' ? $code : null) ?? 'Sin especificar',
+                'payments_count' => $group->count(),
+                'amount_raw' => (float) $group->sum('amount'),
+            ])
+            ->sortByDesc('amount_raw')
+            ->map(fn (array $row) => [
+                'payment_method_code' => $row['payment_method_code'],
+                'payment_method_label' => $row['payment_method_label'],
+                'payments_count' => $row['payments_count'],
+                'payments_total' => \App\Support\Money::format($row['amount_raw']),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Indicadores de la cabecera: a diferencia de $supplierSummary (que
+     * siempre resume la deuda abierta global, sin importar que pestaña de
+     * estado este activa), esto se calcula sobre $payables — la lista que
+     * YA respeta la pestaña Pendientes/Todas/Pagadas y el resto de filtros —
+     * para que las tarjetas de arriba nunca contradigan lo que se ve en la
+     * tabla de abajo. Antes las 3 tarjetas eran fijas ("Debes en total" /
+     * "Vencido" / "A tu favor") aunque estuvieras viendo "Pagadas", donde
+     * esos numeros no significan nada.
+     */
+    protected function statusCards(Collection $payables, float $availableCreditTotal): array
+    {
+        $today = now()->startOfDay();
+
+        // Una compra cancelada no es deuda ni gasto real; se excluye de
+        // los totales en dinero aunque siga apareciendo en la tabla "Todas".
+        $active = $payables->filter(fn (Purchase $purchase) => $purchase->status !== PurchaseStatus::Cancelled->value);
+
+        $overdue = $active->filter(fn (Purchase $purchase) => (float) $purchase->balance_due > 0
+            && $purchase->due_at !== null
+            && $purchase->due_at->lt($today));
+
+        $agingBucketSum = fn ($from, $to) => $overdue
+            ->filter(fn (Purchase $purchase) => (! $from || $purchase->due_at->gte($from)) && (! $to || $purchase->due_at->lt($to)))
+            ->sum(fn (Purchase $purchase) => (float) $purchase->balance_due);
+
+        $paidPurchases = $active->filter(fn (Purchase $purchase) => $purchase->status === PurchaseStatus::Paid->value);
+
+        // Sin fecha limite no hay como llegar tarde: cuenta como a tiempo,
+        // igual que el semaforo de mora de Credito trata "sin vencimiento".
+        $paidOnTime = $paidPurchases->filter(fn (Purchase $purchase) => $purchase->due_at === null
+            || $purchase->paid_at === null
+            || $purchase->paid_at->startOfDay()->lte($purchase->due_at->startOfDay()));
+
+        return [
+            'mode' => match ($this->status) {
+                'open' => 'open',
+                'paid' => 'paid',
+                default => 'all',
+            },
+            'purchases_count' => $active->count(),
+            'total_amount' => $active->sum(fn (Purchase $purchase) => (float) $purchase->total),
+            'paid_amount' => $active->sum(fn (Purchase $purchase) => (float) $purchase->amount_paid),
+            'pending_amount' => $active->sum(fn (Purchase $purchase) => (float) $purchase->balance_due),
+            'overdue_amount' => $overdue->sum(fn (Purchase $purchase) => (float) $purchase->balance_due),
+            'overdue_count' => $overdue->count(),
+            'available_credit_total' => $availableCreditTotal,
+            'aging' => [
+                '0_30' => $agingBucketSum($today->copy()->subDays(30), null),
+                '31_60' => $agingBucketSum($today->copy()->subDays(60), $today->copy()->subDays(30)),
+                '61_90' => $agingBucketSum($today->copy()->subDays(90), $today->copy()->subDays(60)),
+                '91_plus' => $agingBucketSum(null, $today->copy()->subDays(90)),
+            ],
+            'paid_purchases_count' => $paidPurchases->count(),
+            'paid_on_time_count' => $paidOnTime->count(),
+            'paid_late_count' => $paidPurchases->count() - $paidOnTime->count(),
+        ];
     }
 
     /**
@@ -217,6 +311,15 @@ class PayablesPage extends Component
             PayableMovementType::SupplierCreditGenerated->value => 'Saldo a favor generado',
             PayableMovementType::SupplierCreditApplied->value => 'Saldo a favor aplicado',
             default => $movement->movement_type,
+        };
+    }
+
+    public function paymentMethodLabel(?string $code): ?string
+    {
+        return match ($code) {
+            'cash' => 'Efectivo',
+            'transfer' => 'Transferencia',
+            default => null,
         };
     }
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\LogoutController;
+use App\Http\Controllers\Auth\StopImpersonationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
@@ -26,6 +27,9 @@ Route::middleware('guest')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::post('logout', LogoutController::class)
         ->name('logout');
+
+    Route::post('impersonate/stop', StopImpersonationController::class)
+        ->name('impersonate.stop');
 
     Volt::route('cambiar-contrasena', 'pages.auth.force-password-change')
         ->name('password.force-update');

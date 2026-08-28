@@ -75,6 +75,9 @@
                             </p>
                             <p class="text-xs text-gray-500">
                                 {{ optional($movement->occurred_at)->format('Y-m-d H:i:s') ?: 'Sin fecha' }}
+                                @if ($this->paymentMethodLabel($movement->payment_method_code))
+                                    · {{ $this->paymentMethodLabel($movement->payment_method_code) }}
+                                @endif
                                 @if ($movement->reference)
                                     · Ref: {{ $movement->reference }}
                                 @endif

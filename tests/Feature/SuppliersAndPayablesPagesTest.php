@@ -311,6 +311,139 @@ class SuppliersAndPayablesPagesTest extends TestCase
             ->assertDontSee('FAC-ALPHA-AGE');
     }
 
+    public function test_payables_page_status_cards_adapt_to_open_all_and_paid_tabs(): void
+    {
+        [$user, $company, $branch, $warehouse, $product] = $this->purchaseFixture();
+        $this->actingAs($user);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $supplier = app(CreateSupplier::class)->handle($company, [
+            'first_name' => 'Proveedor',
+            'last_name' => 'Mixto',
+        ]);
+
+        // Pendiente, aun no vence.
+        app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'due_at' => now()->addDays(5)->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_cost' => '1000']],
+        ]);
+
+        // Vencida hace 12 dias (cae en el tramo 0-30).
+        app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'due_at' => now()->subDays(12)->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'quantity' => '2', 'unit_cost' => '1000']],
+        ]);
+
+        // Pagada a tiempo: vence en el futuro, se paga hoy.
+        $onTime = app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'due_at' => now()->addDays(10)->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_cost' => '2000']],
+        ]);
+        app(RegisterPurchasePayment::class)->handle($company, $onTime, ['amount' => '2000']);
+
+        // Pagada con retraso: ya habia vencido cuando se pago (hoy).
+        $late = app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'due_at' => now()->subDays(5)->format('Y-m-d H:i:s'),
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_cost' => '3000']],
+        ]);
+        app(RegisterPurchasePayment::class)->handle($company, $late, ['amount' => '3000']);
+
+        // Pendientes: solo las 2 compras con saldo (1000 + 2000), de las
+        // cuales 2000 estan vencidos.
+        $open = Livewire::test(PayablesPage::class)
+            ->assertSee('Debes en total')
+            ->assertSee('A tu favor')
+            ->assertDontSee('Total pagado');
+        $openCards = $open->viewData('statusCards');
+        $this->assertSame('open', $openCards['mode']);
+        $this->assertSame(3000.0, $openCards['pending_amount']);
+        $this->assertSame(2000.0, $openCards['overdue_amount']);
+        $this->assertSame(1, $openCards['overdue_count']);
+        $this->assertSame(2000.0, $openCards['aging']['0_30']);
+
+        // Todas: las 4 compras cuentan para el total, sin importar su estado.
+        $all = Livewire::test(PayablesPage::class)
+            ->call('setStatus', '')
+            ->assertSee('Total en compras');
+        $allCards = $all->viewData('statusCards');
+        $this->assertSame('all', $allCards['mode']);
+        $this->assertSame(4, $allCards['purchases_count']);
+        $this->assertSame(8000.0, $allCards['total_amount']);
+        $this->assertSame(5000.0, $allCards['paid_amount']);
+        $this->assertSame(3000.0, $allCards['pending_amount']);
+
+        // Pagadas: el saldo pendiente/vencido ya no aplica (por eso antes se
+        // veia $0 y parecia roto); lo que importa es la puntualidad del pago.
+        $paid = Livewire::test(PayablesPage::class)
+            ->call('setStatus', 'paid')
+            ->assertSee('Total pagado')
+            ->assertSee('Pagadas a tiempo')
+            ->assertSee('Con retraso')
+            ->assertDontSee('Debes en total');
+        $paidCards = $paid->viewData('statusCards');
+        $this->assertSame('paid', $paidCards['mode']);
+        $this->assertSame(2, $paidCards['paid_purchases_count']);
+        $this->assertSame(1, $paidCards['paid_on_time_count']);
+        $this->assertSame(1, $paidCards['paid_late_count']);
+        $this->assertSame(5000.0, $paidCards['paid_amount']);
+    }
+
+    public function test_payables_page_shows_payment_method_breakdown_scoped_to_current_filters(): void
+    {
+        [$user, $company, $branch, $warehouse, $product] = $this->purchaseFixture();
+        $this->actingAs($user);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $supplier = app(CreateSupplier::class)->handle($company, [
+            'first_name' => 'Proveedor',
+            'last_name' => 'Medios',
+        ]);
+
+        $purchaseA = app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'items' => [['product_id' => $product->id, 'quantity' => '3', 'unit_cost' => '1000']],
+        ]);
+        app(RegisterPurchasePayment::class)->handle($company, $purchaseA, ['amount' => '1000', 'payment_method_code' => 'cash']);
+
+        $purchaseB = app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'items' => [['product_id' => $product->id, 'quantity' => '2', 'unit_cost' => '1000']],
+        ]);
+        app(RegisterPurchasePayment::class)->handle($company, $purchaseB, ['amount' => '2000', 'payment_method_code' => 'transfer']);
+
+        $page = Livewire::test(PayablesPage::class)
+            ->call('setStatus', '')
+            ->assertSee('De donde salio el dinero')
+            ->assertSee('Efectivo')
+            ->assertSee('Transferencia');
+
+        $breakdown = collect($page->viewData('paymentMethodBreakdown'))->keyBy('payment_method_code');
+        $this->assertSame('1.000', $breakdown->get('cash')['payments_total']);
+        $this->assertSame('2.000', $breakdown->get('transfer')['payments_total']);
+    }
+
     protected function actingUserWithCurrentCompany(): array
     {
         $user = User::factory()->create();

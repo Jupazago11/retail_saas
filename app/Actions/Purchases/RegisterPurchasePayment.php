@@ -35,14 +35,15 @@ class RegisterPurchasePayment
 
         $amount = $this->normalizeAmount($attributes['amount'] ?? null);
         $reference = $this->blankToNull($attributes['reference'] ?? null);
+        $paymentMethodCode = $this->normalizePaymentMethodCode($attributes['payment_method_code'] ?? null);
         $beforePurchase = $purchase->fresh();
 
-        return DB::transaction(function () use ($company, $purchase, $amount, $reference, $beforePurchase) {
+        return DB::transaction(function () use ($company, $purchase, $amount, $reference, $paymentMethodCode, $beforePurchase) {
             $purchase = Purchase::query()
                 ->lockForUpdate()
                 ->findOrFail($purchase->id);
 
-            $this->payablesLedger->recordPayment($purchase, $amount, $reference);
+            $this->payablesLedger->recordPayment($purchase, $amount, $reference, $paymentMethodCode);
             $purchase = $purchase->fresh(['payableMovements']);
             $this->auditLogger->logUpdated($company, 'purchase.payment_registered', $beforePurchase, $purchase);
 
@@ -65,6 +66,21 @@ class RegisterPurchasePayment
         }
 
         return $normalized;
+    }
+
+    protected function normalizePaymentMethodCode(mixed $value): ?string
+    {
+        $value = $this->blankToNull($value);
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! in_array($value, ['cash', 'transfer'], true)) {
+            throw new InvalidArgumentException('Medio de pago invalido.');
+        }
+
+        return $value;
     }
 
     protected function blankToNull(mixed $value): ?string

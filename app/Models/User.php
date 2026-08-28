@@ -22,6 +22,7 @@ use Illuminate\Notifications\Notifiable;
     'is_platform_admin',
     'must_change_password',
     'last_login_at',
+    'last_purchase_type',
 ])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable

@@ -107,21 +107,136 @@
             </div>
         </div>
 
-        {{-- Metricas: solo 3, en lenguaje simple (nada de "exposicion neta"). --}}
-        <div class="grid gap-4 sm:grid-cols-3">
-            <div class="rounded-xl bg-blue-600 px-5 py-5 text-white">
-                <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Debes en total</p>
-                <p class="mt-2 text-2xl font-black">${{ \App\Support\Money::format((float) $openBalanceTotal) }}</p>
+        {{-- Metricas: cambian segun la pestaña activa (Pendientes/Todas/Pagadas)
+             — antes eran fijas y en "Pagadas" mostraban deuda que no tenia
+             nada que ver con lo que se estaba mirando. Cada set trae un
+             numero protagonista (mas grande) mas 2-3 tarjetas de apoyo. --}}
+        @php
+            $agingColors = ['0_30' => '#10b981', '31_60' => '#f59e0b', '61_90' => '#f97316', '91_plus' => '#e11d48'];
+            $agingTotal = array_sum($statusCards['aging']);
+        @endphp
+
+        @if ($statusCards['mode'] === 'open')
+            <div class="grid gap-4 lg:grid-cols-4">
+                <div class="rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 px-6 py-5 text-white lg:col-span-2">
+                    <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Debes en total</p>
+                    <p class="mt-2 text-3xl font-black">${{ \App\Support\Money::format((float) $statusCards['pending_amount']) }}</p>
+                    <p class="mt-1 text-xs text-blue-100">
+                        {{ $statusCards['purchases_count'] }} {{ $statusCards['purchases_count'] === 1 ? 'compra pendiente' : 'compras pendientes' }}
+                    </p>
+                    @if ($statusCards['overdue_amount'] > 0)
+                        @php $vencidoPct = round($statusCards['overdue_amount'] / $statusCards['pending_amount'] * 100); @endphp
+                        <div class="mt-3 flex h-1.5 overflow-hidden rounded-full bg-white/25">
+                            <div class="bg-white" style="width: {{ 100 - $vencidoPct }}%"></div>
+                            <div class="bg-white/40" style="width: {{ $vencidoPct }}%"></div>
+                        </div>
+                        <div class="mt-1.5 flex gap-3 text-[11px] text-blue-100">
+                            <span>Vigente {{ 100 - $vencidoPct }}%</span>
+                            <span>Vencido {{ $vencidoPct }}%</span>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Vencido</p>
+                    <p class="mt-2 text-2xl font-black text-rose-700">${{ \App\Support\Money::format((float) $statusCards['overdue_amount']) }}</p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        {{ $statusCards['overdue_count'] }} {{ $statusCards['overdue_count'] === 1 ? 'compra vencida' : 'compras vencidas' }}
+                    </p>
+                    @if ($agingTotal > 0)
+                        <div class="mt-3 flex h-1.5 overflow-hidden rounded-full bg-gray-100">
+                            @foreach ($statusCards['aging'] as $bucket => $amount)
+                                @continue($amount <= 0)
+                                <div style="width: {{ $amount / $agingTotal * 100 }}%; background-color: {{ $agingColors[$bucket] }}"></div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-emerald-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">A tu favor</p>
+                    <p class="mt-2 text-2xl font-black text-emerald-700">${{ \App\Support\Money::format((float) $statusCards['available_credit_total']) }}</p>
+                    <p class="mt-1 text-xs text-gray-500">Aplicable a tus proximas compras</p>
+                </div>
             </div>
-            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Vencido</p>
-                <p class="mt-2 text-2xl font-black text-rose-700">${{ \App\Support\Money::format((float) $overdueBalanceTotal) }}</p>
+        @elseif ($statusCards['mode'] === 'paid')
+            <div class="grid gap-4 lg:grid-cols-3">
+                <div class="rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 px-6 py-5 text-white">
+                    <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Total pagado</p>
+                    <p class="mt-2 text-3xl font-black">${{ \App\Support\Money::format((float) $statusCards['paid_amount']) }}</p>
+                    <p class="mt-1 text-xs text-blue-100">
+                        {{ $statusCards['paid_purchases_count'] }} {{ $statusCards['paid_purchases_count'] === 1 ? 'compra totalmente pagada' : 'compras totalmente pagadas' }}
+                    </p>
+                </div>
+
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-emerald-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">Pagadas a tiempo</p>
+                    <p class="mt-2 text-2xl font-black text-emerald-700">
+                        {{ $statusCards['paid_on_time_count'] }}
+                        <span class="text-sm font-semibold text-gray-400">/ {{ $statusCards['paid_purchases_count'] }}</span>
+                    </p>
+                    @if ($statusCards['paid_purchases_count'] > 0)
+                        <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                            <div class="h-full bg-emerald-500" style="width: {{ round($statusCards['paid_on_time_count'] / $statusCards['paid_purchases_count'] * 100) }}%"></div>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Con retraso</p>
+                    <p class="mt-2 text-2xl font-black text-rose-700">
+                        {{ $statusCards['paid_late_count'] }}
+                        <span class="text-sm font-semibold text-gray-400">/ {{ $statusCards['paid_purchases_count'] }}</span>
+                    </p>
+                    @if ($statusCards['paid_purchases_count'] > 0)
+                        <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                            <div class="h-full bg-rose-500" style="width: {{ round($statusCards['paid_late_count'] / $statusCards['paid_purchases_count'] * 100) }}%"></div>
+                        </div>
+                    @endif
+                </div>
             </div>
-            <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-emerald-200">
-                <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">A tu favor</p>
-                <p class="mt-2 text-2xl font-black text-emerald-700">${{ \App\Support\Money::format((float) $availableCreditTotal) }}</p>
+        @else
+            <div class="grid gap-4 lg:grid-cols-4">
+                <div class="rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 px-6 py-5 text-white lg:col-span-2">
+                    <p class="text-xs uppercase tracking-[0.18em] text-blue-100">Total en compras</p>
+                    <p class="mt-2 text-3xl font-black">${{ \App\Support\Money::format((float) $statusCards['total_amount']) }}</p>
+                    <p class="mt-1 text-xs text-blue-100">
+                        {{ $statusCards['purchases_count'] }} {{ $statusCards['purchases_count'] === 1 ? 'compra registrada' : 'compras registradas' }}
+                    </p>
+                    @if ($statusCards['total_amount'] > 0)
+                        @php $pagadoPct = round($statusCards['paid_amount'] / $statusCards['total_amount'] * 100); @endphp
+                        <div class="mt-3 flex h-1.5 overflow-hidden rounded-full bg-white/25">
+                            <div class="bg-white" style="width: {{ $pagadoPct }}%"></div>
+                            <div class="bg-white/40" style="width: {{ 100 - $pagadoPct }}%"></div>
+                        </div>
+                        <div class="mt-1.5 flex gap-3 text-[11px] text-blue-100">
+                            <span>Pagado {{ $pagadoPct }}%</span>
+                            <span>Pendiente {{ 100 - $pagadoPct }}%</span>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-emerald-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-emerald-600">Pagado</p>
+                    <p class="mt-2 text-2xl font-black text-emerald-700">${{ \App\Support\Money::format((float) $statusCards['paid_amount']) }}</p>
+                </div>
+
+                <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-amber-200">
+                    <p class="text-xs uppercase tracking-[0.18em] text-amber-600">Pendiente</p>
+                    <p class="mt-2 text-2xl font-black text-amber-700">${{ \App\Support\Money::format((float) $statusCards['pending_amount']) }}</p>
+                </div>
+
+                @if ($statusCards['overdue_amount'] > 0)
+                    <div class="rounded-xl bg-white px-5 py-5 ring-1 ring-rose-200">
+                        <p class="text-xs uppercase tracking-[0.18em] text-rose-600">Vencido</p>
+                        <p class="mt-2 text-2xl font-black text-rose-700">${{ \App\Support\Money::format((float) $statusCards['overdue_amount']) }}</p>
+                        <p class="mt-1 text-xs text-gray-500">
+                            {{ $statusCards['overdue_count'] }} {{ $statusCards['overdue_count'] === 1 ? 'compra vencida' : 'compras vencidas' }}
+                        </p>
+                    </div>
+                @endif
             </div>
-        </div>
+        @endif
 
         @if ($emptyDueToFilters)
             <p class="mt-2 text-xs text-gray-400">
@@ -161,6 +276,39 @@
                         </div>
                     </div>
                 @endif
+            </div>
+        @endif
+
+        {{-- De donde salio el dinero con el que se pago a proveedores —
+             mismo indicador que ya existe en Reportes, pero acotado a los
+             filtros actuales de esta pantalla (proveedor, estado, etc.). --}}
+        @if ($paymentMethodBreakdown !== [])
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-600">Pagos</p>
+                <h3 class="mt-1 text-lg font-black text-gray-900">De donde salio el dinero</h3>
+
+                @if (count($paymentMethodBreakdown) > 1)
+                    <div class="mt-4">
+                        <x-charts.bar-chart
+                            :data="$paymentMethodBreakdown"
+                            label-key="payment_method_label"
+                            value-key="payments_total"
+                            :colors="['#eb6834', '#2a78d6', '#9ca3af']"
+                            :money="true"
+                            height="150"
+                            aria-label="Pagos a proveedores por medio de pago" />
+                    </div>
+                @endif
+
+                <div class="mt-4 grid gap-3 sm:grid-cols-{{ min(count($paymentMethodBreakdown), 3) }}">
+                    @foreach ($paymentMethodBreakdown as $method)
+                        <div class="rounded-lg bg-gray-50 px-4 py-3 ring-1 ring-gray-200">
+                            <p class="text-sm font-semibold text-gray-900">{{ $method['payment_method_label'] }}</p>
+                            <p class="mt-1 text-lg font-black text-gray-900">${{ $method['payments_total'] }}</p>
+                            <p class="text-xs text-gray-500">{{ $method['payments_count'] }} {{ \Illuminate\Support\Str::plural('pago', $method['payments_count']) }}</p>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         @endif
 

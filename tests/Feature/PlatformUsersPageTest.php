@@ -33,6 +33,29 @@ class PlatformUsersPageTest extends TestCase
         $this->assertTrue(Hash::check('a-brand-new-password', $target->password));
     }
 
+    public function test_reset_password_modal_warns_when_targeting_own_account(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+
+        $this->actingAs($platformAdmin);
+
+        Livewire::test(UsersPage::class)
+            ->call('startResetPassword', $platformAdmin->id)
+            ->assertSee('tu propia contraseña');
+    }
+
+    public function test_reset_password_modal_does_not_warn_for_other_users(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+        $target = User::factory()->create();
+
+        $this->actingAs($platformAdmin);
+
+        Livewire::test(UsersPage::class)
+            ->call('startResetPassword', $target->id)
+            ->assertDontSee('tu propia contraseña');
+    }
+
     public function test_reset_password_requires_at_least_eight_characters(): void
     {
         $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
@@ -55,4 +78,58 @@ class PlatformUsersPageTest extends TestCase
 
         Livewire::test(UsersPage::class)->assertStatus(403);
     }
+
+    public function test_platform_admin_can_impersonate_a_regular_user(): void
+    {
+        $admin  = User::factory()->create(['is_platform_admin' => true]);
+        $target = User::factory()->create();
+
+        $this->actingAs($admin);
+
+        Livewire::test(UsersPage::class)
+            ->call('impersonate', $target->id)
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($target);
+        $this->assertSame($admin->id, session('impersonator_id'));
+    }
+
+    public function test_cannot_impersonate_own_account(): void
+    {
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(UsersPage::class)->call('impersonate', $admin->id);
+
+        $this->assertAuthenticatedAs($admin);
+        $this->assertNull(session('impersonator_id'));
+    }
+
+    public function test_cannot_impersonate_another_platform_admin(): void
+    {
+        $admin       = User::factory()->create(['is_platform_admin' => true]);
+        $otherAdmin  = User::factory()->create(['is_platform_admin' => true]);
+
+        $this->actingAs($admin);
+
+        Livewire::test(UsersPage::class)->call('impersonate', $otherAdmin->id);
+
+        $this->assertAuthenticatedAs($admin);
+        $this->assertNull(session('impersonator_id'));
+    }
+
+    public function test_cannot_impersonate_an_inactive_user(): void
+    {
+        $admin  = User::factory()->create(['is_platform_admin' => true]);
+        $target = User::factory()->create(['status' => 'inactive']);
+
+        $this->actingAs($admin);
+
+        Livewire::test(UsersPage::class)->call('impersonate', $target->id);
+
+        $this->assertAuthenticatedAs($admin);
+        $this->assertNull(session('impersonator_id'));
+    }
+
 }

@@ -39,7 +39,7 @@ class PayablesLedger
         return $movement;
     }
 
-    public function recordPayment(Purchase $purchase, string $amount, ?string $reference = null): PayableMovement
+    public function recordPayment(Purchase $purchase, string $amount, ?string $reference = null, ?string $paymentMethodCode = null): PayableMovement
     {
         $amount = $this->normalizeAmount($amount);
         $outstanding = $this->outstandingForPurchase($purchase);
@@ -67,6 +67,7 @@ class PayablesLedger
             'balance_after' => $balanceAfter,
             'supplier_credit_after' => $this->currentSupplierCreditBalance($purchase),
             'reference' => $reference,
+            'payment_method_code' => $paymentMethodCode,
             'occurred_at' => now(),
         ]);
 

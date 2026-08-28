@@ -16,7 +16,7 @@ class RequirePasswordChange
             return $next($request);
         }
 
-        if ($request->routeIs('password.force-update', 'logout', 'livewire.*')) {
+        if ($request->routeIs('password.force-update', 'logout', 'impersonate.stop', 'livewire.*')) {
             return $next($request);
         }
 

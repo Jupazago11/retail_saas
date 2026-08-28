@@ -5,6 +5,7 @@ namespace App\Livewire\Purchases;
 use App\Actions\Purchases\CreatePurchase;
 use App\Actions\Purchases\RegisterPurchasePayment;
 use App\Actions\Purchases\ReturnPurchase;
+use App\Actions\Suppliers\CreateSupplier;
 use App\Enums\PayableMovementType;
 use App\Enums\PurchaseStatus;
 use App\Enums\RecordStatus;
@@ -39,12 +40,23 @@ class PurchasesPage extends Component
     public string $notes = '';
     public string $totalAmount = '';
 
+    // Nullable a proposito: null = todavia no responde la pregunta (asi el
+    // resto del formulario se queda oculto hasta que elige), a diferencia
+    // de false que significa "respondio que no".
+    public ?bool $paidImmediately = null;
+    public string $paymentCompletionMode = 'full';
+    public string $initialPaidAmount = '';
+    public string $paymentMethodMode = 'cash';
+    public string $mixedCashAmount = '';
+    public string $mixedTransferAmount = '';
+
     public string $search = '';
     public string $statusFilter = 'confirmed';
     public ?int $supplierFilterId = null;
 
     public string $paymentAmount = '';
     public string $paymentReference = '';
+    public string $paymentMethodCode = 'cash';
     public ?int $ledgerPurchaseId = null;
 
     public bool $showModal = false;
@@ -138,22 +150,108 @@ class PurchasesPage extends Component
             'dueAt' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'totalAmount' => ['required', 'numeric', 'min:0.01'],
+            'paidImmediately' => ['required', 'boolean'],
+            'paymentCompletionMode' => [Rule::in(['full', 'partial'])],
+            'paymentMethodMode' => [Rule::in(['cash', 'transfer', 'mixed'])],
+            'initialPaidAmount' => [
+                Rule::requiredIf(fn () => $this->paidImmediately && $this->paymentCompletionMode === 'partial'),
+                'nullable', 'numeric', 'gt:0',
+            ],
+            'mixedCashAmount' => [
+                Rule::requiredIf(fn () => $this->paidImmediately && $this->paymentMethodMode === 'mixed'),
+                'nullable', 'numeric', 'min:0',
+            ],
+            'mixedTransferAmount' => [
+                Rule::requiredIf(fn () => $this->paidImmediately && $this->paymentMethodMode === 'mixed'),
+                'nullable', 'numeric', 'min:0',
+            ],
         ]);
+
+        $supplierId = $validated['supplierId'] ? (int) $validated['supplierId'] : null;
+        $typedSupplierName = $this->blankToNull($validated['supplierName']);
+
+        // Igual que con clientes en el POS: si escribiste un nombre que no
+        // seleccionaste de la lista, se crea el proveedor de una vez (no se
+        // guarda solo como texto suelto) para que quede en Proveedores y le
+        // puedas agregar documento, telefono, plazo, etc. despues.
+        if ($supplierId === null && $typedSupplierName !== null) {
+            try {
+                $supplierId = $this->resolveOrCreateSupplierByName($company, $typedSupplierName)->id;
+            } catch (InvalidArgumentException $exception) {
+                $this->addError('supplierName', $exception->getMessage());
+
+                return;
+            }
+        }
+
+        // Por defecto la compra nace Pendiente y "Vence" aplica normal. Si
+        // ya se pago (total o parcial) al momento de registrarla, no hay
+        // fecha de vencimiento que pedir y el pago inicial se registra de
+        // una vez, con su medio de pago (o repartido si fue mixto).
+        $requestedStatus = PurchaseStatus::Confirmed->value;
+        $dueAtValue = $this->normalizeDateTime($validated['dueAt'] ?? null);
+        $skipDefaultDueAt = false;
+        $initialPayments = null;
+
+        if ($this->paidImmediately) {
+            $skipDefaultDueAt = true;
+            $dueAtValue = null;
+
+            $totalAmount = (string) $validated['totalAmount'];
+            $paidAmount = $this->paymentCompletionMode === 'partial'
+                ? (string) $validated['initialPaidAmount']
+                : $totalAmount;
+
+            if ($this->paymentCompletionMode === 'partial' && bccomp($paidAmount, $totalAmount, 2) !== -1) {
+                $this->addError('initialPaidAmount', 'El pago inicial debe ser menor al monto total (si es el total completo, usa "Completo").');
+
+                return;
+            }
+
+            $requestedStatus = $this->paymentCompletionMode === 'partial'
+                ? PurchaseStatus::PartiallyPaid->value
+                : PurchaseStatus::Paid->value;
+
+            if ($this->paymentMethodMode === 'mixed') {
+                $cashAmount = (string) $validated['mixedCashAmount'];
+                $transferAmount = (string) $validated['mixedTransferAmount'];
+
+                if (bccomp(bcadd($cashAmount, $transferAmount, 2), $paidAmount, 2) !== 0) {
+                    $label = $this->paymentCompletionMode === 'partial' ? 'lo pagado ahora' : 'el monto total';
+                    $this->addError('mixedCashAmount', "Efectivo + transferencia debe sumar exactamente {$label}.");
+
+                    return;
+                }
+
+                $initialPayments = array_values(array_filter([
+                    bccomp($cashAmount, '0.00', 2) === 1 ? ['amount' => $cashAmount, 'payment_method_code' => 'cash'] : null,
+                    bccomp($transferAmount, '0.00', 2) === 1 ? ['amount' => $transferAmount, 'payment_method_code' => 'transfer'] : null,
+                ]));
+            } else {
+                $initialPayments = [[
+                    'amount' => $paidAmount,
+                    'payment_method_code' => $this->paymentMethodMode,
+                ]];
+            }
+        }
 
         $payload = [
             'branch_id' => (int) $validated['branchId'],
             'warehouse_id' => (int) $validated['warehouseId'],
-            'supplier_id' => $validated['supplierId'] ? (int) $validated['supplierId'] : null,
-            'supplier_name' => $this->blankToNull($validated['supplierName']),
+            'supplier_id' => $supplierId,
             'invoice_number' => $this->blankToNull($validated['invoiceNumber']),
             'purchase_type' => trim($validated['purchaseType']),
-            // Toda compra nueva nace en Pendiente; el estado avanza despues via pagos reales.
-            'status' => PurchaseStatus::Confirmed->value,
+            'status' => $requestedStatus,
             'purchased_at' => $this->normalizeDateTime($validated['purchasedAt'] ?? null),
-            'due_at' => $this->normalizeDateTime($validated['dueAt'] ?? null),
+            'due_at' => $dueAtValue,
+            'skip_default_due_at' => $skipDefaultDueAt,
             'notes' => $this->blankToNull($validated['notes']),
             'total' => (string) $validated['totalAmount'],
         ];
+
+        if ($initialPayments !== null) {
+            $payload['initial_payments'] = $initialPayments;
+        }
 
         try {
             app(CreatePurchase::class)->handle($company, $payload);
@@ -163,6 +261,11 @@ class PurchasesPage extends Component
             return;
         }
 
+        // Recuerda el ultimo tipo usado por este usuario — la mayoria de
+        // negocios siempre registra el mismo tipo de documento, asi la
+        // proxima compra ya arranca con el correcto preseleccionado.
+        auth()->user()?->update(['last_purchase_type' => $payload['purchase_type']]);
+
         $this->showModal = false;
         $this->resetPurchaseForm();
         $this->toast('Compra guardada correctamente.');
@@ -170,14 +273,16 @@ class PurchasesPage extends Component
 
     public function openModal(): void
     {
-        $this->resetPurchaseForm();
         $this->showModal = true;
     }
 
+    // Cerrar (con la X, clic afuera o "Cancelar") ya NO borra lo que se
+    // llevaba escrito — si el cierre fue sin querer, "+" vuelve a abrir el
+    // mismo formulario con los datos intactos. El formulario solo se limpia
+    // de verdad tras guardar con exito (ver savePurchase()).
     public function closeModal(): void
     {
         $this->showModal = false;
-        $this->resetPurchaseForm();
     }
 
     // Abre el modal de movimientos de la compra. Si el usuario puede
@@ -213,6 +318,7 @@ class PurchasesPage extends Component
             ],
             'paymentAmount' => ['required', 'numeric', 'gt:0'],
             'paymentReference' => ['nullable', 'string', 'max:120'],
+            'paymentMethodCode' => ['required', Rule::in(['cash', 'transfer'])],
         ]);
 
         $purchase = $this->purchasesQuery()->findOrFail((int) $validated['ledgerPurchaseId']);
@@ -221,6 +327,7 @@ class PurchasesPage extends Component
             $registerPurchasePayment->handle($this->currentCompany(), $purchase, [
                 'amount' => $validated['paymentAmount'],
                 'reference' => $this->blankToNull($validated['paymentReference']),
+                'payment_method_code' => $validated['paymentMethodCode'],
             ]);
         } catch (InvalidArgumentException $exception) {
             $this->addError('paymentAmount', $exception->getMessage());
@@ -232,6 +339,7 @@ class PurchasesPage extends Component
         // de una vez el movimiento de pago recien creado.
         $this->paymentAmount = '';
         $this->paymentReference = '';
+        $this->paymentMethodCode = 'cash';
         $this->resetValidation();
         $this->toast('Pago registrado correctamente.');
     }
@@ -361,6 +469,15 @@ class PurchasesPage extends Component
             PayableMovementType::SupplierCreditGenerated->value => 'Saldo a favor generado',
             PayableMovementType::SupplierCreditApplied->value => 'Saldo a favor aplicado',
             default => $movement->movement_type,
+        };
+    }
+
+    public function paymentMethodLabel(?string $code): ?string
+    {
+        return match ($code) {
+            'cash' => 'Efectivo',
+            'transfer' => 'Transferencia',
+            default => null,
         };
     }
 
@@ -503,6 +620,23 @@ class PurchasesPage extends Component
         );
     }
 
+    // Evita crear un proveedor duplicado si el nombre tecleado coincide
+    // exactamente (sin distinguir mayusculas) con uno que ya existe pero
+    // el usuario no lo selecciono de la lista desplegable.
+    protected function resolveOrCreateSupplierByName(Company $company, string $name): Supplier
+    {
+        $existing = Supplier::query()
+            ->where('company_id', $company->id)
+            ->whereHas('person', fn ($query) => $query->whereRaw('LOWER(first_name) = ?', [mb_strtolower($name)]))
+            ->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        return app(CreateSupplier::class)->handle($company, ['first_name' => $name]);
+    }
+
     protected function resetPurchaseForm(): void
     {
         $branches = $this->branches();
@@ -511,17 +645,27 @@ class PurchasesPage extends Component
         $this->supplierId = null;
         $this->supplierName = '';
         $this->invoiceNumber = '';
-        $this->purchaseType = 'invoice';
+        // Casi todo negocio siempre usa el mismo tipo de documento; arrancar
+        // con el ultimo que este usuario guardo evita que lo tenga que
+        // cambiar cada vez.
+        $this->purchaseType = auth()->user()?->last_purchase_type ?? 'invoice';
         $this->purchasedAt = now()->format('Y-m-d');
         $this->dueAt = '';
         $this->notes = '';
         $this->totalAmount = '';
+        $this->paidImmediately = null;
+        $this->paymentCompletionMode = 'full';
+        $this->initialPaidAmount = '';
+        $this->paymentMethodMode = 'cash';
+        $this->mixedCashAmount = '';
+        $this->mixedTransferAmount = '';
         $this->resetValidation();
     }
 
     protected function resetPaymentForm(): void
     {
         $this->reset('paymentAmount', 'paymentReference');
+        $this->paymentMethodCode = 'cash';
         $this->resetValidation();
     }
 

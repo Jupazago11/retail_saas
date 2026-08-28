@@ -238,8 +238,31 @@
         Livewire.hook('request', function(ctx) {
             var methods = (ctx.payload && ctx.payload.calls) ? ctx.payload.calls.map(function(c){ return c.method; }) : [];
             POS.log('request →', methods);
-            ctx.succeed(function(resp) { POS.log('response OK', resp.status); });
-            ctx.fail(function(resp) { POS.err('response FAIL', resp.status, resp.content && resp.content.substring(0,200)); });
+            var isSaveSale = methods.indexOf('saveSale') !== -1;
+
+            // Si saveSale no confirma la venta (ej. "selecciona un cliente
+            // para credito"), nunca se dispara open-sale-ticket y la pestaña
+            // en blanco abierta al hacer click (ver x-on:click del boton
+            // "Confirmar y cobrar") se queda huerfana. El timeout deja que
+            // open-sale-ticket corra primero y anule __posTicketTab si la
+            // venta si se confirmo.
+            function closeOrphanTicketTab() {
+                setTimeout(function () {
+                    if (window.__posTicketTab && !window.__posTicketTab.closed) {
+                        window.__posTicketTab.close();
+                        window.__posTicketTab = null;
+                    }
+                }, 150);
+            }
+
+            ctx.succeed(function(resp) {
+                POS.log('response OK', resp.status);
+                if (isSaveSale) closeOrphanTicketTab();
+            });
+            ctx.fail(function(resp) {
+                POS.err('response FAIL', resp.status, resp.content && resp.content.substring(0,200));
+                if (isSaveSale) closeOrphanTicketTab();
+            });
         });
 
         Livewire.on('pos-debug', function(data) { POS.log('pos-debug:', JSON.stringify(data)); });
@@ -739,7 +762,7 @@
 
                 {{-- Restante / Cambio: calculado en JS a partir de $wire.payments,
                 se actualiza con cada tecla (ver posPaymentSummary() arriba). --}}
-                <div class="grid grid-cols-2 gap-2">
+                <div class="mt-3 grid grid-cols-2 gap-2">
                     <div class="rounded-lg bg-gray-50 p-2.5 ring-1 ring-gray-200">
                         <span class="block text-[10px] font-semibold uppercase tracking-wide text-gray-500">Restante</span>
                         <span class="block text-right text-base font-semibold" :class="remaining() > 0 ? 'text-rose-600' : 'text-gray-400'" x-text="fmt(Math.max(remaining(), 0))"></span>
