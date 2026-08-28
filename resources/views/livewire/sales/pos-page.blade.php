@@ -689,6 +689,26 @@
                     @endif
                 </div>
 
+                {{-- Fecha de venta: por defecto queda con el momento actual;
+                el checkbox solo se marca para registrar una venta olvidada
+                de un dia anterior. Solo visible para el dueño de la empresa
+                o quien tenga el permiso sales.change_date. --}}
+                @if ($this->canBackdateSale())
+                    <div>
+                        <label class="flex items-center gap-2 text-xs font-semibold text-gray-700">
+                            <input type="checkbox" wire:model.live="backdateSale"
+                                class="rounded border-gray-300 text-blue-600 focus:border-blue-600 focus:ring-blue-600">
+                            Es de un dia anterior
+                        </label>
+                        @if ($backdateSale)
+                            <input type="date" wire:model="soldAt" max="{{ now()->format('Y-m-d') }}"
+                                class="mt-1.5 h-9 w-full rounded-lg border-gray-300 bg-white px-3 text-sm text-gray-800 shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                        @else
+                            <p class="mt-1 text-[11px] italic text-gray-400">Se registra con la fecha y hora actuales.</p>
+                        @endif
+                    </div>
+                @endif
+
                 {{-- Total a cobrar --}}
                 <div class="rounded-lg bg-blue-50 px-4 py-3 ring-1 ring-blue-100">
                     <div class="flex items-center justify-between">

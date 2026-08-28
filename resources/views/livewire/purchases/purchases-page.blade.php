@@ -384,9 +384,10 @@
                             @endunless
 
                             <div class="grid gap-3 sm:grid-cols-2" wire:transition:enter="transform transition ease-out duration-500 delay-100" wire:transition:enter-start="-translate-y-4 opacity-0 scale-95" wire:transition:enter-end="translate-y-0 opacity-100 scale-100">
-                                <div>
+                                <div x-data="digitGroupInput({ path: 'totalAmount', live: false })">
                                     <label for="purchase-total-amount" class="text-xs font-medium text-gray-700">Monto total <span class="text-rose-600">*</span></label>
-                                    <input wire:model="totalAmount" id="purchase-total-amount" type="number" min="0.01" step="0.01"
+                                    <input type="text" inputmode="numeric" id="purchase-total-amount" @input="onInput($event)"
+                                        value="{{ $totalAmount !== '' ? number_format((int) $totalAmount, 0, ',', '.') : '' }}"
                                         class="mt-1 block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
                                 </div>
                                 <div>

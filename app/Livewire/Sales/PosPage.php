@@ -62,6 +62,8 @@ class PosPage extends Component
 
     public string $soldAt = '';
 
+    public bool $backdateSale = false;
+
     public string $notes = '';
 
     public array $items = [];
@@ -167,6 +169,20 @@ class PosPage extends Component
         if ((string) $value !== SaleStatus::Confirmed->value) {
             $this->loyaltyPointsToRedeem = '';
         }
+    }
+
+    // $soldAt cambia de formato segun el checkbox: datetime-local (momento
+    // actual) cuando no se retrofecha, y solo fecha (sin hora, el input es
+    // type="date") cuando el cajero marca que la venta es de un dia anterior.
+    public function updatedBackdateSale(bool $value): void
+    {
+        if ($value && ! $this->canBackdateSale()) {
+            $this->backdateSale = false;
+
+            return;
+        }
+
+        $this->soldAt = $value ? now()->format('Y-m-d') : now()->format('Y-m-d\TH:i');
     }
 
     public function selectPaymentCustomer(int $customerId): void
@@ -704,6 +720,15 @@ class PosPage extends Component
     {
         $this->ensurePermission('sales.create');
 
+        // Defensa contra manipular backdateSale/soldAt directamente por
+        // Livewire sin pasar por el checkbox (que ya esta oculto en la vista
+        // para quien no tiene el permiso): si igual llega en true sin
+        // permiso, se ignora la retrofecha en vez de confiar en el cliente.
+        if ($this->backdateSale && ! $this->canBackdateSale()) {
+            $this->backdateSale = false;
+            $this->soldAt = now()->format('Y-m-d\TH:i');
+        }
+
         $this->dispatch('pos-debug', stage: 'saveSale.called', details: [
             'paymentCustomerDocument' => $this->paymentCustomerDocument,
             'customerId' => $this->customerId,
@@ -977,6 +1002,7 @@ class PosPage extends Component
         $this->loyaltyPointsToRedeem = '';
         $this->saleType = 'pos';
         $this->saleStatus = $sale->status;
+        $this->backdateSale = false;
         $this->soldAt = $sale->sold_at?->format('Y-m-d\TH:i') ?? '';
         $this->notes = $sale->notes ?? '';
         $this->items = $this->mapSaleItemsForCart($sale->items);
@@ -1011,6 +1037,7 @@ class PosPage extends Component
         $this->loyaltyPointsToRedeem = '';
         $this->saleType = 'pos';
         $this->saleStatus = SaleStatus::Confirmed->value;
+        $this->backdateSale = false;
         $this->soldAt = now()->format('Y-m-d\TH:i');
         $this->notes = $sale->notes ?? '';
         $this->items = $this->mapSaleItemsForCart($sale->items);
@@ -1343,6 +1370,13 @@ class PosPage extends Component
         return auth()->user()?->hasCurrentCompanyPermission('credit.manage') ?? false;
     }
 
+    // El dueño de la empresa siempre pasa (lo resuelve hasCurrentCompanyPermission);
+    // el resto de usuarios necesita el permiso explicito sales.change_date.
+    public function canBackdateSale(): bool
+    {
+        return auth()->user()?->hasCurrentCompanyPermission('sales.change_date') ?? false;
+    }
+
     public function enableCreditForResolvedCustomer(string $creditLimit): void
     {
         $this->ensurePermission('credit.manage');
@@ -1514,6 +1548,7 @@ class PosPage extends Component
         $this->loyaltyPointsToRedeem = '';
         $this->saleType = 'pos';
         $this->saleStatus = SaleStatus::Confirmed->value;
+        $this->backdateSale = false;
         $this->soldAt = now()->format('Y-m-d\TH:i');
         $this->notes = '';
         $this->items = [$this->newItemLine()];

@@ -50,10 +50,10 @@
              orden interno en las 2 columnas (tarjetas, tendencia, medios de
              pago) para que el contraste sea facil de leer de un vistazo. En
              movil se apilan (Compras primero, Ventas debajo). --}}
-        <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div class="grid grid-cols-1 items-stretch gap-6 xl:grid-cols-2">
 
             {{-- Columna Compras --}}
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-amber-200">
+            <div class="h-full rounded-xl bg-white p-6 shadow-sm ring-1 ring-amber-200">
                 <div class="flex items-center gap-2">
                     <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
                     <div>
@@ -159,29 +159,21 @@
             @endif
         </div>
 
-        <div class="grid grid-cols-1 gap-6 {{ $purchasesEnabled ? 'xl:grid-cols-2' : '' }}">
-            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+        <div class="grid grid-cols-1 items-stretch gap-6 {{ $purchasesEnabled ? 'xl:grid-cols-2' : '' }}">
+            <div class="h-full rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <div>
                     <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Productos</p>
                     <h3 class="mt-2 text-2xl font-black text-gray-900">Top vendidos</h3>
                 </div>
 
-                <div class="mt-6 space-y-3">
+                <div class="mt-4 space-y-2">
                     @forelse ($topProducts as $product)
-                        <div class="rounded-lg bg-gray-50 p-4 ring-1 ring-gray-200">
-                            <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                                <div>
-                                    <p class="text-sm font-black text-gray-900">{{ $product['product_name'] }}</p>
-                                    <p class="mt-1 text-sm text-gray-600">Cantidad {{ $product['quantity_sum'] }}</p>
-                                </div>
-                                <div class="grid gap-2 text-sm text-gray-600 md:grid-cols-{{ auth()->user()?->hasCurrentCompanyPermission('reports.view_costs') ? '3' : '1' }}">
-                                    <p>Ingresos: <span class="font-medium text-gray-900">${{ $product['revenue_sum'] }}</span></p>
-                                    @if (isset($product['cost_sum']))
-                                        <p>Costo: <span class="font-medium text-gray-900">${{ $product['cost_sum'] }}</span></p>
-                                        <p>Margen: <span class="font-medium text-gray-900">${{ $product['margin_sum'] }}</span></p>
-                                    @endif
-                                </div>
+                        <div class="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-4 py-2.5 ring-1 ring-gray-200">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-semibold text-gray-900">{{ $product['product_name'] }}</p>
+                                <p class="text-xs text-gray-500">Cantidad {{ $product['quantity_sum'] }}</p>
                             </div>
+                            <p class="shrink-0 text-sm font-semibold text-gray-900">${{ $product['revenue_sum'] }}</p>
                         </div>
                     @empty
                         <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-gray-500">
@@ -192,7 +184,7 @@
             </div>
 
             @if ($purchasesEnabled)
-                <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
+                <div class="h-full rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                     <div>
                         <p class="text-sm font-semibold uppercase tracking-[0.22em] text-amber-600">Proveedores</p>
                         <h3 class="mt-2 text-2xl font-black text-gray-900">Mayor gasto</h3>

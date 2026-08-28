@@ -126,11 +126,7 @@ class OperationalReportsPage extends Component
 
     public function topProducts(): \Illuminate\Support\Collection
     {
-        return app(OperationalReportService::class)->topProducts(
-            $this->currentCompany(),
-            $this->filters(),
-            $this->canViewCosts()
-        );
+        return app(OperationalReportService::class)->topProducts($this->currentCompany(), $this->filters());
     }
 
     public function recentPromotions(): \Illuminate\Support\Collection

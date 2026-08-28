@@ -35,6 +35,7 @@ class PermissionCatalog
             ['code' => 'sales.return', 'name' => 'Devolver ventas', 'module_code' => 'sales'],
             ['code' => 'sales.apply_discount', 'name' => 'Aplicar descuentos', 'module_code' => 'sales'],
             ['code' => 'sales.select_alternative_price', 'name' => 'Elegir precio alterno', 'module_code' => 'sales'],
+            ['code' => 'sales.change_date', 'name' => 'Cambiar fecha de venta', 'module_code' => 'sales'],
             ['code' => 'cash.open', 'name' => 'Abrir caja', 'module_code' => 'cash'],
             ['code' => 'cash.close', 'name' => 'Cerrar caja', 'module_code' => 'cash'],
             ['code' => 'cash.view_difference', 'name' => 'Ver diferencias de caja', 'module_code' => 'cash'],

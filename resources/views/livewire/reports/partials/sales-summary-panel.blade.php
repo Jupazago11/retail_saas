@@ -2,7 +2,7 @@
      columna Compras/Ventas (empresa con modulo de compras) como solo, a
      ancho completo, cuando el plan no incluye compras y no hay con que
      contrastar (ver OperationalReportsPage::purchasesEnabled()). --}}
-<div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-blue-200">
+<div class="h-full rounded-xl bg-white p-6 shadow-sm ring-1 ring-blue-200">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-2">
             <span class="h-2.5 w-2.5 rounded-full bg-blue-600"></span>

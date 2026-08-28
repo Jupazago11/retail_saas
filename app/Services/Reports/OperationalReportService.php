@@ -36,7 +36,11 @@ class OperationalReportService
             'confirmed_sales_count' => $sales->where('status', 'confirmed')->count(),
             'cancelled_sales_count' => $sales->where('status', 'cancelled')->count(),
             'returned_sales_count' => $sales->filter(fn (Sale $sale) => in_array($sale->status, ['returned', 'partially_returned'], true))->count(),
-            'sales_total' => $this->money($sales->sum(fn (Sale $sale) => (float) $sale->grand_total)),
+            // Una venta anulada no es ingreso real aunque su grand_total
+            // original siga guardado en el registro (CancelSale no lo toca,
+            // solo cambia el estado) — se excluye aqui, no en salesQuery(),
+            // porque sales_count/cancelled_sales_count si necesitan verla.
+            'sales_total' => $this->money($sales->reject(fn (Sale $sale) => $sale->status === 'cancelled')->sum(fn (Sale $sale) => (float) $sale->grand_total)),
             'payments_total' => $this->money($payments->sum(fn (Payment $payment) => (float) $payment->amount)),
             'open_cash_sessions_count' => $openCashSessions,
         ];
@@ -77,12 +81,13 @@ class OperationalReportService
      */
     public function salesTotalRaw(Company $company, array $filters = []): float
     {
-        return (float) $this->salesQuery($company, $filters)->sum('grand_total');
+        return (float) $this->salesQuery($company, $filters)->where('status', '!=', 'cancelled')->sum('grand_total');
     }
 
     public function salesTrend(Company $company, array $filters = []): Collection
     {
         return $this->salesQuery($company, $filters)
+            ->where('status', '!=', 'cancelled')
             ->selectRaw('date(coalesce(sold_at, created_at)) as sale_date, count(*) as sales_count, coalesce(sum(grand_total), 0) as sales_total')
             ->groupBy('sale_date')
             ->orderBy('sale_date')
@@ -97,6 +102,7 @@ class OperationalReportService
     public function branchBreakdown(Company $company, array $filters = []): Collection
     {
         $sales = $this->salesQuery($company, $filters)
+            ->where('status', '!=', 'cancelled')
             ->select('branch_id', DB::raw('count(*) as sales_count'), DB::raw('coalesce(sum(grand_total), 0) as sales_total'))
             ->groupBy('branch_id')
             ->get()
@@ -128,14 +134,16 @@ class OperationalReportService
             });
     }
 
-    public function topProducts(Company $company, array $filters = [], bool $includeCosts = false): Collection
+    // Solo nombre, cantidad e ingresos — costo/margen por producto no se
+    // muestra aqui (el margen bruto general ya vive en la columna Ventas),
+    // asi cada fila del listado queda mas compacta.
+    public function topProducts(Company $company, array $filters = []): Collection
     {
         $items = $this->saleItemsQuery($company, $filters)
             ->select(
                 'product_id',
                 DB::raw('coalesce(sum(quantity), 0) as quantity_sum'),
-                DB::raw('coalesce(sum(line_total), 0) as revenue_sum'),
-                DB::raw('coalesce(sum(case when cost_snapshot is null then 0 else (cost_snapshot * base_quantity) end), 0) as cost_sum')
+                DB::raw('coalesce(sum(line_total), 0) as revenue_sum')
             )
             ->groupBy('product_id')
             ->orderByDesc(DB::raw('coalesce(sum(line_total), 0)'))
@@ -147,24 +155,16 @@ class OperationalReportService
             ->get()
             ->keyBy('id');
 
-        return $items->map(function ($row) use ($products, $includeCosts) {
-            $product = $products->get($row->product_id);
-            $payload = [
-                'product_id' => (int) $row->product_id,
-                'product_name' => $product?->name ?? 'Producto '.$row->product_id,
-                'quantity_sum' => number_format((float) $row->quantity_sum, 2, '.', ','),
-                'revenue_sum' => $this->money((float) $row->revenue_sum),
-            ];
-
-            if ($includeCosts) {
-                $cost = (float) $row->cost_sum;
-                $revenue = (float) $row->revenue_sum;
-                $payload['cost_sum'] = $this->money($cost);
-                $payload['margin_sum'] = $this->money($revenue - $cost);
-            }
-
-            return $payload;
-        });
+        return $items->map(fn ($row) => [
+            'product_id' => (int) $row->product_id,
+            'product_name' => $products->get($row->product_id)?->name ?? 'Producto '.$row->product_id,
+            // Mismo patron que Products::tax_rate: 2 decimales pero sin
+            // ceros de sobra (2 unidades se ve "2", no "2.00" o "2,00").
+            // Ademas usa coma decimal / punto de miles, como el resto de
+            // numeros en la app (antes era al reves: 2,00 en vez de 2).
+            'quantity_sum' => rtrim(rtrim(number_format((float) $row->quantity_sum, 2, ',', '.'), '0'), ','),
+            'revenue_sum' => $this->money((float) $row->revenue_sum),
+        ]);
     }
 
     public function recentPromotions(Company $company): Collection
@@ -254,6 +254,7 @@ class OperationalReportService
         return SaleItem::query()
             ->join('sales', 'sales.id', '=', 'sale_items.sale_id')
             ->where('sales.company_id', $company->id)
+            ->where('sales.status', '!=', 'cancelled')
             ->when($this->branchId($filters), fn (Builder $query, int $branchId) => $query->where('sales.branch_id', $branchId))
             ->when($this->cashRegisterId($filters), fn (Builder $query, int $cashRegisterId) => $query->where('sales.cash_register_id', $cashRegisterId))
             ->when($this->dateFrom($filters), fn (Builder $query, string $dateFrom) => $query->whereDate(DB::raw('coalesce(sales.sold_at, sales.created_at)'), '>=', $dateFrom))

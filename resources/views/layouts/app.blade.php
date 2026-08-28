@@ -15,7 +15,19 @@
         @php($launcherMode = request()->routeIs('dashboard'))
 
         @if (session()->has('impersonator_id'))
-            <div class="sticky top-0 z-[210] flex flex-wrap items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-amber-950 shadow">
+            {{-- El alto de este banner varia (el texto se envuelve en pantallas
+            angostas), asi que se mide en vivo y se publica como variable CSS
+            para que el boton de inicio (fixed) y la barra superior (sticky)
+            se corran hacia abajo lo justo y necesario, en vez de un offset
+            fijo que el banner terminaba tapando. --}}
+            <div
+                x-data
+                x-init="
+                    let setBannerHeight = () => document.documentElement.style.setProperty('--impersonation-banner-height', $el.offsetHeight + 'px');
+                    setBannerHeight();
+                    new ResizeObserver(setBannerHeight).observe($el);
+                "
+                class="sticky top-0 z-[210] flex flex-wrap items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-amber-950 shadow">
                 <span>Estas viendo la cuenta de {{ auth()->user()->name }} ({{ '@'.auth()->user()->username }})</span>
                 <form method="POST" action="{{ route('impersonate.stop') }}">
                     @csrf
@@ -35,7 +47,8 @@
             dashboard: ahi no tiene sentido un boton para ir a donde ya estas. --}}
             @unless ($launcherMode)
                 <a href="{{ route('dashboard') }}" wire:navigate data-app-home-link title="Ir al panel principal"
-                    class="fixed left-3 top-3 z-[100] inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-md hover:border-blue-300 hover:text-blue-700 transition">
+                    style="top: calc(0.75rem + var(--impersonation-banner-height, 0px));"
+                    class="fixed left-3 z-[100] inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-md hover:border-blue-300 hover:text-blue-700 transition">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
@@ -43,7 +56,9 @@
             @endunless
 
             <div class="min-h-screen {{ $launcherMode ? 'bg-[radial-gradient(circle_at_top,#fff2d8_0%,#f5f5f4_42%,#e7e5e4_100%)]' : 'bg-gray-100' }}">
-                <div x-data="{ headerOpen: false }" @mouseenter="headerOpen = true" @mouseleave="headerOpen = false" class="sticky top-0 z-20">
+                <div x-data="{ headerOpen: false }" @mouseenter="headerOpen = true" @mouseleave="headerOpen = false"
+                    style="top: var(--impersonation-banner-height, 0px);"
+                    class="sticky z-20">
                     <button type="button" @click="headerOpen = !headerOpen" aria-label="Mostrar barra superior"
                         class="mx-auto flex w-full max-w-7xl items-center justify-center transition-all duration-200"
                         :class="headerOpen ? 'h-0 opacity-0' : 'h-3 opacity-100'">

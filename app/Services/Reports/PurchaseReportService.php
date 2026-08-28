@@ -129,8 +129,16 @@ class PurchaseReportService
         return PayableMovement::query()
             ->where('payable_movements.company_id', $company->id)
             ->where('payable_movements.movement_type', 'payment')
-            ->when($this->branchId($filters), function (Builder $query, int $branchId) {
-                $query->whereHas('purchase', fn (Builder $purchaseQuery) => $purchaseQuery->where('branch_id', $branchId));
+            // whereHas('purchase') sin condiciones adicionales ya excluye los
+            // pagos de una compra archivada (borrado suave): el scope por
+            // defecto de Purchase se aplica dentro del EXISTS. Antes esto
+            // solo pasaba si habia filtro de sucursal activo — sin filtro,
+            // los pagos de una compra archivada seguian sumando en "Pagado a
+            // proveedores" y en el desglose por medio de pago.
+            ->whereHas('purchase', function (Builder $purchaseQuery) use ($filters) {
+                if ($branchId = $this->branchId($filters)) {
+                    $purchaseQuery->where('branch_id', $branchId);
+                }
             })
             ->when($this->dateFrom($filters), fn (Builder $query, string $dateFrom) => $query->whereDate(DB::raw('coalesce(payable_movements.occurred_at, payable_movements.created_at)'), '>=', $dateFrom))
             ->when($this->dateTo($filters), fn (Builder $query, string $dateTo) => $query->whereDate(DB::raw('coalesce(payable_movements.occurred_at, payable_movements.created_at)'), '<=', $dateTo));

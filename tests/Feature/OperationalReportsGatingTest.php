@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Actions\Companies\CreateCompany;
 use App\Actions\Company\CreateCashRegister;
 use App\Actions\Inventory\CreateInventoryAdjustment;
+use App\Actions\Sales\CancelSale;
 use App\Actions\Sales\CreateSale;
 use App\Enums\InventoryAdjustmentType;
 use App\Enums\RecordStatus;
@@ -193,6 +194,76 @@ class OperationalReportsGatingTest extends TestCase
         $cards = $page->viewData('summaryCards');
         $this->assertSame(1, $cards['sales_count']);
         $this->assertSame('4.000', $cards['sales_total']);
+    }
+
+    public function test_cancelled_sales_are_excluded_from_revenue_totals(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->fixture('premium', withProduct: true);
+
+        app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'cash_register_id' => $cashRegister->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '1000']],
+        ]);
+
+        $cancelledSale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'cash_register_id' => $cashRegister->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '9000']],
+        ]);
+        // CancelSale no toca grand_total, solo cambia el estado — por eso el
+        // filtro tiene que excluirla explicitamente en el lado de reportes.
+        app(CancelSale::class)->handle($company, $cancelledSale, 'Prueba de anulacion');
+
+        $filters = [
+            'date_from' => now()->startOfMonth()->format('Y-m-d'),
+            'date_to' => now()->format('Y-m-d'),
+        ];
+        $service = app(OperationalReportService::class);
+
+        $this->assertSame(1000.0, $service->salesTotalRaw($company, $filters));
+
+        $trend = $service->salesTrend($company, $filters);
+        $this->assertSame(1000.0, (float) $trend->sum('sales_total'));
+
+        $topProducts = $service->topProducts($company, $filters);
+        $this->assertSame('1.000', $topProducts->firstWhere('product_id', $product->id)['revenue_sum']);
+
+        $cards = $service->summaryCards($company, $filters, false, false, false, false);
+        $this->assertSame('1.000', $cards['sales_total']);
+        $this->assertSame(2, $cards['sales_count']);
+        $this->assertSame(1, $cards['cancelled_sales_count']);
+    }
+
+    public function test_top_products_shows_whole_quantities_without_decimal_clutter(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->fixture('premium', withProduct: true);
+
+        app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'cash_register_id' => $cashRegister->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'items' => [['product_id' => $product->id, 'quantity' => '2', 'unit_price' => '1000']],
+        ]);
+
+        $filters = [
+            'date_from' => now()->startOfMonth()->format('Y-m-d'),
+            'date_to' => now()->format('Y-m-d'),
+        ];
+
+        $topProducts = app(OperationalReportService::class)->topProducts($company, $filters);
+
+        // Antes salia "2,00" (y con la coma/punto invertidos respecto al
+        // resto de la app) — una cantidad entera no necesita decimales.
+        $this->assertSame('2', $topProducts->firstWhere('product_id', $product->id)['quantity_sum']);
     }
 
     protected function fixture(string $planCode, bool $withProduct = false): array

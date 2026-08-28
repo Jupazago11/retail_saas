@@ -79,6 +79,36 @@ class PurchaseReportServiceTest extends TestCase
         $this->assertSame('1.500', $cards['payables_balance_due']);
     }
 
+    public function test_archived_purchase_payments_are_excluded_from_totals_and_breakdown(): void
+    {
+        [$company, $branch, $warehouse, $product] = $this->fixture();
+        $supplier = app(CreateSupplier::class)->handle($company, ['first_name' => 'Proveedor', 'last_name' => 'Archivado']);
+
+        $purchase = app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_id' => $supplier->id,
+            'status' => PurchaseStatus::Confirmed->value,
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_cost' => '3000']],
+        ]);
+        app(RegisterPurchasePayment::class)->handle($company, $purchase, ['amount' => '3000', 'payment_method_code' => 'cash']);
+
+        // "Archivar" en la UI (PurchasesPage::archivePurchase) es un borrado
+        // suave, solo permitido cuando el saldo ya esta en cero.
+        $purchase->delete();
+
+        $filters = [
+            'date_from' => now()->startOfMonth()->format('Y-m-d'),
+            'date_to' => now()->format('Y-m-d'),
+        ];
+
+        $cards = app(PurchaseReportService::class)->summaryCards($company, $filters);
+        $this->assertSame('0', $cards['payments_total']);
+
+        $breakdown = app(PurchaseReportService::class)->paymentMethodBreakdown($company, $filters);
+        $this->assertTrue($breakdown->isEmpty());
+    }
+
     public function test_payment_method_breakdown_differentiates_cash_and_transfer(): void
     {
         [$company, $branch, $warehouse, $product] = $this->fixture();

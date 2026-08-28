@@ -90,6 +90,115 @@ class PosPageTest extends TestCase
         ]);
     }
 
+    public function test_pos_page_can_backdate_a_sale_when_checkbox_is_marked(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $pastDate = now()->subDays(2)->format('Y-m-d');
+
+        Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('saleStatus', SaleStatus::Confirmed->value)
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_price', '1800')
+            ->set('backdateSale', true)
+            ->set('soldAt', $pastDate)
+            ->call('saveSale')
+            ->assertHasNoErrors();
+
+        $sale = Sale::query()->where('company_id', $company->id)->latest('id')->firstOrFail();
+        $this->assertSame($pastDate, $sale->sold_at->format('Y-m-d'));
+    }
+
+    public function test_pos_page_hides_backdate_checkbox_and_ignores_it_without_the_permission(): void
+    {
+        [, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+
+        $cashier = $this->createUserWithCompanyPermissions($company, 'sales_only', ['sales.create']);
+
+        $this->actingAs($cashier);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $pastDate = now()->subDays(2)->format('Y-m-d');
+
+        Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_price', '1800')
+            ->call('openPaymentModal')
+            ->assertDontSee('Es de un dia anterior')
+            ->set('backdateSale', true)
+            ->assertSet('backdateSale', false)
+            ->call('saveSale')
+            ->assertHasNoErrors();
+
+        $sale = Sale::query()->where('company_id', $company->id)->latest('id')->firstOrFail();
+        $this->assertNotSame($pastDate, $sale->sold_at->format('Y-m-d'));
+        $this->assertTrue($sale->sold_at->isToday());
+    }
+
+    public function test_pos_page_allows_backdating_with_the_explicit_permission(): void
+    {
+        [, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+
+        $cashier = $this->createUserWithCompanyPermissions($company, 'sales_backdate', ['sales.create', 'sales.change_date']);
+
+        $this->actingAs($cashier);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $pastDate = now()->subDays(2)->format('Y-m-d');
+
+        Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_price', '1800')
+            ->call('openPaymentModal')
+            ->assertSee('Es de un dia anterior')
+            ->set('backdateSale', true)
+            ->assertSet('backdateSale', true)
+            ->set('soldAt', $pastDate)
+            ->call('saveSale')
+            ->assertHasNoErrors();
+
+        $sale = Sale::query()->where('company_id', $company->id)->latest('id')->firstOrFail();
+        $this->assertSame($pastDate, $sale->sold_at->format('Y-m-d'));
+    }
+
+    public function test_pos_page_defaults_sale_date_to_now_without_the_checkbox(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('saleStatus', SaleStatus::Confirmed->value)
+            ->set('items.0.product_id', (string) $product->id)
+            ->set('items.0.quantity', '1')
+            ->set('items.0.unit_price', '1800')
+            ->assertSet('backdateSale', false)
+            ->call('saveSale')
+            ->assertHasNoErrors();
+
+        $sale = Sale::query()->where('company_id', $company->id)->latest('id')->firstOrFail();
+        $this->assertTrue($sale->sold_at->isToday());
+    }
+
     public function test_pos_page_can_register_confirmed_sale_payment_without_any_open_cash_session(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
@@ -705,6 +814,31 @@ class PosPageTest extends TestCase
             ->withSession([CurrentCompany::SESSION_KEY => $company->id])
             ->get(route('sales.pos'))
             ->assertForbidden();
+    }
+
+    protected function createUserWithCompanyPermissions(\App\Models\Company $company, string $roleCode, array $permissionCodes): User
+    {
+        $user = User::factory()->create();
+
+        $companyRole = CompanyRole::query()->create([
+            'company_id' => $company->id,
+            'code' => $roleCode,
+            'display_name' => $roleCode,
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $companyRole->permissions()->attach(
+            Permission::query()->whereIn('code', $permissionCodes)->pluck('id')
+        );
+
+        $company->users()->attach($user->id, [
+            'company_role' => $roleCode,
+            'company_role_id' => $companyRole->id,
+            'status' => RecordStatus::Active->value,
+            'joined_at' => now(),
+        ]);
+
+        return $user;
     }
 
     protected function posFixture(): array
