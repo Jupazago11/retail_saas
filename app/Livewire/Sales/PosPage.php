@@ -1037,8 +1037,17 @@ class PosPage extends Component
         $this->loyaltyPointsToRedeem = '';
         $this->saleType = 'pos';
         $this->saleStatus = SaleStatus::Confirmed->value;
-        $this->backdateSale = false;
-        $this->soldAt = now()->format('Y-m-d\TH:i');
+        // Se precarga con la fecha ORIGINAL de la venta, no con "ahora": al
+        // corregir una venta (ej. arreglar un precio mal cargado) lo normal
+        // es que siga contando para el mismo dia. Antes esto se reseteaba a
+        // hoy en silencio — si el usuario no se daba cuenta de reactivar la
+        // retrofecha a mano, la venta corregida terminaba apareciendo hoy en
+        // vez del dia real. Ahora el campo ya queda visible y editable por
+        // si de verdad se quiere cambiar la fecha tambien.
+        $this->backdateSale = $this->canBackdateSale();
+        $this->soldAt = $this->backdateSale
+            ? ($sale->sold_at?->format('Y-m-d') ?? now()->format('Y-m-d'))
+            : now()->format('Y-m-d\TH:i');
         $this->notes = $sale->notes ?? '';
         $this->items = $this->mapSaleItemsForCart($sale->items);
         $this->cashSessionId = $this->openCashSessions()->first()?->id;

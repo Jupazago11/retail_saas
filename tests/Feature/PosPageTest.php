@@ -447,6 +447,34 @@ class PosPageTest extends TestCase
         $this->assertSame('3.000000', $newSale->items->first()->quantity);
     }
 
+    public function test_pos_page_preloads_original_date_when_modifying_a_backdated_sale(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
+
+        $originalSale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'cash_register_id' => $cashRegister->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'items' => [
+                ['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '2000'],
+            ],
+        ]);
+        $originalSale->update(['sold_at' => now()->subDays(3)]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        // Antes esto se reseteaba a "hoy" en silencio; ahora debe mantener el
+        // dia original de la venta (el dueno de la empresa siempre puede
+        // usar retrofecha, ver canBackdateSale()).
+        Livewire::test(PosPage::class)
+            ->call('loadSaleForModification', $originalSale->id)
+            ->assertSet('backdateSale', true)
+            ->assertSet('soldAt', now()->subDays(3)->format('Y-m-d'));
+    }
+
     public function test_pos_page_rejects_loading_draft_sale_for_modification(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();

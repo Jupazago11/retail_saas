@@ -27,6 +27,38 @@ class PurchaseCreationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_it_does_not_reuse_the_sequence_number_of_an_archived_purchase(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Compras Archivadas SAS',
+        ]);
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+
+        $createPurchase = app(CreatePurchase::class);
+
+        $first = $createPurchase->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'total' => '10000',
+            'status' => PurchaseStatus::Confirmed->value,
+        ]);
+
+        $this->assertSame(1, $first->company_sequence);
+
+        $first->delete();
+
+        $second = $createPurchase->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'total' => '20000',
+            'status' => PurchaseStatus::Confirmed->value,
+        ]);
+
+        $this->assertSame(2, $second->company_sequence);
+    }
+
     public function test_it_creates_purchase_with_calculated_totals_base_quantity_and_variant(): void
     {
         $owner = User::factory()->create();

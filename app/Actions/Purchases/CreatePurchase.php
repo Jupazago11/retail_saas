@@ -64,7 +64,11 @@ class CreatePurchase
         return DB::transaction(function () use ($company, $branch, $warehouse, $supplier, $attributes, $calculatedLines, $totals, $hasItems) {
             $requestedStatus = $attributes['status'] ?? PurchaseStatus::Confirmed->value;
 
-            $lastSequence = (int) Purchase::query()
+            // withTrashed(): Purchase usa SoftDeletes (archivar), y company_sequence
+            // tiene unique index por company_id — si la compra archivada era la de
+            // mayor numero, omitirla aqui reciclaria su numero y chocaria contra
+            // esa misma fila todavia presente en la tabla (soft delete no la borra).
+            $lastSequence = (int) Purchase::withTrashed()
                 ->where('company_id', $company->id)
                 ->orderByDesc('company_sequence')
                 ->lockForUpdate()
