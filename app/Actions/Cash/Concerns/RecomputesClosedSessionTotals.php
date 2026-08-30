@@ -20,11 +20,16 @@ trait RecomputesClosedSessionTotals
             return;
         }
 
-        $cashSession->loadMissing(['payments', 'expenses', 'funds']);
+        $cashSession->loadMissing(['payments.sale', 'expenses', 'funds']);
 
+        // Igual que en CloseCashSession::handle(): un pago de venta
+        // backdateada (sold_at de otro dia) no cuenta para el efectivo
+        // esperado, porque ese dinero no entro fisicamente el dia de esta
+        // sesion (ver Payment::belongsToCashSessionDay()).
         $cashPayments = $cashSession->payments
             ->where('status', PaymentStatus::Confirmed->value)
             ->where('payment_method_code', 'cash')
+            ->filter(fn ($payment) => $payment->belongsToCashSessionDay($cashSession))
             ->sum('amount');
 
         $expenses = $cashSession->expenses->sum('amount');

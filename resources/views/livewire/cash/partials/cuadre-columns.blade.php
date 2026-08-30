@@ -92,6 +92,13 @@
                     <span class="font-black text-gray-900">${{ \App\Support\Money::format((float) $this->dailySalesAmount($session)) }}</span>
                 </div>
             @endif
+
+            @if ($this->hasLateSales($session))
+                <div class="flex items-center justify-between rounded-md bg-amber-50 px-2 py-1.5 text-xs ring-1 ring-amber-200" title="Ventas registradas hoy con fecha de un dia anterior: no cuentan en el efectivo esperado ni en la venta diaria de este cuadre porque ese dinero no entro hoy a la caja.">
+                    <span class="text-amber-700">Ventas tardias (otro dia)</span>
+                    <span class="font-semibold text-amber-800">${{ \App\Support\Money::format((float) $this->lateSalesAmount($session)) }}</span>
+                </div>
+            @endif
         </div>
 
     </div>

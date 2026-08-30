@@ -916,10 +916,9 @@ class CashSessionsPage extends Component
 
     public function expectedCashAmount(CashSession $session): string
     {
-        $session->loadMissing(['payments', 'expenses']);
+        $session->loadMissing(['payments.sale', 'expenses']);
 
-        $cashPayments = $session->payments
-            ->where('status', PaymentStatus::Confirmed->value)
+        $cashPayments = $this->sessionDayPayments($session)
             ->where('payment_method_code', 'cash')
             ->sum('amount');
 
@@ -934,11 +933,9 @@ class CashSessionsPage extends Component
 
     public function dailySalesAmount(CashSession $session): string
     {
-        $session->loadMissing('payments');
+        $session->loadMissing('payments.sale');
 
-        return (string) round((float) $session->payments
-            ->where('status', PaymentStatus::Confirmed->value)
-            ->sum('amount'));
+        return (string) round((float) $this->sessionDayPayments($session)->sum('amount'));
     }
 
     /**
@@ -953,13 +950,52 @@ class CashSessionsPage extends Component
      */
     public function dailySalesByPaymentMethod(CashSession $session): array
     {
-        $session->loadMissing('payments');
+        $session->loadMissing('payments.sale');
 
-        return $session->payments
-            ->where('status', PaymentStatus::Confirmed->value)
+        return $this->sessionDayPayments($session)
             ->groupBy(fn ($payment) => $payment->payment_method_code ?: 'otro')
             ->map(fn ($group) => (string) round((float) $group->sum('amount')))
             ->all();
+    }
+
+    /**
+     * Total de pagos que SI pertenecen a la sesion pero quedan fuera del
+     * cuadre porque la venta relacionada tiene `sold_at` de un dia distinto
+     * al de apertura de la sesion (venta tardia/backdateada): ese dinero no
+     * entro fisicamente hoy a la caja, asi que no debe sumar al efectivo
+     * esperado ni a la venta diaria (ver dailySalesAmount()), pero se
+     * muestra aparte para que el cajero sepa que existen.
+     */
+    public function lateSalesAmount(CashSession $session): string
+    {
+        $session->loadMissing('payments.sale');
+
+        return (string) round((float) $this->lateSessionPayments($session)->sum('amount'));
+    }
+
+    public function hasLateSales(CashSession $session): bool
+    {
+        return $this->lateSessionPayments($session)->isNotEmpty();
+    }
+
+    /**
+     * Pagos confirmados de la sesion cuya venta relacionada (si existe)
+     * fue registrada con `sold_at` del mismo dia calendario en que se abrio
+     * la sesion. Los abonos a credito (`sale_id` null) no tienen fecha de
+     * venta que backdatear, asi que siempre cuentan.
+     */
+    protected function sessionDayPayments(CashSession $session): Collection
+    {
+        return $session->payments
+            ->where('status', PaymentStatus::Confirmed->value)
+            ->filter(fn ($payment) => $payment->belongsToCashSessionDay($session));
+    }
+
+    protected function lateSessionPayments(CashSession $session): Collection
+    {
+        return $session->payments
+            ->where('status', PaymentStatus::Confirmed->value)
+            ->reject(fn ($payment) => $payment->belongsToCashSessionDay($session));
     }
 
     public function paymentMethodLabel(string $code): string

@@ -358,6 +358,70 @@ class CashAndPaymentsTest extends TestCase
         $this->assertSame('0.00', $reconciled->difference_amount);
     }
 
+    public function test_a_late_sale_backdated_to_a_previous_day_does_not_inflate_todays_cuadre(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->saleAndCashFixture();
+
+        app(CreateInventoryAdjustment::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'adjustment_type' => InventoryAdjustmentType::Increase->value,
+            'reason' => 'Stock inicial',
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => '5',
+                    'unit_cost' => '1000',
+                ],
+            ],
+        ]);
+
+        $session = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '100000',
+        ]);
+
+        // Venta registrada hoy pero con fecha de un dia anterior (registro
+        // tardio de una venta que ya habia ocurrido, con el dinero ya
+        // movido ese dia): el pago queda atado a la sesion de hoy (unica
+        // abierta), pero ese dinero no entro fisicamente hoy a la caja.
+        $sale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'status' => SaleStatus::Confirmed->value,
+            'sold_at' => now()->subDay(),
+            'items' => [
+                [
+                    'product_id' => $product->id,
+                    'quantity' => '1',
+                    'unit_price' => '1800',
+                ],
+            ],
+        ]);
+
+        app(RegisterSalePayments::class)->handle($company, $sale, [
+            'cash_session_id' => $session->id,
+            'received_by' => $owner->id,
+            'payments' => [
+                [
+                    'payment_method_code' => 'cash',
+                    'amount' => '1800',
+                ],
+            ],
+        ]);
+
+        $closedSession = app(CloseCashSession::class)->handle($company, $session, [
+            'closed_by' => $owner->id,
+            'closing_counted_amount' => '100000',
+        ]);
+
+        $this->assertSame('reconciled', $closedSession->status);
+        $this->assertSame('100000.00', $closedSession->closing_expected_amount);
+        $this->assertSame('0.00', $closedSession->difference_amount);
+    }
+
     public function test_it_always_allows_closing_cash_session_with_a_difference(): void
     {
         [$owner, $company, $branch, $cashRegister] = $this->cashFixture();

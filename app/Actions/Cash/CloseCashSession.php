@@ -4,7 +4,6 @@ namespace App\Actions\Cash;
 
 use App\Actions\Cash\Concerns\ResolvesDenominationBreakdown;
 use App\Enums\CashSessionStatus;
-use App\Enums\PaymentStatus;
 use App\Models\CashSession;
 use App\Models\Company;
 use App\Models\User;
@@ -45,8 +44,12 @@ class CloseCashSession
                 throw new InvalidArgumentException('La sesion de caja no esta abierta.');
             }
 
+            // Un pago de una venta backdateada (sold_at de un dia distinto al
+            // de apertura de esta sesion) no entro fisicamente hoy a la caja:
+            // no debe contar para el efectivo esperado del cierre (ver
+            // Payment::belongsToCashSessionDay()).
             $cashPayments = $cashSession->payments()
-                ->where('status', PaymentStatus::Confirmed->value)
+                ->confirmedForCashSessionDay($cashSession)
                 ->where('payment_method_code', 'cash')
                 ->sum('amount');
 
