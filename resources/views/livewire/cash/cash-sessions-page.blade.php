@@ -2,14 +2,33 @@
     {{-- Iconos fijos arriba a la derecha, al mismo nivel que el icono de
     inicio (arriba a la izquierda, definido en el layout). Sin titulo de
     pagina aqui para no gastar espacio vertical: cada paso ya dice donde
-    esta parado. --}}
-    <div class="fixed right-3 top-3 z-[100] flex items-center gap-2">
+    esta parado.
+
+    El "top" usa la misma variable CSS que el icono de inicio del layout
+    (--impersonation-banner-height, publicada en layouts/app.blade.php) en
+    vez de un top-3 fijo: sin esto, cuando un platform_super_admin esta
+    viendo la cuenta de otra empresa, la franja naranja de "Volver a mi
+    cuenta" (sticky, mas arriba en z-index) tapaba estos botones porque
+    ambos ocupaban la misma franja superior de la pantalla. --}}
+    <div style="top: calc(0.75rem + var(--impersonation-banner-height, 0px));" class="fixed right-3 z-[100] flex items-center gap-2">
         <button type="button" wire:click="openCalendarShortcut" title="Ver cuadres de caja"
             class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-md hover:border-blue-300 hover:text-blue-700 transition">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
         </button>
+
+        @if ($this->canEditHistoricalCuadres())
+            {{-- Mismo destino que "Ver cuadres de caja" (el calendario ya
+            deja editar un dia cerrado al entrar), pero como boton propio y
+            con su propio rotulo: la edicion quedaba escondida detras del
+            icono de lapiz del popover al hacer hover, dificil de encontrar
+            si no sabes que existe. --}}
+            <button type="button" wire:click="openCalendarShortcut" title="Editar cuadres de caja"
+                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-md hover:border-blue-300 hover:text-blue-700 transition">
+                <x-heroicon-o-pencil-square class="h-5 w-5" />
+            </button>
+        @endif
 
         @if ($requiresCashRegisterSelection)
             <button type="button" wire:click="changeCashRegisterShortcut" title="Cambiar de caja"
@@ -40,6 +59,8 @@
     @if ($cashStep === 'day_view')
         <div x-data x-show="true" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
             class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 space-y-4">
+            <button type="button" wire:click="backToCalendar" class="text-sm font-medium text-gray-500 hover:text-gray-700">← Volver al calendario</button>
+
             <h2 class="text-xl font-black text-gray-900">
                 {{ ucfirst(\Illuminate\Support\Carbon::parse($historyDate)->translatedFormat('l, d \d\e F \d\e Y')) }}
             </h2>
@@ -65,8 +86,17 @@
                     </div>
                 </div>
             @else
-                <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 py-10 text-center text-sm text-gray-400">
-                    No hay cuadres de caja para esta fecha.
+                <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 py-10 text-center">
+                    <p class="text-sm text-gray-400">No hay cuadres de caja para esta fecha.</p>
+                    @if ($this->canCreateForHistoryDate())
+                        <button type="button" wire:click="startCreateForHistoryDate"
+                            class="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white hover:from-blue-700 hover:to-purple-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Crear cuadre de caja para este dia
+                        </button>
+                    @endif
                 </div>
             @endif
         </div>
@@ -188,6 +218,12 @@
 
                         <p class="mt-3 text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Apertura</p>
                         <h3 class="text-xl font-black text-gray-900">Nueva sesion de caja</h3>
+
+                        @if ($creatingSessionForDate !== '')
+                            <p class="mt-1 text-xs font-semibold text-amber-600">
+                                Se creara con fecha {{ ucfirst(\Illuminate\Support\Carbon::parse($creatingSessionForDate)->translatedFormat('d \d\e F \d\e Y')) }}, no con la fecha de hoy.
+                            </p>
+                        @endif
 
                         @unless ($canOpenCashSessions)
                             <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -318,16 +354,36 @@
                                          diferencia de esos, este es interactivo (tiene el boton de editar),
                                          asi que usa un pequeno delay al esconderse (en vez de solo
                                          mouseleave del boton) para que de tiempo de mover el mouse hasta
-                                         el icono sin que el popover desaparezca en el camino. --}}
+                                         el icono sin que el popover desaparezca en el camino.
+
+                                         Posicion en dos pasos: primero se abre debajo de la celda (igual
+                                         que antes) para no parpadear, y en $nextTick (ya con el popover
+                                         renderizado y medible) se corrige si no cabe — si no hay espacio
+                                         abajo (celdas de la ultima fila del mes) se voltea arriba de la
+                                         celda en vez de quedar fuera de la pantalla, y se recorta
+                                         horizontalmente para no salirse por los bordes. --}}
                                     <div wire:key="calendar-day-{{ $cell['date'] }}" x-data="{
                                             show: false,
+                                            flipped: false,
                                             hideTimer: null,
-                                            p: {},
+                                            p: { t: 0, l: 0 },
                                             open(e) {
                                                 clearTimeout(this.hideTimer);
                                                 const r = e.currentTarget.getBoundingClientRect();
+                                                this.flipped = false;
                                                 this.p = { t: r.bottom + 8, l: r.left + r.width / 2 };
                                                 this.show = true;
+                                                this.$nextTick(() => {
+                                                    const el = this.$refs.popover;
+                                                    if (! el) return;
+                                                    const margin = 8;
+                                                    if (el.offsetHeight > window.innerHeight - r.bottom - margin) {
+                                                        this.flipped = true;
+                                                        this.p.t = Math.max(margin, r.top - el.offsetHeight - margin);
+                                                    }
+                                                    const halfWidth = el.offsetWidth / 2;
+                                                    this.p.l = Math.min(Math.max(this.p.l, halfWidth + margin), window.innerWidth - halfWidth - margin);
+                                                });
                                             },
                                             scheduleHide() {
                                                 this.hideTimer = setTimeout(() => { this.show = false; }, 200);
@@ -339,59 +395,36 @@
                                             {{ $cell['day'] }}
                                         </button>
 
-                                        <div x-show="show" x-cloak
+                                        <div x-ref="popover" x-show="show" x-cloak
                                             @mouseenter="clearTimeout(hideTimer)" @mouseleave="scheduleHide()"
                                             x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
                                             :style="`position:fixed;top:${p.t}px;left:${p.l}px;transform:translateX(-50%);z-index:9999`"
                                             class="w-56 rounded-xl bg-white p-3 text-left shadow-xl ring-1 ring-gray-200">
-                                            <div class="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white ring-1 ring-gray-200"></div>
+                                            <div class="absolute left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 bg-white ring-1 ring-gray-200"
+                                                :class="flipped ? '-bottom-1.5' : '-top-1.5'"></div>
 
                                             <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
                                                 {{ ucfirst(\Illuminate\Support\Carbon::parse($cell['date'])->translatedFormat('d \d\e F')) }}
                                             </p>
                                             <div class="relative mt-1.5 space-y-1.5">
                                                 @foreach ($cell['registers'] as $register)
-                                                    <div>
-                                                        <div class="flex items-start justify-between gap-2">
-                                                            <span class="pt-1 text-xs font-medium text-gray-700">{{ $register['name'] }}</span>
-                                                            @if ($register['status'] === 'open')
-                                                                <x-status-badge color="amber">sin cerrar</x-status-badge>
-                                                            @else
-                                                                {{-- 'reconciled' solo pasa cuando contado == esperado (ver
-                                                                     CloseCashSession::handle) — o sea que el color de la
-                                                                     pill YA es la señal positivo/negativo: verde = cuadro
-                                                                     perfecto, rojo = quedo con diferencia. --}}
-                                                                <div class="flex items-start gap-1">
-                                                                    <span class="text-right">
-                                                                        <x-status-badge :color="$register['status'] === 'reconciled' ? 'emerald' : 'rose'">
-                                                                            {{ \App\Support\Money::format($register['closingCounted']) }}
-                                                                        </x-status-badge>
-                                                                        @if ($register['difference'] !== null && ! $register['negativeExpected'])
-                                                                            <span class="mt-0.5 block text-[10px] font-semibold text-rose-600">
-                                                                                {{ $register['difference'] > 0 ? 'sobra' : 'falta' }}
-                                                                                {{ \App\Support\Money::format(abs($register['difference'])) }}
-                                                                            </span>
-                                                                        @endif
-                                                                    </span>
-                                                                    @if ($register['status'] !== 'reconciled' && $this->canEditHistoricalCuadres())
-                                                                        <button type="button" wire:click="openCuadre({{ $register['sessionId'] }})"
-                                                                            title="Editar este cuadre"
-                                                                            class="mt-0.5 shrink-0 text-gray-400 transition hover:text-blue-600">
-                                                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
-                                                                        </button>
-                                                                    @endif
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                        @if ($register['negativeExpected'])
-                                                            {{-- El "esperado" mismo salio negativo: los pagos registrados
-                                                                 superaron bases + ventas del dia. No es un "sobrante" de
-                                                                 caja (eso sugeriria que todo esta bien y hay plata de
-                                                                 mas) — el problema real esta en los pagos/bases
-                                                                 registrados, hay que revisarlos. --}}
-                                                            <p class="mt-0.5 text-[10px] font-semibold text-rose-600">
-                                                                Recaudo negativo: los pagos superaron las bases + ventas del dia.
-                                                            </p>
+                                                    <div class="flex items-start justify-between gap-2">
+                                                        <span class="pt-1 text-xs font-medium text-gray-700">{{ $register['name'] }}</span>
+                                                        @if ($register['status'] === 'open')
+                                                            <x-status-badge color="amber">sin cerrar</x-status-badge>
+                                                        @else
+                                                            <div class="flex items-start gap-1">
+                                                                <x-status-badge color="stone">
+                                                                    {{ \App\Support\Money::format($register['closingCounted']) }}
+                                                                </x-status-badge>
+                                                                @if ($this->canEditHistoricalCuadres())
+                                                                    <button type="button" wire:click="openCuadre({{ $register['sessionId'] }})"
+                                                                        title="Editar este cuadre"
+                                                                        class="mt-0.5 shrink-0 text-gray-400 transition hover:text-blue-600">
+                                                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                                                    </button>
+                                                                @endif
+                                                            </div>
                                                         @endif
                                                     </div>
                                                 @endforeach

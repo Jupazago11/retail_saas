@@ -2,6 +2,7 @@
 
 namespace App\Actions\Cash;
 
+use App\Actions\Cash\Concerns\ResolvesDenominationBreakdown;
 use App\Enums\CashSessionStatus;
 use App\Enums\PaymentStatus;
 use App\Models\CashSession;
@@ -13,6 +14,8 @@ use InvalidArgumentException;
 
 class CloseCashSession
 {
+    use ResolvesDenominationBreakdown;
+
     public function __construct(
         protected AuditLogger $auditLogger,
     ) {
@@ -27,7 +30,7 @@ class CloseCashSession
         $closer = $this->resolveUser($company, (int) ($attributes['closed_by'] ?? 0));
         $denominationBreakdown = $this->resolveDenominationBreakdown($attributes);
         $countedAmount = $denominationBreakdown !== null
-            ? array_reduce($denominationBreakdown, fn (string $carry, array $row) => bcadd($carry, bcmul((string) $row['value'], (string) $row['quantity'], 2), 2), '0.00')
+            ? $this->amountFromDenominationBreakdown($denominationBreakdown)
             : $this->normalizeAmount($attributes['closing_counted_amount'] ?? null, 'Monto de cierre invalido.');
 
         $beforeCashSession = $cashSession->fresh();
@@ -72,28 +75,6 @@ class CloseCashSession
         $this->auditLogger->logUpdated($company, 'cash_session.closed', $beforeCashSession, $cashSession, $closer);
 
         return $cashSession;
-    }
-
-    protected function resolveDenominationBreakdown(array $attributes): ?array
-    {
-        if (! array_key_exists('denomination_breakdown', $attributes) || ! is_array($attributes['denomination_breakdown'])) {
-            return null;
-        }
-
-        $breakdown = [];
-
-        foreach ($attributes['denomination_breakdown'] as $row) {
-            $value = (int) ($row['value'] ?? 0);
-            $quantity = (int) ($row['quantity'] ?? 0);
-
-            if ($value <= 0 || $quantity <= 0) {
-                continue;
-            }
-
-            $breakdown[] = ['value' => $value, 'quantity' => $quantity];
-        }
-
-        return $breakdown;
     }
 
     protected function resolveUser(Company $company, int $userId): User

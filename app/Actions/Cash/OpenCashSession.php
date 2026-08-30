@@ -34,8 +34,9 @@ class OpenCashSession
         }
 
         $openingAmount = array_reduce($funds, fn (string $carry, array $fund) => bcadd($carry, $fund['amount'], 2), '0.00');
+        $openedAt = $this->resolveOpenedAt($attributes);
 
-        return DB::transaction(function () use ($company, $branch, $cashRegister, $opener, $openingAmount, $funds) {
+        return DB::transaction(function () use ($company, $branch, $cashRegister, $opener, $openingAmount, $funds, $openedAt) {
             $existing = CashSession::query()
                 ->where('company_id', $company->id)
                 ->where('cash_register_id', $cashRegister->id)
@@ -63,7 +64,7 @@ class OpenCashSession
                 'status' => CashSessionStatus::Open->value,
                 'opening_amount' => $openingAmount,
                 'closing_expected_amount' => $openingAmount,
-                'opened_at' => now(),
+                'opened_at' => $openedAt,
             ]);
 
             foreach ($funds as $fund) {
@@ -82,6 +83,28 @@ class OpenCashSession
 
             return $cashSession;
         });
+    }
+
+    /**
+     * Por defecto una caja se abre "ahora", pero el modulo de caja tambien
+     * permite crear el cuadre de un dia pasado que se quedo sin registrar
+     * (ver CashSessionsPage::startCreateForHistoryDate()) — en ese caso se
+     * pide una fecha concreta y se le pega la hora actual, para no perder
+     * el orden cronologico si ese dia termina con varias sesiones.
+     */
+    protected function resolveOpenedAt(array $attributes): \Illuminate\Support\Carbon
+    {
+        if (! array_key_exists('opened_at', $attributes) || $attributes['opened_at'] === null || $attributes['opened_at'] === '') {
+            return now();
+        }
+
+        $date = \Illuminate\Support\Carbon::parse($attributes['opened_at']);
+
+        if (! $date->isToday()) {
+            $date->setTimeFromTimeString(now()->format('H:i:s'));
+        }
+
+        return $date;
     }
 
     protected function resolveBranch(Company $company, int $branchId): Branch

@@ -99,6 +99,34 @@ class OperationalReportService
             ]);
     }
 
+    /**
+     * Efectivo en caja por dia: suma de `closing_counted_amount` (el
+     * conteo fisico real al cerrar, ver Cash\CashSessionsPage) de las
+     * sesiones YA cerradas dentro del rango filtrado, agrupada por el dia
+     * de APERTURA de la sesion — mismo criterio que usa el resto del
+     * modulo de caja para decidir "a que dia pertenece" una sesion (ver
+     * CashSessionsPage::calendarCells()/historyDateScope()), en vez de la
+     * fecha de cierre. Una sesion todavia abierta no tiene un conteo final
+     * que graficar, asi que no se incluye.
+     */
+    public function cashOnHandTrend(Company $company, array $filters = []): Collection
+    {
+        return $company->cashSessions()
+            ->whereIn('status', ['closed', 'reconciled'])
+            ->when($this->branchId($filters), fn (Builder $query, int $branchId) => $query->where('branch_id', $branchId))
+            ->when($this->cashRegisterId($filters), fn (Builder $query, int $cashRegisterId) => $query->where('cash_register_id', $cashRegisterId))
+            ->when($this->dateFrom($filters), fn (Builder $query, string $dateFrom) => $query->whereDate('opened_at', '>=', $dateFrom))
+            ->when($this->dateTo($filters), fn (Builder $query, string $dateTo) => $query->whereDate('opened_at', '<=', $dateTo))
+            ->selectRaw('date(opened_at) as session_date, coalesce(sum(closing_counted_amount), 0) as cash_on_hand_total')
+            ->groupBy('session_date')
+            ->orderBy('session_date')
+            ->get()
+            ->map(fn ($row) => [
+                'date' => (string) $row->session_date,
+                'cash_on_hand_total' => (float) $row->cash_on_hand_total,
+            ]);
+    }
+
     public function branchBreakdown(Company $company, array $filters = []): Collection
     {
         $sales = $this->salesQuery($company, $filters)

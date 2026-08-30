@@ -75,17 +75,25 @@
             </div>
         </div>
 
-        <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200">
-            <p class="text-xs text-gray-500">Venta diaria (todos los medios de pago)</p>
-            <p class="text-lg font-black text-gray-900">${{ \App\Support\Money::format((float) $this->dailySalesAmount($session)) }}</p>
+        <div class="rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200 space-y-1.5">
+            <p class="text-xs text-gray-500">Venta diaria por medio de pago</p>
+            @php($salesByMethod = $this->dailySalesByPaymentMethod($session))
+            @forelse ($salesByMethod as $methodCode => $methodAmount)
+                <div class="flex items-center justify-between text-sm">
+                    <span class="text-gray-600">{{ $this->paymentMethodLabel($methodCode) }}</span>
+                    <span class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $methodAmount) }}</span>
+                </div>
+            @empty
+                <p class="text-sm text-gray-400">Sin ventas registradas.</p>
+            @endforelse
+            @if (count($salesByMethod) > 1)
+                <div class="flex items-center justify-between border-t border-gray-100 pt-1.5 text-sm">
+                    <span class="font-medium text-gray-700">Total</span>
+                    <span class="font-black text-gray-900">${{ \App\Support\Money::format((float) $this->dailySalesAmount($session)) }}</span>
+                </div>
+            @endif
         </div>
 
-        @php($expectedCash = (float) $this->expectedCashAmount($session))
-        <div class="rounded-lg px-3 py-3 text-white {{ $expectedCash < 0 ? 'bg-gradient-to-br from-rose-600 to-red-600' : 'bg-gradient-to-br from-emerald-600 to-teal-600' }}">
-            <p class="text-xs uppercase tracking-[0.18em] {{ $expectedCash < 0 ? 'text-rose-100' : 'text-emerald-100' }}">Resultado (efectivo esperado)</p>
-            <p class="text-2xl font-black">${{ \App\Support\Money::format($expectedCash) }}</p>
-            <p class="mt-1 text-[11px] {{ $expectedCash < 0 ? 'text-rose-100' : 'text-emerald-100' }}">Bases + ventas en efectivo − pagos de caja</p>
-        </div>
     </div>
 
     {{-- Columna 2: Pagos de caja --}}
@@ -140,13 +148,61 @@
             <span class="text-sm font-medium text-gray-700">Total pagos de caja</span>
             <span class="text-sm font-black text-gray-900">${{ \App\Support\Money::format((float) $session->expenses->sum('amount')) }}</span>
         </div>
+
+        @if ($canEditThisCuadre)
+            {{-- Compras ya pagadas ese mismo dia (registradas en el modulo de
+                 Compras, cualquier medio de pago): dejar marcarlas en vez de
+                 obligar a volver a escribirlas a mano en el formulario de
+                 arriba. Cada una solo puede agregarse una vez (ver
+                 ManageCashSessionExpenses::recordFromPurchasePayments), asi
+                 que la lista se va vaciando a medida que se agregan. --}}
+            @php($purchaseCandidates = $this->purchasePaymentCandidates($session))
+            @if ($purchaseCandidates->isNotEmpty())
+                <div class="space-y-1.5 border-t border-dashed border-gray-300 pt-3">
+                    <p class="text-xs font-semibold text-gray-500">Compras registradas este dia</p>
+                    <div class="space-y-1">
+                        @foreach ($purchaseCandidates as $movement)
+                            <label wire:key="purchase-candidate-{{ $movement->id }}"
+                                class="flex cursor-pointer items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-sm ring-1 ring-gray-200 hover:ring-blue-300">
+                                {{-- wire:model.live (no el diferido normal): el boton de abajo
+                                     queda deshabilitado/habilitado segun $selectedPurchasePaymentIds
+                                     en el servidor, y sin .live el checkbox quedaba marcado
+                                     visualmente en el navegador pero el servidor nunca se enteraba
+                                     hasta el proximo round-trip — el boton se veia pegado en
+                                     "deshabilitado" aunque ya hubiera algo seleccionado. --}}
+                                <input type="checkbox" wire:model.live="selectedPurchasePaymentIds" value="{{ $movement->id }}"
+                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                <span class="flex-1 truncate text-gray-700">
+                                    {{ $movement->purchase?->supplier_name ?? 'Compra' }}
+                                    @if ($movement->payment_method_code && $movement->payment_method_code !== 'cash')
+                                        <span class="text-xs text-gray-400">({{ $this->paymentMethodLabel($movement->payment_method_code) }})</span>
+                                    @endif
+                                </span>
+                                <span class="font-medium text-gray-900">${{ \App\Support\Money::format((float) $movement->amount) }}</span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <button type="button" wire:click="addSelectedPurchasePayments" @disabled(empty($selectedPurchasePaymentIds))
+                        class="w-full rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50">
+                        Agregar como pago de caja
+                    </button>
+                </div>
+            @endif
+        @endif
     </div>
 
     {{-- Columna 3: Efectivo en caja --}}
+    @php($isRecountingThisSession = $recountingSessionId === $session->id)
     <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Efectivo en caja</p>
 
-        @if ($sessionIsOpen)
+        @if ($sessionIsOpen || $isRecountingThisSession)
+            {{-- Mismo formulario de conteo tanto para cerrar por primera vez
+                 como para CORREGIR el contado de una sesion ya cerrada (ver
+                 CashSessionsPage::startRecountingClosedSession()) — antes,
+                 corregir un cierre mostraba un input suelto sin ningun
+                 boton de guardar visible, una pantalla completamente
+                 distinta a la de cerrar caja. --}}
             @foreach ($this->denominations() as $groupLabel => $group)
                 <div class="space-y-1">
                     <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{{ $groupLabel }}</p>
@@ -178,21 +234,24 @@
                     class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
             </div>
 
-            @if ($this->canViewDifference())
-                @php($liveDiff = bcsub($this->currentCountedAmount(), $this->expectedCashAmount($session), 2))
-                <div class="flex items-center justify-between rounded-lg px-3 py-2 text-sm {{ bccomp($liveDiff, '0.00', 2) === 0 ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-rose-50 ring-1 ring-rose-200' }}">
-                    <span class="{{ bccomp($liveDiff, '0.00', 2) === 0 ? 'text-emerald-800' : 'text-rose-800' }}">Diferencia</span>
-                    <span class="font-semibold {{ bccomp($liveDiff, '0.00', 2) === 0 ? 'text-emerald-800' : 'text-rose-800' }}">${{ \App\Support\Money::format((float) $liveDiff) }}</span>
+            @if ($sessionIsOpen)
+                @if ($this->canCloseCash())
+                    <button wire:click="closeSession" wire:confirm="¿Cerrar esta sesion de caja?"
+                        class="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
+                        Cerrar caja
+                    </button>
+                @endif
+            @else
+                <div class="flex gap-2">
+                    <button type="button" wire:click="cancelRecountingClosedSession"
+                        class="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="button" wire:click="saveRecountedAmount"
+                        class="flex-1 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
+                        Guardar cambios
+                    </button>
                 </div>
-            @endif
-
-            <p class="text-[11px] text-gray-500">El cierre se permite aunque el conteo no coincida con el resultado esperado; la diferencia queda registrada en la sesion.</p>
-
-            @if ($this->canCloseCash())
-                <button wire:click="closeSession" wire:confirm="¿Cerrar esta sesion de caja?"
-                    class="w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700">
-                    Cerrar caja
-                </button>
             @endif
         @else
             @if ($session->closing_denomination_breakdown)
@@ -208,26 +267,16 @@
 
             <div class="space-y-2">
                 <div class="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200 text-sm">
-                    <span class="text-gray-700">Esperado</span>
-                    <span class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $session->closing_expected_amount) }}</span>
-                </div>
-                <div class="flex items-center justify-between rounded-lg bg-white px-3 py-2 ring-1 ring-gray-200 text-sm">
                     <span class="text-gray-700">Contado</span>
                     <span class="font-semibold text-gray-900">${{ \App\Support\Money::format((float) $session->closing_counted_amount) }}</span>
                 </div>
-                @if ($this->canViewDifference())
-                    @php($diff = (float) $session->difference_amount)
-                    <div class="flex items-center justify-between rounded-lg px-3 py-2 text-sm {{ $diff === 0.0 ? 'bg-emerald-50 ring-1 ring-emerald-200' : 'bg-rose-50 ring-1 ring-rose-200' }}">
-                        <span class="{{ $diff === 0.0 ? 'text-emerald-800' : 'text-rose-800' }}">Diferencia</span>
-                        <span class="font-semibold {{ $diff === 0.0 ? 'text-emerald-800' : 'text-rose-800' }}">${{ \App\Support\Money::format($diff) }}</span>
-                    </div>
-                @endif
             </div>
 
             @if ($canEditThisCuadre)
-                <p class="text-[11px] text-amber-600">
-                    Si corriges bases o pagos de caja arriba, el esperado y la diferencia se recalculan solos.
-                </p>
+                <button type="button" wire:click="startRecountingClosedSession({{ $session->id }})"
+                    class="text-xs font-semibold text-blue-700 hover:underline">
+                    Corregir efectivo contado
+                </button>
             @endif
         @endif
     </div>

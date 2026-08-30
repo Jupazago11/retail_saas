@@ -69,6 +69,17 @@ abstract class TestCase extends BaseTestCase
             'DB_DATABASE' => ':memory:',
             'DB_URL' => '',
             'SESSION_DRIVER' => 'array',
+            // `docker compose exec app php artisan test` corre como root por
+            // defecto. Sin este aislamiento, las pruebas compilan vistas
+            // Blade directo en storage/framework/views (la misma carpeta
+            // que usa el sitio real, servido por PHP-FPM como `www-data`) y
+            // dejan ahi archivos con dueno root — el siguiente request real
+            // que necesite recompilar esa MISMA vista revienta con
+            // "touch(): Utime failed: Operation not permitted" porque
+            // www-data no es dueno del archivo (ver docs/docker-local.md).
+            // Las pruebas usan su propia carpeta para no pisar la cache de
+            // la app real sin importar que usuario del SO las ejecute.
+            'VIEW_COMPILED_PATH' => dirname(__DIR__) . '/storage/framework/testing/views',
         ] as $key => $value) {
             putenv("{$key}={$value}");
             $_ENV[$key] = $value;

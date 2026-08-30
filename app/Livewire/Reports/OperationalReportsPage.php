@@ -83,6 +83,16 @@ class OperationalReportsPage extends Component
             && (bool) app(CompanySettings::class)->get($company, 'loyalty', 'loyalty_enabled');
     }
 
+    // El modulo 'cash' esta incluido en todos los planes (ver PlanCatalog),
+    // pero una empresa puede desactivarlo operativamente en Configuracion
+    // igual que credito/fidelizacion (ver CashSessionsPage::ensureCashAccess()) —
+    // sin este chequeo, el reporte graficaria efectivo en caja de un
+    // modulo que la empresa ni siquiera esta usando.
+    public function cashEnabled(): bool
+    {
+        return (bool) app(CompanySettings::class)->get($this->currentCompany(), 'cash', 'module_enabled');
+    }
+
     public function promotionsEnabled(): bool
     {
         return app(CompanyPlanResolver::class)->hasModule($this->currentCompany(), 'promotions');
@@ -122,6 +132,15 @@ class OperationalReportsPage extends Component
     public function branchBreakdown(): \Illuminate\Support\Collection
     {
         return app(OperationalReportService::class)->branchBreakdown($this->currentCompany(), $this->filters());
+    }
+
+    public function cashOnHandTrend(): \Illuminate\Support\Collection
+    {
+        if (! $this->cashEnabled()) {
+            return collect();
+        }
+
+        return app(OperationalReportService::class)->cashOnHandTrend($this->currentCompany(), $this->filters());
     }
 
     public function topProducts(): \Illuminate\Support\Collection
@@ -218,6 +237,8 @@ class OperationalReportsPage extends Component
             'cashRegisters' => $this->cashRegisters(),
             'summaryCards' => $this->summaryCards(),
             'branchBreakdown' => $this->branchBreakdown(),
+            'cashOnHandTrend' => $this->cashOnHandTrend(),
+            'cashEnabled' => $this->cashEnabled(),
             'topProducts' => $this->topProducts(),
             'paymentMethodBreakdown' => $this->paymentMethodBreakdown(),
             'creditAging' => $this->creditAging(),

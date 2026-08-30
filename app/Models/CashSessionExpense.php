@@ -11,6 +11,7 @@ class CashSessionExpense extends Model
         'company_id',
         'company_sequence',
         'cash_session_id',
+        'payable_movement_id',
         'description',
         'amount',
         'created_by',
@@ -32,6 +33,11 @@ class CashSessionExpense extends Model
     public function cashSession(): BelongsTo
     {
         return $this->belongsTo(CashSession::class);
+    }
+
+    public function payableMovement(): BelongsTo
+    {
+        return $this->belongsTo(PayableMovement::class);
     }
 
     public function creator(): BelongsTo

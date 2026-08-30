@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Cash\CloseCashSession;
 use App\Actions\Cash\OpenCashSession;
 use App\Actions\Companies\CreateCompany;
 use App\Actions\Credit\RegisterCreditPayment;
@@ -141,6 +142,56 @@ class OperationalReportsPageTest extends TestCase
         // no contra esta venta puntual (ver CreditAccountsPage::moraStatus()),
         // asi que el saldo de ESTA venta en el aging queda intacto en 1620.
         $this->assertSame('1.620', $overdueBucket['balance_total']);
+    }
+
+    public function test_reports_page_shows_cash_on_hand_trend_from_closed_sessions(): void
+    {
+        [$owner, $company, $branch, , $cashRegister] = $this->fixture();
+
+        $session = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '100000',
+        ]);
+
+        app(CloseCashSession::class)->handle($company, $session, [
+            'closed_by' => $owner->id,
+            'closing_counted_amount' => '135000',
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $component = Livewire::test(OperationalReportsPage::class)
+            ->assertSee('Efectivo en caja por dia');
+
+        $trend = $component->instance()->cashOnHandTrend();
+        $this->assertCount(1, $trend);
+        $this->assertSame(now()->format('Y-m-d'), $trend->first()['date']);
+        $this->assertSame(135000.0, $trend->first()['cash_on_hand_total']);
+    }
+
+    public function test_cash_on_hand_trend_excludes_sessions_still_open_and_respects_module_toggle(): void
+    {
+        [$owner, $company, $branch, , $cashRegister] = $this->fixture();
+
+        app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '50000',
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $component = Livewire::test(OperationalReportsPage::class);
+        $this->assertCount(0, $component->instance()->cashOnHandTrend());
+
+        app(CompanySettings::class)->set($company, 'cash', 'module_enabled', false);
+
+        $this->assertFalse(Livewire::test(OperationalReportsPage::class)->instance()->cashEnabled());
     }
 
     public function test_reports_page_shows_purchases_versus_sales_contrast(): void

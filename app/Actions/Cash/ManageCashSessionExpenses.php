@@ -4,11 +4,14 @@ namespace App\Actions\Cash;
 
 use App\Actions\Cash\Concerns\RecomputesClosedSessionTotals;
 use App\Enums\CashSessionStatus;
+use App\Enums\PayableMovementType;
 use App\Models\CashSession;
 use App\Models\CashSessionExpense;
 use App\Models\Company;
+use App\Models\PayableMovement;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -57,6 +60,77 @@ class ManageCashSessionExpenses
             $this->auditLogger->logCreated($company, 'cash_session_expense.created', $expense, $actor);
 
             return $expense;
+        });
+    }
+
+    /**
+     * Convierte uno o varios pagos de compras ya registrados
+     * (`payable_movements` con movement_type=payment, cualquier
+     * payment_method_code) en pagos de caja, para no obligar al usuario a
+     * volver a digitarlos a mano. Cada movimiento solo puede convertirse
+     * una vez (`cash_session_expenses.payable_movement_id` es unico); los
+     * que ya fueron convertidos simplemente se ignoran aqui en vez de
+     * fallar, para que un doble clic o una seleccion vieja no interrumpa el
+     * resto.
+     *
+     * @param  array<int>  $payableMovementIds
+     * @return Collection<int, CashSessionExpense>
+     */
+    public function recordFromPurchasePayments(Company $company, CashSession $cashSession, array $payableMovementIds, User $actor): Collection
+    {
+        if ($cashSession->company_id !== $company->id) {
+            throw new InvalidArgumentException('La sesion de caja no pertenece a la empresa indicada.');
+        }
+
+        $payableMovementIds = array_values(array_unique(array_map('intval', $payableMovementIds)));
+
+        if ($payableMovementIds === []) {
+            throw new InvalidArgumentException('Selecciona al menos una compra para agregar.');
+        }
+
+        return DB::transaction(function () use ($company, $cashSession, $payableMovementIds, $actor) {
+            $cashSession = CashSession::query()->lockForUpdate()->findOrFail($cashSession->id);
+            $this->ensureCanModify($cashSession, $actor);
+
+            $movements = PayableMovement::query()
+                ->where('company_id', $company->id)
+                ->where('movement_type', PayableMovementType::Payment->value)
+                ->whereDoesntHave('cashSessionExpense')
+                ->whereIn('id', $payableMovementIds)
+                ->with('purchase')
+                ->lockForUpdate()
+                ->get();
+
+            if ($movements->isEmpty()) {
+                throw new InvalidArgumentException('Esas compras ya fueron agregadas o ya no estan disponibles.');
+            }
+
+            $nextSequence = 1 + (int) CashSessionExpense::query()
+                ->where('company_id', $company->id)
+                ->orderByDesc('company_sequence')
+                ->lockForUpdate()
+                ->value('company_sequence');
+
+            $expenses = new Collection();
+
+            foreach ($movements as $movement) {
+                $expense = CashSessionExpense::query()->create([
+                    'company_id' => $company->id,
+                    'company_sequence' => $nextSequence++,
+                    'cash_session_id' => $cashSession->id,
+                    'payable_movement_id' => $movement->id,
+                    'description' => 'Compra · ' . ($movement->purchase?->supplier_name ?? 'proveedor sin nombre'),
+                    'amount' => $movement->amount,
+                    'created_by' => $actor->id,
+                ]);
+
+                $this->auditLogger->logCreated($company, 'cash_session_expense.created_from_purchase', $expense, $actor);
+                $expenses->push($expense);
+            }
+
+            $this->recomputeClosedTotalsIfNeeded($cashSession);
+
+            return $expenses;
         });
     }
 

@@ -249,6 +249,29 @@
             </div>
         @endif
 
+        @if ($cashEnabled)
+            {{-- "Efectivo en caja" = suma de lo contado al cerrar cada sesion
+                 (closing_counted_amount), no un calculo derivado — mismo
+                 numero que ya se ve como "Contado" en el cuadre de cada dia
+                 (ver Cash\CashSessionsPage). Una sesion sin cerrar no aporta
+                 nada todavia, por eso el grafico puede tener menos puntos
+                 que dias con actividad de ventas/compras en el mismo rango. --}}
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-teal-200">
+                <div class="flex items-center gap-2">
+                    <span class="h-2.5 w-2.5 rounded-full bg-teal-500"></span>
+                    <div>
+                        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-teal-600">Caja</p>
+                        <h3 class="mt-0.5 text-xl font-black text-gray-900">Efectivo en caja por dia</h3>
+                    </div>
+                </div>
+
+                <div class="mt-5">
+                    <x-charts.line-chart :data="$cashOnHandTrend" label-key="date" value-key="cash_on_hand_total"
+                        color="#0d9488" :money="true" aria-label="Efectivo en caja por dia" />
+                </div>
+            </div>
+        @endif
+
         @if ($creditEnabled)
             <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
                 <div class="flex flex-wrap items-start justify-between gap-4">

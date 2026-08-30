@@ -3820,3 +3820,172 @@
   - Debido a que el listado Alpine continuo siendo inestable en QA manual, se retiro por completo y se reemplazo por un `datalist` nativo. La seleccion por clic usa `change` y `Enter` envia el valor actual directamente al metodo Livewire.
   - Detectar en JavaScript cuando Edge completa exactamente una opcion del `datalist` y emitir `change` de inmediato, sin esperar a que el campo pierda el foco.
   - Los logs posteriores mostraron que los eventos nativos ocurrian pero las directivas del input no iniciaban solicitudes. El campo ahora localiza su componente por `wire:id` y usa la API publica `Livewire.find(id).$call()` para invocar la seleccion de forma explicita.
+
+## 2026-08-29 - Ajustes de UX en el cuadre de caja: quitar Diferencia/Esperado de la UI, arreglar edicion de cierres pasados y el popover del calendario
+
+- Objetivo: corregir tres problemas reportados en el modulo de caja: (1) el negocio no registra las ventas del dia por POS, asi que "Esperado" (bases + ventas en efectivo − pagos) no reflejaba la realidad y "Diferencia" salia siempre grande sin que hubiera un problema real; (2) agregar una base o un pago de caja nuevo no hacia nada al editar un cierre pasado entrando por "seleccionar el dia" en el calendario (a diferencia de entrar por el icono de lapiz del popover); (3) el popover de un dia con cuadres, al hacer hover sobre las ultimas filas del mes, se posicionaba fuera de la pantalla y quedaba invisible.
+- Archivos modificados:
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php`
+  - `resources/views/livewire/cash/partials/cuadre-columns.blade.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - UI del cuadre (`cuadre-columns.blade.php`): se quito la caja "Resultado (efectivo esperado)" de la sesion abierta, la fila "Diferencia" en vivo mientras se cuenta, y las filas "Esperado"/"Diferencia" de la sesion ya cerrada. Bases (total), Pagos de caja (total) y Efectivo contado quedan como tres valores independientes e informativos, sin comparacion ni alerta entre ellos, tal como opera el negocio hoy (caja manual, sin todas las ventas pasando por el POS).
+  - Popover del calendario: se quito el texto "sobra/falta $X" y el aviso "Recaudo negativo"; el badge de una caja cerrada ya no cambia de verde a rojo segun si hubo diferencia (color neutro `stone` para cualquier cierre, igual que ya se usaba en la cabecera del cuadre para "Cerrada").
+  - Importante: el calculo interno de `closing_expected_amount`/`difference_amount` y la distincion de estado `reconciled` vs `closed` (`CloseCashSession`, `RecomputesClosedSessionTotals`, `CashSessionsPage::calendarCellRegisterSummary()`) NO se tocaron — se siguen calculando y guardando igual que antes, solo se dejaron de mostrar en pantalla. Sirven para auditoria/reportes futuros de conciliacion (ver `roadmap.md`), pero ya no se presentan como una alerta al usuario que hoy no registra ventas por POS.
+  - El boton de editar (lapiz) del popover ahora aparece para cualquier caja cerrada, tambien las que cuadraron exacto (`reconciled`), no solo las que tuvieron diferencia — antes quedaba oculto en `reconciled` porque esa condicion asumia que solo tenia sentido "corregir" cuando habia diferencia.
+  - Bug corregido: `addFund()`/`addExpense()` solo resolvian la sesion a editar por `cuadreSessionId` (el modal abierto desde el icono de lapiz). Al entrar por "seleccionar el dia" en el calendario (`day_view`, que usa `historyDate`/`historyCashRegisterId`), `cuadreSessionId` queda `null` y ambos metodos retornaban sin guardar nada, sin mostrar ningun error — el formulario se veia funcional pero no hacia nada. Se agrego `editableCuadreSessionId()` (`cuadreSessionId ?? historySession()?->id`) como fallback.
+  - Se agrego el boton "← Volver al calendario" en `day_view`, que ya faltaba (el metodo `backToCalendar()` existia en el componente pero no estaba enlazado en ningun boton de esa vista).
+  - Popover del calendario: se cambio el posicionamiento a dos pasos — se abre primero debajo de la celda (para no parpadear) y en `$nextTick`, ya con el popover renderizado y medible, se corrige: si no cabe el espacio de abajo se voltea arriba de la celda (con el "pico" del tooltip tambien invertido) y se recorta horizontalmente para no salirse por los bordes de la pantalla. Antes siempre se posicionaba `r.bottom + 8px` sin verificar espacio disponible, por lo que en las ultimas filas del mes el popover quedaba renderizado fuera del viewport (invisible, sin poder hacerle scroll porque es `position:fixed`).
+- Pruebas ejecutadas:
+  - `php artisan test --filter=CashSessionsPageTest`: 12 pruebas, 58 aserciones, aprobado (incluye una prueba nueva que reproduce el bug de `addFund`/`addExpense` editando desde `day_view` en vez del modal).
+  - `php artisan test --filter=Cash`: 27 de 28 pruebas aprobadas; la unica falla (`CashAndPaymentsTest::it rejects payment registration when total does not match sale`) es preexistente y no tiene relacion con este cambio (mensaje de error de `RegisterSalePayments` para pagos de venta, no de caja).
+- Deuda o pendientes:
+  - `cash.view_difference` y `canViewDifference()` quedaron sin uso en las vistas (el calculo que protegian ya no se muestra); no se eliminaron del catalogo de permisos ni del componente porque tocar el catalogo de permisos y roles sembrados es un cambio de mayor alcance que no se pidio en este ajuste.
+  - No se corrio QA manual en navegador (sesion sin acceso interactivo); la correccion del popover se validó leyendo el flujo de posicionamiento, no visualmente.
+
+## 2026-08-29 - Boton de editar cuadres, banner de impersonacion tapaba los iconos de caja, y compras en efectivo como pagos de caja
+
+- Objetivo: tres ajustes de seguimiento sobre el cuadre de caja. (1) La franja naranja de impersonacion ("Estas viendo la cuenta de...") tapaba los iconos fijos de calendario/reglas porque ambos usaban la misma franja superior sin coordinarse. (2) Aun con el flujo de editar-seleccionando-el-dia ya arreglado, la edicion quedaba escondida detras del icono de lapiz del popover (hover); se pidio un boton propio junto a calendario/reglas. (3) El negocio compra insumos (ej. "crem helado") pagando de la misma caja fisica, pero esos pagos ya se registran en el modulo de Compras (`payable_movements`) y el cajero los volvia a escribir a mano como pago de caja aparte, con riesgo de olvidarlos o duplicarlos.
+- Archivos modificados:
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `app/Actions/Cash/ManageCashSessionExpenses.php`
+  - `app/Models/CashSessionExpense.php`
+  - `app/Models/PayableMovement.php`
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php`
+  - `resources/views/livewire/cash/partials/cuadre-columns.blade.php`
+  - `database/migrations/2026_08_29_200000_add_payable_movement_id_to_cash_session_expenses_table.php`
+  - `docs/docker-local.md`
+  - `tests/Feature/CashSessionsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - El icono fijo superior derecho (calendario/reglas) ahora usa la misma variable CSS `--impersonation-banner-height` que ya publicaba `layouts/app.blade.php` para el icono de inicio, en vez de un `top-3` fijo que quedaba tapado por el banner cuando un `platform_super_admin` esta viendo la cuenta de otra empresa.
+  - Se agrego un boton independiente "Editar cuadres de caja" (icono de lapiz) junto al de calendario, visible solo con `canEditHistoricalCuadres()`; abre el mismo calendario (misma accion `openCalendarShortcut`) pero con su propio rotulo, para que la posibilidad de corregir un cierre pasado no dependa de encontrar el icono chiquito del popover al hacer hover.
+  - `cash_session_expenses` gano una columna nullable y unica `payable_movement_id` (FK a `payable_movements`, `nullOnDelete`) para poder enlazar un pago de caja con el movimiento de compra del que se origino, y evitar que la misma compra se convierta dos veces en pago de caja.
+  - Nuevo metodo `ManageCashSessionExpenses::recordFromPurchasePayments()`: recibe una lista de ids de `payable_movements` (`movement_type=payment`, `payment_method_code=cash`, sin `cash_session_expense` ya enlazado), crea un `CashSessionExpense` por cada uno (descripcion autogenerada "Compra · {proveedor}") y recalcula los totales de la sesion si ya estaba cerrada (mismo mecanismo que las demas mutaciones de caja).
+  - `CashSessionsPage::purchasePaymentCandidates()` lista, para una sesion dada, las compras pagadas en efectivo el mismo dia de apertura de esa sesion Y en la misma sucursal, que todavia no se convirtieron en pago de caja. En la columna "Pagos de caja" del cuadre, debajo del total, aparecen como una lista de checkboxes (`selectedPurchasePaymentIds`) con un boton "Agregar como pago de caja" que llama a `addSelectedPurchasePayments()`. Reutiliza el mismo `editableCuadreSessionId()` agregado en el ajuste anterior, asi que funciona tanto desde el modal como desde `day_view`.
+  - Solo las compras pagadas en `cash` cuentan como candidatas; una compra pagada por `transfer` no sale de la caja fisica y no deberia poder convertirse en un "pago de caja" (verificado con una prueba especifica).
+  - "Venta diaria (todos los medios de pago)" — un solo numero que mezclaba efectivo, tarjeta, transferencia y credito — se reemplazo por `CashSessionsPage::dailySalesByPaymentMethod()`: una fila por cada `payment_method_code` presente en los pagos confirmados de la sesion (mismo mapa de rotulos que ya usa el POS: Efectivo/Tarjeta/Transferencia/Credito, con fallback a `ucfirst($code)` porque el codigo sigue siendo texto libre sin catalogo formal), mas una fila "Total" cuando hay mas de un medio de pago. El total ya calculado (`dailySalesAmount()`) no se toco, solo se dejo de ser la unica cifra visible.
+  - Se documento en `docs/docker-local.md` el problema de permisos de `storage/`/`bootstrap/cache` (bind mount con UID del host vs PHP-FPM corriendo como `www-data`) despues de que `docker compose exec app php artisan view:clear` (corre como root) tumbara toda la app con `ErrorException: tempnam()` al primer request real servido por Nginx/`www-data`; se aplico `chmod -R o+rwX storage bootstrap/cache` como correccion para este entorno local.
+- Pruebas ejecutadas:
+  - `php artisan test --filter=CashSessionsPageTest`: 15 pruebas, 78 aserciones, aprobado (incluye dos pruebas nuevas: conversion de compra en efectivo a pago de caja excluyendo pagos por transferencia y exclusion tras convertir, y desglose de venta diaria por medio de pago).
+  - `php artisan test --filter=Cash`: 30 de 31 pruebas aprobadas; sigue fallando solo la misma prueba preexistente y no relacionada de `CashAndPaymentsTest` ya registrada en la entrada anterior.
+  - `php artisan test --filter=Purchase`: 50 de 50 pruebas aprobadas (confirma que la nueva FK/migracion sobre `cash_session_expenses` no afecto el modulo de Compras).
+- Deuda o pendientes:
+  - No hay UI para deshacer la conversion compra→pago de caja mas alla del boton generico de eliminar pago de caja ya existente (que si borra el `CashSessionExpense`, pero deja el `payable_movement_id` original libre de nuevo gracias a `nullOnDelete`, asi que la compra volveria a aparecer como candidata — comportamiento correcto pero no probado explicitamente).
+  - `purchasePaymentCandidates()` filtra por `branch_id` de la compra igual al de la sesion; si una empresa registra compras sin bodega/sucursal coherente con su caja, esas compras nunca apareceran como candidatas (mismo tipo de limitacion ya aceptada en otras partes de caja, ver nota sobre `cash_session_id = null` en `decisiones-tecnicas.md`).
+
+## 2026-08-29 - Crear el cuadre de caja de un dia pasado sin ninguna sesion registrada
+
+- Objetivo: el `day_view` de un dia sin cuadres solo mostraba "No hay cuadres de caja para esta fecha." sin ninguna accion posible — si una caja se quedo sin abrir/cerrar un dia (se les olvido), no habia forma de registrarla retroactivamente salvo abrir una sesion "de hoy" con la fecha equivocada.
+- Archivos modificados:
+  - `app/Actions/Cash/OpenCashSession.php`
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `resources/views/livewire/cash/cash-sessions-page.blade.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - `OpenCashSession::handle()` ya no fija `opened_at = now()` a ciegas: acepta un `opened_at` opcional en los atributos (`resolveOpenedAt()`); si se manda una fecha que no es hoy, le pega la hora actual encima (para no perder el orden cronologico si ese dia termina con varias sesiones) en vez de dejarla a medianoche.
+  - Nueva propiedad `creatingSessionForDate` en `CashSessionsPage`: vacia en el flujo normal, y con la fecha objetivo cuando el formulario de "crear caja" se abrio desde el nuevo boton del `day_view` (`startCreateForHistoryDate()`). `openSession()` la usa para decidir si manda `opened_at` a la accion, y al terminar regresa a `day_view` (en vez del modal generico de "Crear caja") ya con la sesion recien abierta visible, lista para llenar bases/pagos/efectivo y cerrar. `backToChoice()` tambien distingue este caso: "Volver" desde el formulario regresa al dia del historial en vez de saltar a la pantalla de "elegir".
+  - Nuevo boton "Crear cuadre de caja para este dia" en el estado vacio del `day_view`, gateado por `canCreateForHistoryDate()`: el dia de hoy solo exige el permiso normal `cash.open` (es lo mismo que "Crear caja" desde el menu principal), un dia pasado exige ademas `canEditHistoricalCuadres()` (mismo permiso que editar un cierre ya cerrado, porque backdatear una apertura es igualmente sensible), y una fecha futura nunca se permite.
+  - El formulario de apertura muestra un aviso ("Se creara con fecha ...") cuando se llego por este camino, para que no parezca que se esta abriendo la caja de hoy por error.
+- Pruebas ejecutadas:
+  - `php artisan test --filter=CashSessionsPageTest`: 17 pruebas, 94 aserciones, aprobado (dos pruebas nuevas: creacion retroactiva exitosa por un admin incluyendo el rechazo de fechas futuras, y el bloqueo del mismo flujo para un cajero sin permiso de editar cierres — que si puede usarlo para el dia de hoy).
+  - `php artisan test --filter=Cash`: 32 de 33 pruebas aprobadas; la unica falla es la misma preexistente y no relacionada ya registrada en entradas anteriores.
+- Deuda o pendientes:
+  - Si la caja elegida ya tiene una sesion abierta hoy (de la operacion normal), no se puede backdatear una segunda sesion en esa misma caja para un dia pasado hasta cerrar la de hoy — es la misma regla de "una sola sesion abierta por caja" que ya aplica en todos lados, no una limitacion nueva, pero vale la pena tenerla presente si se usa este flujo a mitad de una jornada activa.
+
+## 2026-08-29 - Dos correcciones sobre lo agregado hoy: compras por transferencia invisibles en "Pagos de caja" y advertencia enganosa al backdatear con la unica caja ocupada
+
+- Objetivo: QA manual del usuario sobre los cambios de hoy encontro dos problemas reales. (1) Cred una compra pagada por transferencia y no aparecia como candidata en "Pagos de caja" — el filtro `payment_method_code = 'cash'` (razonable cuando "Pagos de caja" todavia alimentaba el calculo de esperado/diferencia) ya no tiene sentido ahora que esa comparacion se elimino: hoy es solo un registro informativo, y una compra pagada por transferencia es igual de valida para no reescribirla a mano. (2) Al intentar crear el cuadre retroactivo de un dia pasado en una empresa con una sola caja (la principal, que nunca se puede desactivar), si esa caja ya tenia una sesion abierta HOY, el formulario mostraba "Antes de operar caja debes tener al menos una sucursal activa y una caja activa" — mensaje tecnicamente heredado del formulario generico pero enganoso, porque la empresa SI tiene sucursal y caja activa; el problema real es que esa caja esta ocupada con la sesion de hoy.
+- Archivos modificados:
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `app/Actions/Cash/ManageCashSessionExpenses.php`
+  - `resources/views/livewire/cash/partials/cuadre-columns.blade.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - `purchasePaymentCandidates()` y `ManageCashSessionExpenses::recordFromPurchasePayments()` ya no filtran por `payment_method_code = 'cash'`: cualquier `payable_movements` con `movement_type=payment` del dia y sucursal de la sesion cuenta como candidato, sin importar el medio. La fila del candidato ahora muestra el medio entre parentesis (ej. "Proveedor X (Transferencia)") cuando no es efectivo, para que quede claro de un vistazo.
+  - `startCreateForHistoryDate()` ahora revisa `hasAvailableCashRegisters()` antes de entrar al formulario de creacion: si no hay ninguna caja disponible (lo mas probable, dado que la caja principal nunca se puede desactivar, es que la unica caja ya tenga una sesion abierta ahora mismo), muestra un toast especifico ("No puedes crear un cuadre para otro dia mientras tengas una sesion de caja abierta ahora mismo. Cierrala primero.") en vez de dejar entrar al formulario con el aviso generico enganoso.
+- Pruebas ejecutadas:
+  - `php artisan test --filter=CashSessionsPageTest`: 18 pruebas, 99 aserciones, aprobado. Se reescribio la prueba de conversion compra→pago de caja para verificar que TANTO efectivo COMO transferencia se conviertan, y se agrego una prueba nueva para el bloqueo con mensaje claro cuando la unica caja ya esta abierta hoy.
+  - `php artisan test --filter=Cash`: 33 de 34 aprobadas (la misma falla preexistente y no relacionada).
+  - `php artisan test --filter=Purchase`: 50 de 50 aprobadas.
+  - Verificacion manual contra los datos reales que reporto el usuario (`php artisan tinker`): la compra real pagada por transferencia (movement id=18, purchase id=11) ahora aparece como unica candidata para la sesion abierta real de esa empresa.
+
+## 2026-08-29 - Causa raiz definitiva de "touch(): Utime failed" en caja: las pruebas tambien recompilaban vistas como root
+
+- Objetivo: el error `ErrorException: touch(): Utime failed: Operation not permitted` (misma familia del `tempnam()` de hoy temprano) volvio a aparecer en el calendario de caja DESPUES de aplicar `chown -R www-data:www-data storage bootstrap/cache` como correccion. La causa que faltaba: `docker compose exec app php artisan test ...` (sin `--user`, osea como root) tambien compila vistas Blade cuando una prueba hace `Livewire::test(...)` y renderiza un componente — y las escribe en la MISMA carpeta `storage/framework/views` que usa el sitio real, porque `tests/TestCase.php` ya aislaba `DB_CONNECTION`/`SESSION_DRIVER` pero no `VIEW_COMPILED_PATH`. Cada vez que se corrian las pruebas (incluyendo las corridas de "verificacion" de los cambios de hoy) se volvian a dejar unos cuantos archivos con `owner=root`, deshaciendo el `chown` para exactamente las plantillas que esas pruebas tocaban (`cash-sessions-page.blade.php` y el componente de icono `<x-heroicon-o-pencil-square>` entre ellas).
+- Archivos modificados:
+  - `tests/TestCase.php`
+  - `docs/docker-local.md`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - `TestCase::createApplication()` ahora tambien fija `VIEW_COMPILED_PATH` a `storage/framework/testing/views` (carpeta separada de la produccion) antes de arrancar la app de prueba, con el mismo mecanismo (`putenv`/`$_ENV`/`$_SERVER`) ya usado ahi para forzar SQLite en memoria. La carpeta se crea sola en el primer uso (Blade la crea via `ensureCompiledDirectoryExists()`), no hace falta versionarla.
+  - Se reparo el estado actual con `chown -R www-data:www-data storage bootstrap/cache` una vez mas.
+  - Se documento la causa completa en `docs/docker-local.md` para no volver a perseguir este mismo sintoma como si fuera un bug de codigo.
+- Pruebas ejecutadas:
+  - Se corrio `docker compose exec app php artisan test --filter=CashSessionsPageTest` (como root, deliberadamente, para probar el aislamiento) y se conto la propiedad de los archivos en `storage/framework/views` antes y despues: se mantuvo en `224` archivos `www-data` (uid 33) sin ningun `root` nuevo. La carpeta separada `storage/framework/testing/views` si quedo con archivos `root`, pero esa carpeta no la lee nadie mas que las propias pruebas.
+  - `php artisan test --filter=Cash`: 33 de 34 aprobadas (misma falla preexistente y no relacionada).
+  - `curl http://localhost:8088/login`: `200` despues de la reparacion.
+- Deuda o pendientes:
+  - Cualquier otro comando `artisan` que compile vistas y se corra via `docker compose exec app ...` (sin `--user www-data`) FUERA de la suite de pruebas — por ejemplo `view:cache`/`optimize` manuales — sigue pudiendo reintroducir archivos `root` en `storage/framework/views`. Eso no se puede resolver desde `tests/TestCase.php`; sigue aplicando la regla operativa de `docs/docker-local.md` (preferir `--user www-data` o repetir el `chown`).
+
+## 2026-08-29 - Grafica "Efectivo en caja por dia" en Reportes
+
+- Objetivo: agregar en el modulo de Reportes una grafica de efectivo en caja, respetando el mismo rango de fechas (y sucursal/caja) que ya filtran el resto del corte operativo.
+- Archivos modificados:
+  - `app/Services/Reports/OperationalReportService.php`
+  - `app/Livewire/Reports/OperationalReportsPage.php`
+  - `resources/views/livewire/reports/operational-reports-page.blade.php`
+  - `tests/Feature/OperationalReportsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - `OperationalReportService::cashOnHandTrend()`: suma `closing_counted_amount` (el mismo numero que ya se ve como "Contado" en el cuadre de caja, no un calculo derivado) de las sesiones `closed`/`reconciled` dentro del rango, agrupada por dia. Reutiliza los mismos helpers de filtro (`branchId()`, `cashRegisterId()`, `dateFrom()`, `dateTo()`) que ya usan `salesTrend()`/`branchBreakdown()`, asi que respeta los mismos filtros de fecha, sucursal y caja del resto de la pagina sin logica nueva. Se agrupa por el dia de APERTURA de la sesion (no de cierre), igual que el resto del modulo de caja decide "a que dia pertenece" una sesion.
+  - Una sesion todavia abierta no aporta ningun punto (no tiene conteo final que graficar todavia).
+  - Nuevo `OperationalReportsPage::cashEnabled()`: aunque el modulo `cash` esta incluido en todos los planes, una empresa puede desactivarlo operativamente en Configuracion (mismo `module_enabled` que ya usa `CashSessionsPage::ensureCashAccess()`) — la seccion nueva del reporte se oculta completa si asi es.
+  - Nueva seccion "Caja" en la pagina de reportes (color teal `#0d9488`, distinto de los ya usados por Ventas/Compras/Sucursales en la misma pagina), reutilizando el componente `<x-charts.line-chart>` ya existente (mismo que usan "Ventas por dia" y "Compras por dia") — sin componente ni libreria de graficas nueva.
+- Pruebas ejecutadas:
+  - `php artisan test --filter=OperationalReportsPageTest`: 5 pruebas, 26 aserciones, aprobado (dos nuevas: la grafica muestra el conteo real de una sesion cerrada agrupado por su dia, y una sesion abierta no aporta puntos mientras que desactivar el modulo apaga `cashEnabled()`).
+  - `php artisan test --filter=OperationalReportsGatingTest` y `--filter=Reports`: 8 y 21 pruebas aprobadas respectivamente, sin regresiones.
+  - `curl http://localhost:8088/login`: `200` despues de recompilar vistas como `www-data`; se conto la propiedad de `storage/framework/views` y se mantuvo en `www-data` sin archivos `root` nuevos.
+
+## 2026-08-29 - "Efectivo en caja" (Contado) de una sesion cerrada no tenia forma de corregirse
+
+- Objetivo: el usuario reporto que al editar un cuadre cerrado (por el icono de lapiz o seleccionando el dia), Bases y Pagos de caja si se dejaban corregir, pero "Efectivo en caja" no — se mostraba como texto fijo, sin ningun input. Sin esto, corregir un monto contado mal digitado no tenia salida: el sistema nunca soporto "reabrir" una sesion cerrada, asi que quedaba mal para siempre.
+- Archivos modificados:
+  - `app/Actions/Cash/UpdateCashSessionCount.php` (nuevo)
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `resources/views/livewire/cash/partials/cuadre-columns.blade.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - `UpdateCashSessionCount::handle()`: actualiza `closing_counted_amount` de una sesion cerrada y limpia `closing_denomination_breakdown` (el desglose por billetes/monedas quedaria inconsistente con el total corregido a mano). Reutiliza `RecomputesClosedSessionTotals` (el mismo trait que ya usan `ManageCashSessionFunds`/`ManageCashSessionExpenses`) para recalcular `difference_amount`/`status` contra el nuevo contado. Exige `settings.manage`, igual que las otras dos correcciones sobre una sesion cerrada.
+  - `CashSessionsPage::saveCountedAmount(int $sessionId, string $amount, ...)`: toma el `sessionId` directo (igual que `saveFundAmount(int $fundId, ...)`), no depende de `cuadreSessionId`/`historySession()` — funciona tanto desde el modal del icono de lapiz como desde `day_view`.
+  - `cuadre-columns.blade.php`: la fila "Contado" de una sesion cerrada ahora es un input editable cuando `$canEditThisCuadre`, con el mismo patron visual (formato de miles en vivo, guardar en `wire:change`) que ya usan los montos de Bases.
+- Pruebas ejecutadas:
+  - `php artisan test --filter=CashSessionsPageTest`: 20 pruebas, 110 aserciones, aprobado (dos nuevas: un admin corrige el contado de una sesion `reconciled` y la diferencia/estado se recalculan solos contra el nuevo valor, y un cajero sin `settings.manage` no puede corregirlo).
+  - `php artisan test --filter=Cash`: 37 de 38 aprobadas (la misma falla preexistente y no relacionada).
+  - `curl http://localhost:8088/login`: `200` despues de recompilar como `www-data`; propiedad de `storage/framework/views` verificada en `www-data`.
+
+## 2026-08-29 - Corregir el "Contado" de un cierre debe verse igual que cerrar caja, con boton de guardar explicito
+
+- Objetivo: seguimiento inmediato al cambio anterior. El usuario probo la correccion de "Efectivo en caja" (un input suelto con `wire:change`) y reporto dos problemas: (1) no era obvio como se guardaba (nada de boton, solo se guardaba al perder el foco), y (2) la pantalla no se parecia en nada a la de cerrar una caja normal (esa si tiene la grilla de denominaciones, el total y un boton claro).
+- Archivos modificados:
+  - `app/Actions/Cash/Concerns/ResolvesDenominationBreakdown.php` (nuevo)
+  - `app/Actions/Cash/CloseCashSession.php`
+  - `app/Actions/Cash/UpdateCashSessionCount.php`
+  - `app/Livewire/Cash/CashSessionsPage.php`
+  - `resources/views/livewire/cash/partials/cuadre-columns.blade.php`
+  - `tests/Feature/CashSessionsPageTest.php`
+  - `docs/registro-cambios-ia.md`
+- Cambios:
+  - Se extrajo `ResolvesDenominationBreakdown` (trait) con la logica de validar un desglose por denominacion y sumarlo a un monto, que antes vivia solo dentro de `CloseCashSession`. `CloseCashSession` ahora la usa en vez de tener su propia copia.
+  - `UpdateCashSessionCount::handle()` ahora acepta el mismo `denomination_breakdown` (o un monto suelto) que `CloseCashSession`, con la misma prioridad: si se manda un desglose, el monto contado se calcula de ahi; si no, se usa el monto escrito directo.
+  - `CashSessionsPage`: `saveCountedAmount()` (el input suelto con `wire:change`) se reemplazo por tres metodos — `startRecountingClosedSession(sessionId)` (precarga `denominationCounts`/`closingCountedAmount` con lo que ya habia guardado y activa el modo recuento para ESA sesion), `saveRecountedAmount()` (guarda, misma prioridad denominaciones-vs-monto-suelto que `closeSession()`) y `cancelRecountingClosedSession()`. Nuevo helper `denominationCountsFromBreakdown()` para volver a mapear el desglose guardado (solo tiene `value`/`quantity`, sin llave) a las llaves `coin_50`/`bill_1000`/etc. que usa el formulario.
+  - `cuadre-columns.blade.php`: la columna "Efectivo en caja" ahora muestra la MISMA grilla de denominaciones + total + monto suelto tanto al cerrar por primera vez como al corregir un cierre (`$sessionIsOpen || $recountingSessionId === $session->id`), cambiando solo el boton final: "Cerrar caja" en el primer caso, "Cancelar"/"Guardar cambios" en el segundo. Antes de esto, corregir un cierre mostraba un input aislado sin boton visible; ahora se ve y se siente igual a cerrar caja, con guardado explicito.
+- Pruebas ejecutadas:
+  - `php artisan test --filter=CashSessionsPageTest`: 21 pruebas, 121 aserciones, aprobado. Se reemplazaron las dos pruebas del cambio anterior por tres: correccion con monto suelto (precarga y recalculo correctos), correccion usando la grilla de denominaciones precargada desde el desglose original (se le agrega un billete y el total/diferencia se recalculan), y el bloqueo para un cajero sin `settings.manage`.
+  - `php artisan test --filter=Cash`: 38 de 39 aprobadas (la misma falla preexistente y no relacionada) — confirma que refactorizar `CloseCashSession` para usar el trait compartido no cambio su comportamiento.
+  - `curl http://localhost:8088/login`: `200` despues de recompilar como `www-data`; propiedad de `storage/framework/views` verificada en `www-data`.

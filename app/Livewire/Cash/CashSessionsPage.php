@@ -6,8 +6,10 @@ use App\Actions\Cash\CloseCashSession;
 use App\Actions\Cash\ManageCashSessionExpenses;
 use App\Actions\Cash\ManageCashSessionFunds;
 use App\Actions\Cash\OpenCashSession;
+use App\Actions\Cash\UpdateCashSessionCount;
 use App\Actions\Settings\UpdateCompanySettings;
 use App\Enums\CashSessionStatus;
+use App\Enums\PayableMovementType;
 use App\Enums\PaymentStatus;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\InteractsWithToast;
@@ -17,6 +19,7 @@ use App\Models\CashSession;
 use App\Models\CashSessionExpense;
 use App\Models\CashSessionFund;
 use App\Models\Company;
+use App\Models\PayableMovement;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
@@ -41,9 +44,19 @@ class CashSessionsPage extends Component
     public ?int $cashRegisterId = null;
     public string $openingAmount = '';
     public array $openFunds = [];
+    // No vacio solo cuando el formulario de "crear caja" se abrio desde el
+    // boton "Crear cuadre de caja" de un dia del historial sin cuadre (ver
+    // startCreateForHistoryDate()) — le dice a openSession() que backdatee
+    // la sesion a este dia en vez de usar "ahora".
+    public string $creatingSessionForDate = '';
 
     public ?int $closingSessionId = null;
     public string $closingCountedAmount = '';
+    // No nulo solo cuando se esta corrigiendo el "Contado" de una sesion YA
+    // cerrada (ver startRecountingClosedSession()) — comparte
+    // denominationCounts/closingCountedAmount con el cierre normal porque
+    // solo un cuadre se muestra a la vez.
+    public ?int $recountingSessionId = null;
 
     public bool $showCuadreModal = false;
     public ?int $cuadreSessionId = null;
@@ -52,6 +65,8 @@ class CashSessionsPage extends Component
     public array $denominationCounts = [];
     public string $newFundLabel = '';
     public string $newFundAmount = '';
+    /** @var array<int> */
+    public array $selectedPurchasePaymentIds = [];
 
     public bool $showRulesModal = false;
     public bool $ruleOpeningRequired = true;
@@ -196,6 +211,56 @@ class CashSessionsPage extends Component
         $this->cashStep = 'create';
     }
 
+    /**
+     * "Crear cuadre de caja" desde un dia del historial que no tiene
+     * ninguna sesion registrada (day_view con historySession() = null).
+     * Reutiliza el mismo formulario de "Crear caja", solo que openSession()
+     * va a backdatear la sesion a $historyDate en vez de usar "ahora" (ver
+     * creatingSessionForDate). Un dia pasado exige el mismo permiso que
+     * corregir un cuadre ya cerrado, porque backdatear una apertura es
+     * igual de sensible que editar una; el dia de hoy no, porque eso es
+     * exactamente lo mismo que el flujo normal de "Crear caja".
+     */
+    public function startCreateForHistoryDate(): void
+    {
+        $this->ensurePermission('cash.open');
+
+        if ($this->historyDate === '') {
+            return;
+        }
+
+        $date = \Illuminate\Support\Carbon::parse($this->historyDate);
+
+        if ($date->isFuture() && ! $date->isToday()) {
+            $this->toast('No puedes crear un cuadre de caja para una fecha futura.', 'error');
+
+            return;
+        }
+
+        if (! $date->isToday() && ! $this->canEditHistoricalCuadres()) {
+            $this->toast('Solo un administrador puede crear el cuadre de un dia pasado.', 'error');
+
+            return;
+        }
+
+        // Toda empresa siempre tiene al menos una sucursal y una caja
+        // activa (la caja principal no se puede desactivar, ver
+        // toggleCashRegisterStatus()), asi que si no hay ninguna caja
+        // disponible la causa real casi siempre es esta: la unica caja (o
+        // todas) ya tiene una sesion abierta ahora mismo. El mensaje
+        // generico del formulario ("no tienes sucursal/caja activa") es
+        // enganoso en ese caso, asi que se explica aqui antes de entrar.
+        if (! $this->hasAvailableCashRegisters()) {
+            $this->toast('No puedes crear un cuadre para otro dia mientras tengas una sesion de caja abierta ahora mismo. Cierrala primero.', 'error');
+
+            return;
+        }
+
+        $this->resetOpenForm();
+        $this->creatingSessionForDate = $this->historyDate;
+        $this->cashStep = 'create';
+    }
+
     public function startHistory(): void
     {
         $this->calendarMonth = now()->format('Y-m');
@@ -220,6 +285,16 @@ class CashSessionsPage extends Component
 
     public function backToChoice(): void
     {
+        // El formulario de "crear caja" se puede haber abierto desde un dia
+        // del historial sin cuadre (startCreateForHistoryDate()); "Volver"
+        // ahi debe regresar a ese dia, no perderlo saltando a "choice".
+        if ($this->creatingSessionForDate !== '') {
+            $this->creatingSessionForDate = '';
+            $this->cashStep = 'day_view';
+
+            return;
+        }
+
         $this->cashStep = 'choice';
         $this->historyDate = '';
         $this->historyCashRegisterId = null;
@@ -254,6 +329,8 @@ class CashSessionsPage extends Component
         $this->historyDate = $date;
         $this->historyCashRegisterId = $this->historyCashRegisterOptions()->first()?->id;
         $this->cashStep = 'day_view';
+        $this->selectedPurchasePaymentIds = [];
+        $this->cancelRecountingClosedSession();
     }
 
     public function canManageRules(): bool
@@ -452,6 +529,10 @@ class CashSessionsPage extends Component
             'opened_by' => auth()->id(),
         ];
 
+        if ($this->creatingSessionForDate !== '') {
+            $payload['opened_at'] = $this->creatingSessionForDate;
+        }
+
         $funds = collect($this->openFunds)
             ->map(fn ($fund) => ['label' => trim((string) ($fund['label'] ?? '')), 'amount' => $fund['amount'] ?? ''])
             ->filter(fn ($fund) => $fund['label'] !== '' && is_numeric($fund['amount']) && (float) $fund['amount'] > 0)
@@ -472,9 +553,21 @@ class CashSessionsPage extends Component
             return;
         }
 
+        $wasBackdated = $this->creatingSessionForDate !== '';
         $this->resetOpenForm();
-        $this->cashStep = 'choice';
         $this->toast('Sesion de caja abierta correctamente.');
+
+        if ($wasBackdated) {
+            // Vuelve a la vista del dia para el que se creo (en vez del
+            // modal generico): ese dia ya no esta "sin cuadre" y ahora debe
+            // mostrar la sesion recien abierta, lista para llenar/cerrar.
+            $this->historyCashRegisterId = $newSession->cash_register_id;
+            $this->cashStep = 'day_view';
+
+            return;
+        }
+
+        $this->cashStep = 'choice';
         $this->openCuadre($newSession->id);
     }
 
@@ -848,6 +941,39 @@ class CashSessionsPage extends Component
             ->sum('amount'));
     }
 
+    /**
+     * Desglose de venta diaria por medio de pago: un solo total "todos los
+     * medios de pago" mezclaba efectivo con transferencia/tarjeta/credito,
+     * lo que no sirve para saber cuanto deberia haber realmente en el
+     * cajon de efectivo. `payment_method_code` sigue siendo texto libre
+     * (no hay catalogo formal todavia, ver docs/modelo-datos.md), asi que
+     * cualquier codigo que no reconozcamos se muestra tal cual.
+     *
+     * @return array<string, string>
+     */
+    public function dailySalesByPaymentMethod(CashSession $session): array
+    {
+        $session->loadMissing('payments');
+
+        return $session->payments
+            ->where('status', PaymentStatus::Confirmed->value)
+            ->groupBy(fn ($payment) => $payment->payment_method_code ?: 'otro')
+            ->map(fn ($group) => (string) round((float) $group->sum('amount')))
+            ->all();
+    }
+
+    public function paymentMethodLabel(string $code): string
+    {
+        return match ($code) {
+            'cash' => 'Efectivo',
+            'card' => 'Tarjeta',
+            'transfer' => 'Transferencia',
+            'credit' => 'Credito',
+            'otro' => 'Otro',
+            default => ucfirst($code),
+        };
+    }
+
     public function render(): View
     {
         return view('livewire.cash.cash-sessions-page', [
@@ -926,6 +1052,7 @@ class CashSessionsPage extends Component
 
         $this->openingAmount = '';
         $this->openFunds = [['label' => 'Base inicial', 'amount' => '']];
+        $this->creatingSessionForDate = '';
         $this->resetValidation();
     }
 
@@ -934,6 +1061,7 @@ class CashSessionsPage extends Component
         $this->closingSessionId = null;
         $this->closingCountedAmount = '';
         $this->denominationCounts = [];
+        $this->recountingSessionId = null;
         $this->resetValidation();
     }
 
@@ -999,6 +1127,8 @@ class CashSessionsPage extends Component
         $this->newExpenseAmount = '';
         $this->newFundLabel = '';
         $this->newFundAmount = '';
+        $this->selectedPurchasePaymentIds = [];
+        $this->recountingSessionId = null;
         $this->resetErrorBag();
         $this->showCuadreModal = true;
     }
@@ -1016,6 +1146,29 @@ class CashSessionsPage extends Component
             || (auth()->user()?->hasCurrentCompanyPermission('cash.edit_closed') ?? false);
     }
 
+    /**
+     * Controla si se muestra el boton "Crear cuadre de caja" en el
+     * day_view de un dia sin ninguna sesion registrada. Hoy no exige mas
+     * que el permiso normal de abrir caja (es lo mismo que "Crear caja"
+     * desde el menu principal); un dia pasado exige ademas el mismo
+     * permiso que editar un cierre ya cerrado, porque backdatear una
+     * apertura es igual de sensible.
+     */
+    public function canCreateForHistoryDate(): bool
+    {
+        if (! $this->canOpenCash() || $this->historyDate === '') {
+            return false;
+        }
+
+        $date = \Illuminate\Support\Carbon::parse($this->historyDate);
+
+        if ($date->isFuture() && ! $date->isToday()) {
+            return false;
+        }
+
+        return $date->isToday() || $this->canEditHistoricalCuadres();
+    }
+
     public function cuadreSession(): ?CashSession
     {
         if (! $this->cuadreSessionId) {
@@ -1031,11 +1184,26 @@ class CashSessionsPage extends Component
             ->find($this->cuadreSessionId);
     }
 
+    /**
+     * addFund()/addExpense() se usan tanto desde el modal de cuadre
+     * (cuadreSessionId) como desde la vista de un dia del historial
+     * (day_view, que solo conoce historySession()) — sin este fallback,
+     * "agregar base/pago" no hacia nada al editar un cierre pasado
+     * seleccionando el dia directo en el calendario, en vez de pasar por
+     * el icono de lapiz del popover.
+     */
+    protected function editableCuadreSessionId(): ?int
+    {
+        return $this->cuadreSessionId ?? $this->historySession()?->id;
+    }
+
     public function addFund(ManageCashSessionFunds $manageCashSessionFunds): void
     {
         $this->ensurePermission('cash.open');
 
-        if (! $this->cuadreSessionId) {
+        $sessionId = $this->editableCuadreSessionId();
+
+        if (! $sessionId) {
             return;
         }
 
@@ -1044,7 +1212,7 @@ class CashSessionsPage extends Component
             'newFundAmount' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $session = $this->sessionsQuery()->findOrFail($this->cuadreSessionId);
+        $session = $this->sessionsQuery()->findOrFail($sessionId);
 
         try {
             $manageCashSessionFunds->add($this->currentCompany(), $session, [
@@ -1079,6 +1247,94 @@ class CashSessionsPage extends Component
         }
 
         $this->toast('Base actualizada.');
+    }
+
+    /**
+     * Abre el mismo formulario de conteo (denominaciones + monto suelto)
+     * que se usa para cerrar una caja por primera vez, pero para CORREGIR
+     * el contado de una sesion YA cerrada — precargado con lo que ya
+     * quedo guardado, para que se sienta como la misma pantalla en vez de
+     * un input suelto sin contexto. Reutiliza denominationCounts/
+     * closingCountedAmount (los mismos campos del cierre normal) porque
+     * solo un cuadre se muestra a la vez.
+     */
+    public function startRecountingClosedSession(int $sessionId): void
+    {
+        $this->ensurePermission('cash.open');
+
+        $session = $this->sessionsQuery()->findOrFail($sessionId);
+
+        $this->recountingSessionId = $session->id;
+        $this->denominationCounts = $this->denominationCountsFromBreakdown($session->closing_denomination_breakdown);
+        $this->closingCountedAmount = (string) round((float) $session->closing_counted_amount);
+        $this->resetErrorBag();
+    }
+
+    public function cancelRecountingClosedSession(): void
+    {
+        $this->recountingSessionId = null;
+        $this->denominationCounts = [];
+        $this->closingCountedAmount = '';
+    }
+
+    public function saveRecountedAmount(UpdateCashSessionCount $updateCashSessionCount): void
+    {
+        $this->ensurePermission('cash.open');
+
+        if (! $this->recountingSessionId) {
+            return;
+        }
+
+        $session = $this->sessionsQuery()->findOrFail($this->recountingSessionId);
+        $payload = [];
+        $denominationRows = $this->denominationBreakdownPayload();
+
+        if ($denominationRows !== []) {
+            $payload['denomination_breakdown'] = $denominationRows;
+        } elseif ($this->blankToNull($this->closingCountedAmount) !== null) {
+            $payload['closing_counted_amount'] = $this->closingCountedAmount;
+        } else {
+            $this->toast('Ingresa el monto contado o cuenta el efectivo por denominacion.', 'error');
+
+            return;
+        }
+
+        try {
+            $updateCashSessionCount->handle($this->currentCompany(), $session, $payload, auth()->user());
+        } catch (InvalidArgumentException $exception) {
+            $this->toast($exception->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->cancelRecountingClosedSession();
+        $this->toast('Efectivo contado actualizado.');
+    }
+
+    /**
+     * Vuelve a mapear un desglose guardado ({value, quantity} sin llave) a
+     * las llaves que usa denominationCounts (coin_50, bill_1000, ...) para
+     * precargar el formulario de recuento — el desglose guardado no
+     * conserva la llave, solo el valor de la denominacion.
+     */
+    protected function denominationCountsFromBreakdown(?array $breakdown): array
+    {
+        if (! $breakdown) {
+            return [];
+        }
+
+        $valueToKey = array_flip(array_merge(...array_values($this->denominations())));
+        $counts = [];
+
+        foreach ($breakdown as $row) {
+            $key = $valueToKey[(int) ($row['value'] ?? 0)] ?? null;
+
+            if ($key !== null) {
+                $counts[$key] = (string) $row['quantity'];
+            }
+        }
+
+        return $counts;
     }
 
     public function saveFundLabel(int $fundId, string $label, ManageCashSessionFunds $manageCashSessionFunds): void
@@ -1123,7 +1379,9 @@ class CashSessionsPage extends Component
     {
         $this->ensurePermission('cash.open');
 
-        if (! $this->cuadreSessionId) {
+        $sessionId = $this->editableCuadreSessionId();
+
+        if (! $sessionId) {
             return;
         }
 
@@ -1132,7 +1390,7 @@ class CashSessionsPage extends Component
             'newExpenseAmount' => ['required', 'numeric', 'min:0.01'],
         ]);
 
-        $session = $this->sessionsQuery()->findOrFail($this->cuadreSessionId);
+        $session = $this->sessionsQuery()->findOrFail($sessionId);
 
         try {
             $manageCashSessionExpenses->record($this->currentCompany(), $session, [
@@ -1167,6 +1425,65 @@ class CashSessionsPage extends Component
         }
 
         $this->toast('Pago de caja eliminado.', 'warning');
+    }
+
+    /**
+     * Pagos de compras registrados el mismo dia de la sesion (mismo
+     * `branch_id`) que todavia no se han convertido en un pago de caja —
+     * candidatas para que el usuario las marque en vez de volver a
+     * digitarlas a mano. Se compara por la fecha de APERTURA de la sesion,
+     * no por "hoy": una sesion de un dia pasado que se esta corrigiendo
+     * debe ver las compras de ESE dia, no las de hoy.
+     *
+     * No se filtra por `payment_method_code`: "Pagos de caja" ya no
+     * alimenta ningun calculo de esperado/diferencia (se quito esa
+     * comparacion), es solo un registro informativo de plata que salio ese
+     * dia — asi que una compra pagada por transferencia es igual de
+     * relevante para no tener que volver a escribirla a mano que una
+     * pagada en efectivo.
+     */
+    public function purchasePaymentCandidates(CashSession $session): Collection
+    {
+        return PayableMovement::query()
+            ->where('company_id', $session->company_id)
+            ->where('movement_type', PayableMovementType::Payment->value)
+            ->whereDate('occurred_at', $session->opened_at->toDateString())
+            ->whereDoesntHave('cashSessionExpense')
+            ->whereHas('purchase', fn ($query) => $query->where('branch_id', $session->branch_id))
+            ->with('purchase')
+            ->orderBy('occurred_at')
+            ->get();
+    }
+
+    public function addSelectedPurchasePayments(ManageCashSessionExpenses $manageCashSessionExpenses): void
+    {
+        $this->ensurePermission('cash.open');
+
+        $sessionId = $this->editableCuadreSessionId();
+
+        if (! $sessionId || $this->selectedPurchasePaymentIds === []) {
+            return;
+        }
+
+        $session = $this->sessionsQuery()->findOrFail($sessionId);
+
+        try {
+            $expenses = $manageCashSessionExpenses->recordFromPurchasePayments(
+                $this->currentCompany(),
+                $session,
+                $this->selectedPurchasePaymentIds,
+                auth()->user(),
+            );
+        } catch (InvalidArgumentException $exception) {
+            $this->toast($exception->getMessage(), 'error');
+
+            return;
+        }
+
+        $this->selectedPurchasePaymentIds = [];
+        $this->toast($expenses->count() > 1
+            ? $expenses->count() . ' compras agregadas como pago de caja.'
+            : 'Compra agregada como pago de caja.');
     }
 
     protected function blankToNull(mixed $value): ?string
