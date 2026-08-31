@@ -147,12 +147,16 @@ class CashSessionsPage extends Component
 
     protected function afterCashRegisterResolved(): void
     {
-        // Si la caja activa de esta sesion ya tiene un cuadre abierto, no
-        // tiene sentido preguntar "crear o ver historial": se entra directo.
+        // Si la caja activa de esta sesion ya tiene un cuadre abierto DE HOY,
+        // no tiene sentido preguntar "crear o ver historial": se entra
+        // directo. Una sesion sin cerrar de otro dia no cuenta aqui — es
+        // independiente por dia (ver OpenCashSession::handle()) y no debe
+        // reemplazar la pantalla de crear el cuadre de hoy.
         if ($this->activeCashRegisterId) {
             $openSession = $this->sessionsQuery()
                 ->where('status', CashSessionStatus::Open->value)
                 ->where('cash_register_id', $this->activeCashRegisterId)
+                ->whereDate('opened_at', now())
                 ->first();
 
             if ($openSession) {
@@ -166,7 +170,7 @@ class CashSessionsPage extends Component
         // no tiene sentido preguntar "crear o ver historial": se entra
         // directo al cuadre de esa sesion.
         if (! $this->hasAvailableCashRegisters()) {
-            $openSessions = $this->openSessionsForChoice();
+            $openSessions = $this->openTodaySessionsForChoice();
 
             if ($openSessions->count() === 1) {
                 $this->openCuadre($openSessions->first()->id);
@@ -178,7 +182,7 @@ class CashSessionsPage extends Component
     {
         $value = $value ? (int) $value : null;
 
-        $cashRegisterIds = $this->cashRegisters()
+        $cashRegisterIds = $this->cashRegisters($this->creatingSessionForDate ?: null)
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -198,7 +202,7 @@ class CashSessionsPage extends Component
         $this->ensurePermission('cash.open');
 
         if (! $this->hasAvailableCashRegisters()) {
-            $openSession = $this->openSessionsForChoice()->first();
+            $openSession = $this->openTodaySessionsForChoice()->first();
 
             if ($openSession) {
                 $this->openCuadre($openSession->id);
@@ -247,16 +251,18 @@ class CashSessionsPage extends Component
         // activa (la caja principal no se puede desactivar, ver
         // toggleCashRegisterStatus()), asi que si no hay ninguna caja
         // disponible la causa real casi siempre es esta: la unica caja (o
-        // todas) ya tiene una sesion abierta ahora mismo. El mensaje
-        // generico del formulario ("no tienes sucursal/caja activa") es
-        // enganoso en ese caso, asi que se explica aqui antes de entrar.
-        if (! $this->hasAvailableCashRegisters()) {
-            $this->toast('No puedes crear un cuadre para otro dia mientras tengas una sesion de caja abierta ahora mismo. Cierrala primero.', 'error');
+        // todas) ya tiene una sesion abierta ESE MISMO dia ($historyDate).
+        // El mensaje generico del formulario ("no tienes sucursal/caja
+        // activa") es enganoso en ese caso, asi que se explica aqui antes
+        // de entrar. Una sesion abierta de otro dia no cuenta — la sesion
+        // es independiente por dia.
+        if (! $this->hasAvailableCashRegisters($this->historyDate)) {
+            $this->toast('Ya existe una sesion de caja abierta para ese dia. Cierrala primero.', 'error');
 
             return;
         }
 
-        $this->resetOpenForm();
+        $this->resetOpenForm($this->historyDate);
         $this->creatingSessionForDate = $this->historyDate;
         $this->cashStep = 'create';
     }
@@ -641,32 +647,44 @@ class CashSessionsPage extends Component
             ->get();
     }
 
-    public function cashRegisters(): Collection
+    /**
+     * Cajas de la sucursal activa sin sesion abierta para $date (por
+     * defecto hoy). $date importa cuando se esta creando el cuadre
+     * backdateado de un dia pasado ($creatingSessionForDate /
+     * startCreateForHistoryDate()) — una caja ocupada hoy puede estar
+     * libre ese otro dia y viceversa, porque la sesion es independiente
+     * por dia (ver OpenCashSession::handle()).
+     */
+    public function cashRegisters(?string $date = null): Collection
     {
         if (! $this->branchId) {
             return new Collection();
         }
+
+        $date ??= now()->toDateString();
 
         return CashRegister::query()
             ->where('company_id', $this->currentCompany()->id)
             ->where('branch_id', $this->branchId)
             ->where('status', RecordStatus::Active->value)
             ->whereNull('deleted_at')
-            ->whereDoesntHave('cashSessions', fn ($query) => $query->where('status', CashSessionStatus::Open->value))
+            ->whereDoesntHave('cashSessions', fn ($query) => $query->where('status', CashSessionStatus::Open->value)->whereDate('opened_at', $date))
             ->orderByDesc('is_primary')
             ->orderBy('name')
             ->get();
     }
 
-    public function hasAvailableCashRegisters(): bool
+    public function hasAvailableCashRegisters(?string $date = null): bool
     {
+        $date ??= now()->toDateString();
+
         foreach ($this->branches() as $branch) {
             $available = CashRegister::query()
                 ->where('company_id', $this->currentCompany()->id)
                 ->where('branch_id', $branch->id)
                 ->where('status', RecordStatus::Active->value)
                 ->whereNull('deleted_at')
-                ->whereDoesntHave('cashSessions', fn ($query) => $query->where('status', CashSessionStatus::Open->value))
+                ->whereDoesntHave('cashSessions', fn ($query) => $query->where('status', CashSessionStatus::Open->value)->whereDate('opened_at', $date))
                 ->exists();
 
             if ($available) {
@@ -675,6 +693,25 @@ class CashSessionsPage extends Component
         }
 
         return false;
+    }
+
+    /**
+     * Sesiones abiertas de HOY para el/los registro(s) activo(s): usado por
+     * los atajos que saltan directo a "el cuadre" cuando no hay nada mas
+     * que crear. A diferencia de openSessionsForChoice() (que lista TODO lo
+     * abierto, de cualquier dia, para la pantalla de eleccion manual), este
+     * filtro por dia evita saltar en silencio a una sesion vieja sin cerrar
+     * como si fuera la de hoy.
+     */
+    protected function openTodaySessionsForChoice(): Collection
+    {
+        return $this->sessionsQuery()
+            ->with(['branch', 'cashRegister'])
+            ->where('status', CashSessionStatus::Open->value)
+            ->whereDate('opened_at', now())
+            ->when($this->activeCashRegisterId, fn ($query) => $query->where('cash_register_id', $this->activeCashRegisterId))
+            ->orderBy('opened_at')
+            ->get();
     }
 
     public function openSessionsForChoice(): Collection
@@ -692,34 +729,17 @@ class CashSessionsPage extends Component
         $start = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $this->calendarMonth . '-01')->startOfMonth();
         $end = $start->copy()->endOfMonth();
 
+        // Una sesion es independiente por dia (ver OpenCashSession::handle()):
+        // pertenece unicamente al dia en que se abrio, este abierta o no.
+        // Una que quedo sin cerrar de otro dia NO se muestra en el popover
+        // de hoy — eso hacia que el cuadre de un dia pasado se viera
+        // "duplicado" en el dia de hoy con los mismos valores.
         $sessionsByDay = $this->sessionsQuery()
             ->with('cashRegister')
             ->whereBetween('opened_at', [$start, $end])
             ->orderBy('opened_at')
             ->get()
             ->groupBy(fn (CashSession $session) => $session->opened_at->format('Y-m-d'));
-
-        // Una caja abierta sigue "pendiente" sin importar que dia se abrio
-        // — si se abrio ayer y todavia nadie la cierra, quiero verla en el
-        // popover de HOY, no solo escondida en el dia en que se abrio.
-        $openRegardlessOfDay = $this->sessionsQuery()
-            ->with('cashRegister')
-            ->where('status', CashSessionStatus::Open->value)
-            ->get()
-            ->groupBy('cash_register_id')
-            ->map(fn (Collection $group) => $group->sortByDesc('opened_at')->first());
-
-        // Y al reves: si una caja se abrio OTRO dia pero se cerro HOY, ese
-        // cierre tambien es algo que paso hoy — sin esto, una caja abierta
-        // el 11 y cerrada el 13 solo aparecia en el popover del 11, como si
-        // cerrarla hoy no hubiera sido una accion de hoy.
-        $closedToday = $this->sessionsQuery()
-            ->with('cashRegister')
-            ->whereNotNull('closed_at')
-            ->whereDate('closed_at', now())
-            ->get()
-            ->groupBy('cash_register_id')
-            ->map(fn (Collection $group) => $group->sortByDesc('closed_at')->first());
 
         $canViewDifference = $this->canViewDifference();
 
@@ -740,15 +760,6 @@ class CashSessionsPage extends Component
             $sessionsForCell = ($sessionsByDay->get($dateString) ?? new Collection())
                 ->groupBy('cash_register_id')
                 ->map(fn (Collection $group) => $group->sortByDesc('opened_at')->first());
-
-            if ($isToday) {
-                // union() conserva la sesion de $sessionsForCell cuando la
-                // misma caja ya aparece ahi (abierta hoy mismo) y solo
-                // agrega las que faltan. Orden importa: si una caja sigue
-                // abierta ahora mismo, eso pesa mas que un cierre viejo de
-                // hoy mismo para la MISMA caja (caso raro, pero por si acaso).
-                $sessionsForCell = $sessionsForCell->union($openRegardlessOfDay)->union($closedToday);
-            }
 
             $registers = $sessionsForCell
                 ->map(fn (CashSession $session) => $this->calendarCellRegisterSummary($session, $canViewDifference))
@@ -836,25 +847,19 @@ class CashSessionsPage extends Component
     }
 
     /**
-     * Que sesiones cuentan para un dia dado del historial. Normalmente,
-     * las que se abrieron ese dia exacto. Si el dia es HOY, tambien
-     * cuentan las que siguen abiertas de otro dia (sin cerrar todavia) y
-     * las que se cerraron hoy mismo aunque se hayan abierto otro dia —
-     * "hoy" debe reflejar el estado actual de cada caja, no solo lo que
-     * se abrio hoy. Se usa tanto para listar cajas seleccionables como
-     * para resolver la sesion real al elegir una.
+     * Que sesiones cuentan para un dia dado del historial: las que se
+     * abrieron ese dia exacto, sin excepcion. Una sesion es independiente
+     * por dia (ver OpenCashSession::handle()): una que quedo abierta de
+     * otro dia sin cerrar sigue perteneciendo a SU dia, nunca se muestra
+     * como si fuera la de hoy solo por seguir abierta — eso es lo que
+     * causaba que el cuadre de un dia pasado se viera "duplicado" en hoy.
+     * Se usa tanto para listar cajas seleccionables como para resolver la
+     * sesion real al elegir una.
      */
     protected function historyDateScope(string $date): \Closure
     {
-        $isToday = \Illuminate\Support\Carbon::parse($date)->isToday();
-
-        return function (Builder $query) use ($date, $isToday) {
+        return function (Builder $query) use ($date) {
             $query->whereDate('opened_at', $date);
-
-            if ($isToday) {
-                $query->orWhere('status', CashSessionStatus::Open->value)
-                    ->orWhere(fn (Builder $q) => $q->whereNotNull('closed_at')->whereDate('closed_at', $date));
-            }
         };
     }
 
@@ -1069,7 +1074,7 @@ class CashSessionsPage extends Component
         );
     }
 
-    protected function resetOpenForm(): void
+    protected function resetOpenForm(?string $forDate = null): void
     {
         $activeRegister = $this->activeCashRegisterId
             ? $this->enabledCashRegisters()->firstWhere('id', $this->activeCashRegisterId)
@@ -1081,7 +1086,7 @@ class CashSessionsPage extends Component
             $this->branchId = $this->branches()->first()?->id;
         }
 
-        $available = $this->cashRegisters();
+        $available = $this->cashRegisters($forDate);
         $this->cashRegisterId = $activeRegister && $available->contains('id', $activeRegister->id)
             ? $activeRegister->id
             : $available->first()?->id;

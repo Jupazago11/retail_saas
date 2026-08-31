@@ -186,7 +186,7 @@ class CashSessionsPageTest extends TestCase
         $this->assertNull($registers['Caja 2']['closingCounted']);
     }
 
-    public function test_a_register_left_open_from_a_previous_day_still_shows_up_today(): void
+    public function test_a_register_left_open_from_a_previous_day_does_not_show_up_today(): void
     {
         [$company, $cashier] = $this->companyWithTemplateUser('cashier');
         $branch = $company->branches()->firstOrFail();
@@ -202,30 +202,39 @@ class CashSessionsPageTest extends TestCase
             'opening_amount' => '15000',
         ]);
         // Se abrio "ayer" y nadie la cerro — sigue open, solo que su
-        // opened_at ya no cae en el dia de hoy.
+        // opened_at ya no cae en el dia de hoy. Una sesion es independiente
+        // por dia: sigue perteneciendo a ayer, no se cuela en hoy.
         $session->update(['opened_at' => now()->subDay()]);
+        $yesterday = now()->subDay()->format('Y-m-d');
 
         $component = Livewire::test(CashSessionsPage::class);
         $today = now()->format('Y-m-d');
 
-        // Se ve en el popover de hoy...
+        // No aparece en el popover de hoy...
         $todayCell = collect($component->instance()->calendarCells())->firstWhere('date', $today);
-        $this->assertTrue($todayCell['hasSessions']);
-        $this->assertSame('open', collect($todayCell['registers'])->firstWhere('name', $register->name)['status']);
+        $this->assertFalse($todayCell['hasSessions']);
 
-        // ...y tambien se puede seleccionar y abrir desde "hoy" en el
-        // historial, no solo desde el dia en que se abrio de verdad.
+        // ...ni se puede seleccionar/abrir desde "hoy" en el historial.
         $component->set('historyDate', $today);
         $options = $component->instance()->historyCashRegisterOptions();
-        $this->assertTrue($options->contains('id', $register->id));
+        $this->assertFalse($options->contains('id', $register->id));
 
+        $component->set('historyCashRegisterId', $register->id);
+        $this->assertNull($component->instance()->historySession());
+
+        // Pero SI aparece bajo su dia real de apertura (ayer).
+        $yesterdayCell = collect($component->instance()->calendarCells())->firstWhere('date', $yesterday);
+        $this->assertTrue($yesterdayCell['hasSessions']);
+        $this->assertSame('open', collect($yesterdayCell['registers'])->firstWhere('name', $register->name)['status']);
+
+        $component->set('historyDate', $yesterday);
         $component->set('historyCashRegisterId', $register->id);
         $resolved = $component->instance()->historySession();
         $this->assertNotNull($resolved);
         $this->assertSame($session->id, $resolved->id);
     }
 
-    public function test_a_register_opened_earlier_but_closed_today_shows_up_in_todays_cell(): void
+    public function test_a_register_opened_earlier_but_closed_today_stays_under_its_own_day(): void
     {
         [$company, $cashier] = $this->companyWithTemplateUser('cashier');
         $branch = $company->branches()->firstOrFail();
@@ -234,8 +243,8 @@ class CashSessionsPageTest extends TestCase
         $this->actingAs($cashier);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
-        // Se abrio "hace dos dias" y se cierra hoy — exactamente el caso
-        // real: Caja Principal se abrio el 11 y se cerro el 13.
+        // Se abrio "hace dos dias" y se cierra hoy — el cuadre le sigue
+        // perteneciendo al dia en que se abrio, no al dia en que se cerro.
         Livewire::test(CashSessionsPage::class)
             ->set('branchId', $branch->id)
             ->set('cashRegisterId', $register->id)
@@ -244,6 +253,7 @@ class CashSessionsPageTest extends TestCase
             ->assertHasNoErrors();
         $session = $company->cashSessions()->where('cash_register_id', $register->id)->firstOrFail();
         $session->update(['opened_at' => now()->subDays(2)]);
+        $openedDay = now()->subDays(2)->format('Y-m-d');
 
         Livewire::test(CashSessionsPage::class)
             ->call('startClosingSession', $session->id)
@@ -254,18 +264,18 @@ class CashSessionsPageTest extends TestCase
         $component = Livewire::test(CashSessionsPage::class);
         $today = now()->format('Y-m-d');
 
-        // Aparece en el popover de hoy, no solo en el dia en que se abrio.
+        // No aparece en el popover de hoy solo porque se cerro hoy...
         $todayCell = collect($component->instance()->calendarCells())->firstWhere('date', $today);
-        $this->assertTrue($todayCell['hasSessions']);
-        $todayRegister = collect($todayCell['registers'])->firstWhere('name', $register->name);
-        $this->assertNotNull($todayRegister);
-        $this->assertSame('reconciled', $todayRegister['status']);
+        $this->assertFalse($todayCell['hasSessions']);
 
-        // Y se puede seleccionar/ver desde "hoy" en el historial tambien.
-        $component->set('historyDate', $today);
-        $options = $component->instance()->historyCashRegisterOptions();
-        $this->assertTrue($options->contains('id', $register->id));
+        // ...sigue viviendo bajo el dia en que realmente se abrio.
+        $openedCell = collect($component->instance()->calendarCells())->firstWhere('date', $openedDay);
+        $this->assertTrue($openedCell['hasSessions']);
+        $openedRegister = collect($openedCell['registers'])->firstWhere('name', $register->name);
+        $this->assertNotNull($openedRegister);
+        $this->assertSame('reconciled', $openedRegister['status']);
 
+        $component->set('historyDate', $openedDay);
         $component->set('historyCashRegisterId', $register->id);
         $resolved = $component->instance()->historySession();
         $this->assertNotNull($resolved);
@@ -675,7 +685,7 @@ class CashSessionsPageTest extends TestCase
         $this->assertTrue($component->instance()->canCreateForHistoryDate());
     }
 
-    public function test_creating_a_backdated_cuadre_is_blocked_with_a_clear_reason_when_the_only_register_is_already_open(): void
+    public function test_creating_a_backdated_cuadre_succeeds_even_when_todays_session_is_already_open(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, ['legal_name' => 'Caja Unica Ocupada SAS']);
@@ -685,11 +695,9 @@ class CashSessionsPageTest extends TestCase
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
-        // La empresa siempre tiene una sucursal y una caja activa (la
-        // principal no se puede desactivar), pero si esa unica caja ya
-        // tiene una sesion abierta HOY, no hay ninguna caja disponible para
-        // backdatear un dia distinto — el mensaje debe explicar eso, no
-        // decir que falta sucursal/caja activa.
+        // Una sesion es independiente por dia: que la unica caja ya tenga
+        // sesion abierta HOY no debe impedir crear el cuadre backdateado de
+        // un dia distinto sin sesion.
         Livewire::test(CashSessionsPage::class)
             ->set('branchId', $branch->id)
             ->set('cashRegisterId', $register->id)
@@ -698,6 +706,40 @@ class CashSessionsPageTest extends TestCase
             ->assertHasNoErrors();
 
         $pastDate = now()->subDays(1)->format('Y-m-d');
+        $component = Livewire::test(CashSessionsPage::class)->set('historyDate', $pastDate);
+
+        $this->assertTrue($component->instance()->canCreateForHistoryDate());
+
+        $component->call('startCreateForHistoryDate');
+        $this->assertSame($pastDate, $component->get('creatingSessionForDate'));
+        $this->assertSame('create', $component->get('cashStep'));
+    }
+
+    public function test_creating_a_backdated_cuadre_is_blocked_with_a_clear_reason_when_that_same_day_is_already_open(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, ['legal_name' => 'Caja Unica Ocupada SAS']);
+        $branch = $company->branches()->firstOrFail();
+        $register = $company->cashRegisters()->firstOrFail();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $pastDate = now()->subDays(1)->format('Y-m-d');
+
+        // La empresa siempre tiene una sucursal y una caja activa (la
+        // principal no se puede desactivar), pero si esa unica caja ya
+        // tiene una sesion abierta para ESE MISMO dia pasado, no hay
+        // ninguna caja disponible para backdatearlo de nuevo — el mensaje
+        // debe explicar eso, no decir que falta sucursal/caja activa.
+        app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $register->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '50000',
+            'opened_at' => $pastDate,
+        ]);
+
         $component = Livewire::test(CashSessionsPage::class)->set('historyDate', $pastDate);
 
         $this->assertTrue($component->instance()->canCreateForHistoryDate());
@@ -830,7 +872,9 @@ class CashSessionsPageTest extends TestCase
         $this->actingAs($cashier);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
-        // Caja 2 quedo abierta desde ayer, sin cerrar.
+        // Caja 2 quedo abierta desde ayer, sin cerrar — es independiente
+        // por dia, asi que no debe mezclarse con el cuadre de hoy de
+        // Caja Principal ni impedir que Caja Principal opere hoy.
         $carriedOverSession = app(OpenCashSession::class)->handle($company, [
             'branch_id' => $branch->id,
             'cash_register_id' => $secondRegister->id,
@@ -860,7 +904,12 @@ class CashSessionsPageTest extends TestCase
         $this->assertTrue($todayCell['hasSessions']);
         $registers = collect($todayCell['registers'])->keyBy('name');
         $this->assertSame('reconciled', $registers['Caja Principal']['status']);
-        $this->assertSame('open', $registers['Caja 2']['status']);
+        $this->assertArrayNotHasKey('Caja 2', $registers);
+
+        // Caja 2 sigue viva bajo su propio dia (ayer), no bajo hoy.
+        $yesterday = now()->subDay()->format('Y-m-d');
+        $yesterdayCell = collect($component->instance()->calendarCells())->firstWhere('date', $yesterday);
+        $this->assertSame('open', collect($yesterdayCell['registers'])->firstWhere('name', 'Caja 2')['status']);
     }
 
     protected function companyWithTemplateUser(string $templateCode): array

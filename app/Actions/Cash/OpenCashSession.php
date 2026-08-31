@@ -37,15 +37,21 @@ class OpenCashSession
         $openedAt = $this->resolveOpenedAt($attributes);
 
         return DB::transaction(function () use ($company, $branch, $cashRegister, $opener, $openingAmount, $funds, $openedAt) {
+            // Una sesion es independiente por dia: si quedo una sesion sin
+            // cerrar de otro dia, eso no debe impedir abrir la de hoy — cada
+            // caja puede tener a la vez varias sesiones abiertas mientras
+            // sean de dias distintos. Solo se bloquea repetir apertura el
+            // MISMO dia.
             $existing = CashSession::query()
                 ->where('company_id', $company->id)
                 ->where('cash_register_id', $cashRegister->id)
                 ->where('status', CashSessionStatus::Open->value)
+                ->whereDate('opened_at', $openedAt->toDateString())
                 ->lockForUpdate()
                 ->first();
 
             if ($existing) {
-                throw new InvalidArgumentException('La caja ya tiene una sesion abierta.');
+                throw new InvalidArgumentException('La caja ya tiene una sesion abierta para este dia.');
             }
 
             $lastSequence = (int) CashSession::query()

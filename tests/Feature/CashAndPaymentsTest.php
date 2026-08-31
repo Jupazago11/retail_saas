@@ -53,13 +53,35 @@ class CashAndPaymentsTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('La caja ya tiene una sesion abierta.');
+        $this->expectExceptionMessage('La caja ya tiene una sesion abierta para este dia.');
 
         app(OpenCashSession::class)->handle($company, [
             'branch_id' => $branch->id,
             'cash_register_id' => $cashRegister->id,
             'opened_by' => $owner->id,
         ]);
+    }
+
+    public function test_it_allows_opening_a_new_session_for_a_register_that_has_an_older_day_still_open(): void
+    {
+        [$owner, $company, $branch, $cashRegister] = $this->cashFixture();
+
+        $yesterdaySession = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opened_at' => now()->subDay(),
+        ]);
+
+        $todaySession = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+        ]);
+
+        $this->assertSame('open', $yesterdaySession->fresh()->status);
+        $this->assertSame('open', $todaySession->status);
+        $this->assertNotSame($yesterdaySession->id, $todaySession->id);
     }
 
     public function test_company_sequence_is_independent_per_company(): void
