@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Actions\Companies\CreateCompany;
 use App\Actions\Inventory\CreateInventoryAdjustment;
 use App\Actions\Sales\CreateSale;
+use App\Actions\Sales\RegisterSalePayments;
 use App\Enums\InventoryAdjustmentType;
 use App\Enums\RecordStatus;
 use App\Enums\SaleStatus;
@@ -49,6 +50,53 @@ class SalesPageTest extends TestCase
             ->set('search', $sale->document_number)
             ->assertSee($sale->document_number)
             ->assertSee('Arroz visual');
+    }
+
+    public function test_sales_page_can_filter_sales_by_payment_method(): void
+    {
+        [$owner, $company, $cashSale] = $this->salesFixture();
+
+        app(RegisterSalePayments::class)->handle($company, $cashSale, [
+            'received_by' => $owner->id,
+            'payments' => [
+                ['payment_method_code' => 'cash', 'amount' => (string) $cashSale->grand_total],
+            ],
+        ]);
+
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+        $product = Product::query()->where('company_id', $company->id)->firstOrFail();
+        app(CreateInventoryAdjustment::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'adjustment_type' => InventoryAdjustmentType::Increase->value,
+            'reason' => 'Stock adicional',
+            'items' => [['product_id' => $product->id, 'quantity' => '5', 'unit_cost' => '1000']],
+        ]);
+        $transferSale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'sold_at' => now(),
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '3000']],
+        ]);
+        app(RegisterSalePayments::class)->handle($company, $transferSale, [
+            'received_by' => $owner->id,
+            'payments' => [
+                ['payment_method_code' => 'transfer', 'amount' => (string) $transferSale->grand_total],
+            ],
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->assertSee($cashSale->document_number)
+            ->assertSee($transferSale->document_number)
+            ->set('paymentMethodFilter', 'transfer')
+            ->assertDontSee($cashSale->document_number)
+            ->assertSee($transferSale->document_number);
     }
 
     public function test_sales_page_route_is_forbidden_without_sales_view_permission(): void

@@ -6,6 +6,7 @@ use App\Actions\Sales\CancelSale;
 use App\Actions\Sales\ReturnSale;
 use App\Actions\Settings\UpdateCompanyLogo;
 use App\Actions\Settings\UpdateCompanySettings;
+use App\Enums\PaymentStatus;
 use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
@@ -32,6 +33,7 @@ class SalesPage extends Component
     public string $search = '';
     public string $statusFilter = '';
     public string $saleTypeFilter = '';
+    public string $paymentMethodFilter = '';
     public ?int $returningSaleId = null;
     public array $returnItems = [];
     public string $returnReason = '';
@@ -77,6 +79,39 @@ class SalesPage extends Component
 
         $this->saleTypeFilter = $type;
         $this->resetPage();
+    }
+
+    public function setPaymentMethodFilter(string $method): void
+    {
+        if ($method !== '' && ! array_key_exists($method, $this->paymentMethodOptions())) {
+            return;
+        }
+
+        $this->paymentMethodFilter = $method;
+        $this->resetPage();
+    }
+
+    /**
+     * Mismos codigos que ofrece el POS al cobrar (ver PosPage::paymentMethodOptions()).
+     * Una venta a credito no tiene fila en `payments` (los abonos se ligan a
+     * `credit_account_id`, no a `sale_id`), asi que filtrar por medio de
+     * pago naturalmente la deja fuera — es correcto, a credito no se cobro
+     * con ninguno de estos medios al momento de la venta.
+     *
+     * @return array<string, string>
+     */
+    public function paymentMethodOptions(): array
+    {
+        return [
+            'cash' => 'Efectivo',
+            'card' => 'Tarjeta',
+            'transfer' => 'Transferencia',
+        ];
+    }
+
+    public function paymentMethodLabel(string $code): string
+    {
+        return $this->paymentMethodOptions()[$code] ?? ucfirst($code);
     }
 
     // Disparado desde PosPage (componente hermano dentro del mismo
@@ -237,6 +272,15 @@ class SalesPage extends Component
             ])
             ->when($this->statusFilter !== '', fn (Builder $query) => $query->where('status', $this->statusFilter))
             ->when($this->saleTypeFilter !== '', fn (Builder $query) => $query->where('sale_type', $this->saleTypeFilter))
+            ->when(
+                $this->paymentMethodFilter !== '',
+                fn (Builder $query) => $query->whereHas(
+                    'payments',
+                    fn (Builder $paymentQuery) => $paymentQuery
+                        ->where('payment_method_code', $this->paymentMethodFilter)
+                        ->where('status', PaymentStatus::Confirmed->value)
+                )
+            )
             ->when($this->search !== '', function (Builder $query) {
                 $search = '%' . trim($this->search) . '%';
 

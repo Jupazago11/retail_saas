@@ -581,6 +581,66 @@ class CashSessionsPageTest extends TestCase
         $this->assertCount(0, $component->instance()->purchasePaymentCandidates($session->fresh()));
     }
 
+    public function test_a_backdated_purchase_marked_paid_at_creation_is_eligible_for_its_own_days_cuadre_not_todays(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, ['legal_name' => 'Compras Tardias SAS']);
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+        $register = $company->cashRegisters()->firstOrFail();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        // Sesion de HOY.
+        Livewire::test(CashSessionsPage::class)
+            ->set('branchId', $branch->id)
+            ->set('cashRegisterId', $register->id)
+            ->set('openingAmount', '100000')
+            ->call('openSession')
+            ->assertHasNoErrors();
+        $todaySession = $company->cashSessions()->where('cash_register_id', $register->id)->firstOrFail();
+
+        // Sesion de ayer, ya cerrada (se esta corrigiendo con el flujo de
+        // "backdatear" para agregar el gasto que faltaba).
+        $yesterday = now()->subDay();
+        $yesterdaySession = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $register->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '80000',
+            'opened_at' => $yesterday,
+        ]);
+        app(CloseCashSession::class)->handle($company, $yesterdaySession, [
+            'closed_by' => $owner->id,
+            'closing_counted_amount' => '80000',
+        ]);
+
+        // Compra registrada HOY (occurred_at real del alta) pero fechada
+        // AYER y marcada como ya pagada — un registro tardio, igual que
+        // una venta backdateada.
+        $purchase = app(CreatePurchase::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'supplier_name' => 'Fruver de Ayer',
+            'total' => '10800',
+            'status' => PurchaseStatus::Paid->value,
+            'purchased_at' => $yesterday,
+            'paid_amount' => '10800',
+        ]);
+
+        $component = Livewire::test(CashSessionsPage::class);
+
+        // Elegible para el cuadre de AYER...
+        $yesterdayCandidates = $component->instance()->purchasePaymentCandidates($yesterdaySession->fresh());
+        $this->assertCount(1, $yesterdayCandidates);
+        $this->assertSame($purchase->id, $yesterdayCandidates->first()->purchase_id);
+
+        // ...no para el de HOY, aunque se haya digitado hoy.
+        $todayCandidates = $component->instance()->purchasePaymentCandidates($todaySession->fresh());
+        $this->assertCount(0, $todayCandidates);
+    }
+
     public function test_daily_sales_are_broken_down_by_payment_method(): void
     {
         [$company, $cashier] = $this->companyWithTemplateUser('cashier');

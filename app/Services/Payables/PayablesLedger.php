@@ -39,7 +39,17 @@ class PayablesLedger
         return $movement;
     }
 
-    public function recordPayment(Purchase $purchase, string $amount, ?string $reference = null, ?string $paymentMethodCode = null): PayableMovement
+    /**
+     * $occurredAt permite registrar un pago inicial (al crear la compra) con
+     * la fecha real de la compra (`purchased_at`) en vez de "ahora": un
+     * registro tardio de una compra que ya se pago hace dias no debe
+     * aparecer como candidata de "Pagos de caja" del cuadre de HOY (ver
+     * CashSessionsPage::purchasePaymentCandidates(), que filtra por
+     * occurred_at) — igual que Sale::sold_at para las ventas. Un abono
+     * posterior sobre una compra ya existente (RegisterPurchasePayment) no
+     * pasa este parametro: ese dinero si se mueve "ahora".
+     */
+    public function recordPayment(Purchase $purchase, string $amount, ?string $reference = null, ?string $paymentMethodCode = null, ?\DateTimeInterface $occurredAt = null): PayableMovement
     {
         $amount = $this->normalizeAmount($amount);
         $outstanding = $this->outstandingForPurchase($purchase);
@@ -68,7 +78,7 @@ class PayablesLedger
             'supplier_credit_after' => $this->currentSupplierCreditBalance($purchase),
             'reference' => $reference,
             'payment_method_code' => $paymentMethodCode,
-            'occurred_at' => now(),
+            'occurred_at' => $occurredAt ?? now(),
         ]);
 
         $purchase->update([

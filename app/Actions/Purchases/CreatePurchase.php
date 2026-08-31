@@ -111,12 +111,18 @@ class CreatePurchase
             $this->payablesLedger->recordPurchaseCharge($purchase, (string) $purchase->total, $purchase->invoice_number);
 
             if ($requestedStatus === PurchaseStatus::PartiallyPaid->value || $requestedStatus === PurchaseStatus::Paid->value) {
+                // El pago inicial se marca con la fecha de la compra
+                // (purchased_at), no con "ahora": un registro tardio de una
+                // compra ya pagada hace dias debe quedar elegible para el
+                // cuadre de caja de ESE dia, no el de hoy (ver
+                // PayablesLedger::recordPayment()).
                 foreach ($this->resolveInitialPayments($attributes, $purchase, $requestedStatus) as $payment) {
                     $this->payablesLedger->recordPayment(
                         $purchase,
                         $payment['amount'],
                         'initial_purchase_payment',
-                        $payment['payment_method_code']
+                        $payment['payment_method_code'],
+                        $purchase->purchased_at,
                     );
                 }
             }

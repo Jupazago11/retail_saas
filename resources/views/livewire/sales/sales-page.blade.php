@@ -75,6 +75,18 @@
                         Credito
                     </button>
                 </div>
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setPaymentMethodFilter('')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $paymentMethodFilter === '' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todos los medios
+                    </button>
+                    @foreach ($this->paymentMethodOptions() as $code => $label)
+                        <button type="button" wire:click="setPaymentMethodFilter('{{ $code }}')"
+                            class="rounded-md px-3 py-1.5 font-semibold transition {{ $paymentMethodFilter === $code ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            {{ $label }}
+                        </button>
+                    @endforeach
+                </div>
             </div>
 
             {{-- Tabla de ventas --}}
@@ -111,6 +123,11 @@
                                     <div class="mt-1 flex flex-wrap items-center gap-1">
                                         <span class="rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $statusBadge }}">{{ $statusLabel }}</span>
                                         <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500">{{ strtoupper($sale->sale_type) }}</span>
+                                        @foreach ($sale->payments->pluck('payment_method_code')->filter()->unique() as $methodCode)
+                                            <span class="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-medium text-teal-700 ring-1 ring-inset ring-teal-600/20">
+                                                {{ $this->paymentMethodLabel($methodCode) }}
+                                            </span>
+                                        @endforeach
                                         @if ($sale->replacesSale)
                                             <span class="rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600 ring-1 ring-inset ring-violet-600/20">
                                                 Reemplaza a {{ $sale->replacesSale->document_number }}
