@@ -15,6 +15,7 @@ use App\Models\SaleItem;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
+use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -34,6 +35,8 @@ class SalesPage extends Component
     public string $statusFilter = '';
     public string $saleTypeFilter = '';
     public string $paymentMethodFilter = '';
+    public string $dateFrom = '';
+    public string $dateTo = '';
     public ?int $returningSaleId = null;
     public array $returnItems = [];
     public string $returnReason = '';
@@ -88,6 +91,23 @@ class SalesPage extends Component
         }
 
         $this->paymentMethodFilter = $method;
+        $this->resetPage();
+    }
+
+    public function updatedDateFrom(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedDateTo(): void
+    {
+        $this->resetPage();
+    }
+
+    public function clearDateFilter(): void
+    {
+        $this->dateFrom = '';
+        $this->dateTo = '';
         $this->resetPage();
     }
 
@@ -272,6 +292,23 @@ class SalesPage extends Component
             ])
             ->when($this->statusFilter !== '', fn (Builder $query) => $query->where('status', $this->statusFilter))
             ->when($this->saleTypeFilter !== '', fn (Builder $query) => $query->where('sale_type', $this->saleTypeFilter))
+            ->when(
+                $this->parsedDateFrom() !== null,
+                // Un draft no tiene sold_at (solo se fija al confirmar), y la
+                // tabla ya lo muestra con created_at como respaldo — el
+                // filtro tiene que mirar la misma fecha que el usuario ve.
+                fn (Builder $query) => $query->whereRaw(
+                    'COALESCE(sold_at, created_at) >= ?',
+                    [$this->parsedDateFrom()->startOfDay()]
+                )
+            )
+            ->when(
+                $this->parsedDateTo() !== null,
+                fn (Builder $query) => $query->whereRaw(
+                    'COALESCE(sold_at, created_at) <= ?',
+                    [$this->parsedDateTo()->endOfDay()]
+                )
+            )
             ->when(
                 $this->paymentMethodFilter !== '',
                 fn (Builder $query) => $query->whereHas(
@@ -526,6 +563,33 @@ class SalesPage extends Component
     {
         return Sale::query()
             ->where('company_id', $this->currentCompany()->id);
+    }
+
+    protected function parsedDateFrom(): ?Carbon
+    {
+        return $this->parseDate($this->dateFrom);
+    }
+
+    protected function parsedDateTo(): ?Carbon
+    {
+        return $this->parseDate($this->dateTo);
+    }
+
+    // El input HTML `type=date` siempre manda 'YYYY-MM-DD' o '' cuando es
+    // valido, pero un valor pegado a mano o manipulado en el DOM podria no
+    // serlo — createFromFormat con strict rechaza cualquier otra cosa en vez
+    // de dejar pasar una fecha rara al whereRaw.
+    protected function parseDate(string $value): ?Carbon
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::createFromFormat('!Y-m-d', $value);
+        } catch (InvalidArgumentException) {
+            return null;
+        }
     }
 
     protected function ensurePermission(string $permissionCode): void

@@ -99,6 +99,44 @@ class SalesPageTest extends TestCase
             ->assertSee($transferSale->document_number);
     }
 
+    public function test_sales_page_can_filter_sales_by_date_range(): void
+    {
+        [$owner, $company, $todaySale] = $this->salesFixture();
+
+        $branch = $company->branches()->firstOrFail();
+        $warehouse = $company->warehouses()->firstOrFail();
+        $product = Product::query()->where('company_id', $company->id)->firstOrFail();
+        app(CreateInventoryAdjustment::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'adjustment_type' => InventoryAdjustmentType::Increase->value,
+            'reason' => 'Stock adicional',
+            'items' => [['product_id' => $product->id, 'quantity' => '5', 'unit_cost' => '1000']],
+        ]);
+        $oldSale = app(CreateSale::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'warehouse_id' => $warehouse->id,
+            'user_id' => $owner->id,
+            'status' => SaleStatus::Confirmed->value,
+            'sold_at' => now()->subDays(10),
+            'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '3000']],
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(SalesPage::class)
+            ->assertSee($todaySale->document_number)
+            ->assertSee($oldSale->document_number)
+            ->set('dateFrom', now()->subDays(1)->toDateString())
+            ->assertSee($todaySale->document_number)
+            ->assertDontSee($oldSale->document_number)
+            ->set('dateFrom', '')
+            ->set('dateTo', now()->subDays(5)->toDateString())
+            ->assertDontSee($todaySale->document_number)
+            ->assertSee($oldSale->document_number);
+    }
+
     public function test_sales_page_route_is_forbidden_without_sales_view_permission(): void
     {
         [, $company] = $this->salesFixture();

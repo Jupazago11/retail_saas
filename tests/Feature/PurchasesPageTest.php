@@ -198,6 +198,42 @@ class PurchasesPageTest extends TestCase
         ]);
     }
 
+    public function test_purchases_page_backdated_purchase_paid_immediately_uses_purchased_at_for_the_payment(): void
+    {
+        [$user, $company, $branch, $warehouse] = $this->fixture();
+        $supplier = app(CreateSupplier::class)->handle($company, [
+            'first_name' => 'Fruver',
+            'last_name' => 'Ayer',
+            'payment_term_days' => 30,
+        ]);
+
+        $this->actingAs($user);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $yesterday = now()->subDay()->format('Y-m-d');
+
+        Livewire::test(PurchasesPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('supplierId', $supplier->id)
+            ->set('purchasedAt', $yesterday)
+            ->set('totalAmount', '10800')
+            ->set('paidImmediately', true)
+            ->set('paymentCompletionMode', 'full')
+            ->set('paymentMethodMode', 'cash')
+            ->call('savePurchase')
+            ->assertHasNoErrors();
+
+        $purchase = Purchase::query()->where('company_id', $company->id)->firstOrFail();
+        $movement = \App\Models\PayableMovement::query()
+            ->where('purchase_id', $purchase->id)
+            ->where('movement_type', 'payment')
+            ->firstOrFail();
+
+        $this->assertSame($yesterday, $purchase->purchased_at->toDateString());
+        $this->assertSame($yesterday, $movement->occurred_at->toDateString());
+    }
+
     public function test_purchases_page_can_create_purchase_with_partial_mixed_payment(): void
     {
         [$user, $company, $branch, $warehouse] = $this->fixture();

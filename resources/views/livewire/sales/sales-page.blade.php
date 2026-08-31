@@ -87,6 +87,20 @@
                         </button>
                     @endforeach
                 </div>
+                <div class="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm">
+                    <label for="sales-date-from" class="text-xs font-medium text-gray-500">Desde</label>
+                    <input wire:model.live="dateFrom" type="date" id="sales-date-from" max="{{ $dateTo ?: '' }}"
+                        class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                    <label for="sales-date-to" class="text-xs font-medium text-gray-500">Hasta</label>
+                    <input wire:model.live="dateTo" type="date" id="sales-date-to" min="{{ $dateFrom ?: '' }}"
+                        class="rounded-md border-gray-300 py-1 text-xs shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                    @if ($dateFrom !== '' || $dateTo !== '')
+                        <button type="button" wire:click="clearDateFilter" title="Limpiar fechas"
+                            class="text-gray-400 hover:text-gray-600">
+                            &times;
+                        </button>
+                    @endif
+                </div>
             </div>
 
             {{-- Tabla de ventas --}}
