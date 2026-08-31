@@ -51,7 +51,7 @@ class PurchasesPage extends Component
     public string $mixedTransferAmount = '';
 
     public string $search = '';
-    public string $statusFilter = 'confirmed';
+    public string $statusFilter = '';
     public ?int $supplierFilterId = null;
 
     public string $paymentAmount = '';

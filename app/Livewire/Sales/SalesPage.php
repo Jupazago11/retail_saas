@@ -57,6 +57,9 @@ class SalesPage extends Component
     public function mount(): void
     {
         $this->ensurePermission('sales.view');
+
+        $this->dateFrom = now()->startOfMonth()->toDateString();
+        $this->dateTo = now()->endOfMonth()->toDateString();
     }
 
     public function updatedSearch(): void

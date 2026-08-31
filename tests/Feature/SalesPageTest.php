@@ -118,7 +118,7 @@ class SalesPageTest extends TestCase
             'warehouse_id' => $warehouse->id,
             'user_id' => $owner->id,
             'status' => SaleStatus::Confirmed->value,
-            'sold_at' => now()->subDays(10),
+            'sold_at' => now()->subMonths(2),
             'items' => [['product_id' => $product->id, 'quantity' => '1', 'unit_price' => '3000']],
         ]);
 
@@ -126,13 +126,17 @@ class SalesPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(SalesPage::class)
+            // La pagina abre con el filtro de fechas puesto en el mes en
+            // curso, asi que hay que quitarlo primero para poder ver la
+            // venta de hace dos meses.
+            ->call('clearDateFilter')
             ->assertSee($todaySale->document_number)
             ->assertSee($oldSale->document_number)
             ->set('dateFrom', now()->subDays(1)->toDateString())
             ->assertSee($todaySale->document_number)
             ->assertDontSee($oldSale->document_number)
             ->set('dateFrom', '')
-            ->set('dateTo', now()->subDays(5)->toDateString())
+            ->set('dateTo', now()->subMonth()->toDateString())
             ->assertDontSee($todaySale->document_number)
             ->assertSee($oldSale->document_number);
     }
