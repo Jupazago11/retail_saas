@@ -89,6 +89,42 @@ class ProductsCatalogTest extends TestCase
         ]);
     }
 
+    public function test_products_page_flexible_price_product_forces_zero_price_and_no_inventory_tracking(): void
+    {
+        [$user, $company] = $this->actingUserWithCurrentCompany();
+        $category = Category::query()->create([
+            'company_id' => $company->id,
+            'name' => 'Verduras',
+            'code' => 'VER',
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $this->actingAs($user);
+
+        // Aunque el formulario mande price1/tracksInventory con otros
+        // valores (por un bug de UI o un payload manipulado), precio
+        // flexible siempre debe quedar en $0 y sin inventario — se fuerza
+        // en el servidor, no solo se esconde en la vista.
+        Livewire::test(ProductsPage::class)
+            ->set('categoryId', $category->id)
+            ->set('name', 'Papa')
+            ->set('cost', '0')
+            ->set('price1', '3800')
+            ->set('tracksInventory', true)
+            ->set('minimumStock', '5')
+            ->set('flexiblePrice', true)
+            ->call('saveProduct')
+            ->assertHasNoErrors();
+
+        $product = Product::query()->where('company_id', $company->id)->where('name', 'Papa')->firstOrFail();
+
+        $this->assertTrue($product->flexible_price);
+        $this->assertFalse($product->tracks_inventory);
+        $this->assertSame('0.00', $product->price_1);
+        $this->assertNull($product->price_2);
+        $this->assertSame(0, (int) $product->minimum_stock);
+    }
+
     public function test_products_page_rejects_foreign_masters_from_other_company(): void
     {
         [$user, $company] = $this->actingUserWithCurrentCompany();

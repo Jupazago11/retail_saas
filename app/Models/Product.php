@@ -27,6 +27,7 @@ class Product extends Model
         'price_1',
         'price_2',
         'price_3',
+        'flexible_price',
         'margin_1',
         'margin_2',
         'margin_3',
@@ -48,6 +49,7 @@ class Product extends Model
             'margin_3' => 'decimal:2',
             'minimum_stock' => 'decimal:3',
             'tracks_inventory' => 'boolean',
+            'flexible_price' => 'boolean',
         ];
     }
 

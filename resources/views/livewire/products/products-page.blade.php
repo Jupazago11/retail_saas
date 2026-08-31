@@ -307,12 +307,17 @@
                                 <label for="product-price-1" class="mb-1 block text-xs font-medium text-gray-700">Precio 1 <span class="text-rose-600">*</span></label>
                                 <input type="text" inputmode="numeric" @input="onInput($event, 'price1')"
                                     value="{{ $price1 !== '' ? number_format((int) $price1, 0, ',', '.') : '' }}"
-                                    id="product-price-1"
-                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm">
-                                <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price1))">
-                                    <span x-text="margin($wire.price1) !== null ? margin($wire.price1) + '% margen' : ''"></span>
-                                </p>
+                                    id="product-price-1" @disabled($flexiblePrice)
+                                    class="block w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-600 focus:ring-blue-600 text-sm disabled:bg-gray-100 disabled:text-gray-400">
+                                @if ($flexiblePrice)
+                                    <p class="mt-0.5 min-h-[1rem] text-xs text-gray-400">Se escribe en cada venta, en el POS.</p>
+                                @else
+                                    <p class="mt-0.5 min-h-[1rem] text-xs" :class="cls(margin($wire.price1))">
+                                        <span x-text="margin($wire.price1) !== null ? margin($wire.price1) + '% margen' : ''"></span>
+                                    </p>
+                                @endif
                             </div>
+                            @unless ($flexiblePrice)
                             <div>
                                 <label for="product-price-2" class="mb-1 block text-xs font-medium text-gray-700">Precio 2</label>
                                 <input type="text" inputmode="numeric" @input="onInput($event, 'price2')"
@@ -333,9 +338,26 @@
                                     <span x-text="$wire.price3 > 0 && margin($wire.price3) !== null ? margin($wire.price3) + '% margen' : ''"></span>
                                 </p>
                             </div>
+                            @endunless
                         </div>
 
-                        @if ($hasInventory)
+                        {{-- Precio flexible: perecederos/granel (papa, yuca, frijol...) cuyo
+                             precio cambia a diario. En vez de editar price_1 cada dia, el
+                             cajero escribe el total de la venta directamente en el POS. --}}
+                        <div class="rounded-xl border border-gray-200 p-3">
+                            <label class="flex cursor-pointer items-center gap-3 text-sm text-gray-700">
+                                <input wire:model.live="flexiblePrice" type="checkbox"
+                                    class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-600">
+                                Precio flexible (perecederos con precio diario, ej. papa, yuca, frijol)
+                            </label>
+                            @if ($flexiblePrice)
+                                <p class="mt-2 text-xs text-gray-400">
+                                    En el POS, el cajero escribira el total de la venta en vez de una cantidad y precio fijo. No lleva inventario porque nunca se registra un peso exacto.
+                                </p>
+                            @endif
+                        </div>
+
+                        @if ($hasInventory && ! $flexiblePrice)
                         {{-- Inventario: primero se pregunta si el producto lo lleva --}}
                         <div class="rounded-xl border border-gray-200 p-3">
                             <label class="flex cursor-pointer items-center gap-3 text-sm text-gray-700">

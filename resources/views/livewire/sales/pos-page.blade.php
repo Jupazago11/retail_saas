@@ -460,7 +460,9 @@
                                     <td class="px-2 py-2 align-middle text-xs text-gray-500">{{ $barcode }}</td>
                                     <td class="px-2 py-2 align-middle">
                                         <div class="font-semibold text-gray-900">{{ $product?->name ?? '—' }}</div>
-                                        @if ($product?->presentations?->isNotEmpty())
+                                        @if ($product?->flexible_price)
+                                            <span class="mt-1 inline-block rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-600/20">Precio libre</span>
+                                        @elseif ($product?->presentations?->isNotEmpty())
                                             <select wire:model.live="items.{{ $index }}.product_presentation_id" class="mt-1 h-7 w-full rounded-md border-gray-200 bg-white px-2 text-[11px] text-gray-700 focus:border-blue-600 focus:ring-blue-600">
                                                 <option value="">Presentacion base</option>
                                                 @foreach ($product->presentations as $presentation)
@@ -470,17 +472,31 @@
                                         @endif
                                     </td>
                                     <td class="px-1.5 py-2 align-middle">
-                                        <div class="flex items-center justify-end gap-1">
-                                            <button type="button" wire:click="decreaseQuantity({{ $lineKey }})" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-base font-bold text-gray-500 transition hover:border-blue-400 hover:text-blue-600">−</button>
-                                            <input type="text" wire:model.live="items.{{ $index }}.quantity" class="h-8 w-14 min-w-0 rounded-md border-gray-300 bg-white px-1 text-center text-sm text-gray-900 focus:border-blue-600 focus:ring-blue-600">
-                                            <button type="button" wire:click="increaseQuantity({{ $lineKey }})" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-base font-bold text-gray-500 transition hover:border-blue-400 hover:text-blue-600">+</button>
-                                        </div>
+                                        @if ($product?->flexible_price)
+                                            <div class="text-center text-sm text-gray-400">—</div>
+                                        @else
+                                            <div class="flex items-center justify-end gap-1">
+                                                <button type="button" wire:click="decreaseQuantity({{ $lineKey }})" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-base font-bold text-gray-500 transition hover:border-blue-400 hover:text-blue-600">−</button>
+                                                <input type="text" wire:model.live="items.{{ $index }}.quantity" class="h-8 w-14 min-w-0 rounded-md border-gray-300 bg-white px-1 text-center text-sm text-gray-900 focus:border-blue-600 focus:ring-blue-600">
+                                                <button type="button" wire:click="increaseQuantity({{ $lineKey }})" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gray-300 text-base font-bold text-gray-500 transition hover:border-blue-400 hover:text-blue-600">+</button>
+                                            </div>
+                                        @endif
                                     </td>
                                     <td class="px-2 py-2 align-middle text-right text-sm font-semibold text-gray-900">
-                                        {{ Money::format((float) ($item['unit_price'] ?? 0)) }}
+                                        @if ($product?->flexible_price)
+                                            {{-- Con precio flexible no hay cantidad x precio unitario: el
+                                                 cajero escribe directamente el total de esta venta. --}}
+                                            <input type="text" inputmode="numeric" wire:model.live="items.{{ $index }}.unit_price"
+                                                placeholder="Total"
+                                                class="h-8 w-24 rounded-md border-amber-300 bg-amber-50 px-2 text-right text-sm font-semibold text-gray-900 focus:border-amber-500 focus:ring-amber-500">
+                                        @else
+                                            {{ Money::format((float) ($item['unit_price'] ?? 0)) }}
+                                        @endif
                                     </td>
                                     <td class="px-1 py-2 align-middle">
-                                        @if (count($priceTierOptions) > 1)
+                                        @if ($product?->flexible_price)
+                                            <span class="block text-center text-[11px] text-gray-400">Libre</span>
+                                        @elseif (count($priceTierOptions) > 1)
                                             <div class="grid grid-cols-3 gap-1">
                                                 @foreach ($priceTierOptions as $tier => $option)
                                                     <button

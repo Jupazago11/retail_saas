@@ -55,6 +55,13 @@ class ProductsPage extends Component
     public string $price1 = '0.00';
     public string $price2 = '';
     public string $price3 = '';
+    // Perecederos/graneles (papa, yuca, frijol...) con precio que cambia a
+    // diario: en vez de mantener price_1/2/3 actualizados cada dia, el
+    // producto queda sin precio de catalogo (price_1 en 0) y en el POS el
+    // cajero escribe el total de la venta directamente (ver PosPage). No
+    // tiene sentido llevar inventario en kilos si nunca se registra un peso
+    // exacto, asi que fuerza tracksInventory a false (ver saveProduct()).
+    public bool $flexiblePrice = false;
     public bool $tracksInventory = true;
     public string $minimumStock = '0';
     public array $initialQuantities = [];
@@ -222,6 +229,7 @@ class ProductsPage extends Component
             'price1' => ['required', 'numeric', 'min:0'],
             'price2' => ['nullable', 'numeric', 'min:0'],
             'price3' => ['nullable', 'numeric', 'min:0'],
+            'flexiblePrice' => ['required', 'boolean'],
             'tracksInventory' => ['required', 'boolean'],
             'minimumStock' => ['required', 'integer', 'min:0'],
             'initialQuantities' => ['nullable', 'array'],
@@ -233,6 +241,19 @@ class ProductsPage extends Component
         if (! $hasInventory) {
             $validated['tracksInventory'] = false;
             $validated['minimumStock']    = 0;
+        }
+
+        // Precio flexible nunca lleva inventario ni precios de catalogo: el
+        // total lo escribe el cajero en el POS cada vez, no tiene sentido
+        // llevar stock en kilos que nunca se pesan exactamente. Se fuerza
+        // aqui (no solo en el formulario) para que no dependa de que el
+        // cliente mande los campos coherentes.
+        if ($validated['flexiblePrice']) {
+            $validated['tracksInventory'] = false;
+            $validated['minimumStock'] = 0;
+            $validated['price1'] = '0';
+            $validated['price2'] = null;
+            $validated['price3'] = null;
         }
 
         // La carga de existencias iniciales por bodega solo aplica al crear
@@ -258,6 +279,7 @@ class ProductsPage extends Component
             'price_1' => $validated['price1'],
             'price_2' => $this->blankToNull($validated['price2']),
             'price_3' => $this->blankToNull($validated['price3']),
+            'flexible_price' => $validated['flexiblePrice'],
             'margin_1' => $this->marginFrom($validated['cost'], $validated['price1']),
             'margin_2' => $this->marginFrom($validated['cost'], $validated['price2']),
             'margin_3' => $this->marginFrom($validated['cost'], $validated['price3']),
@@ -334,6 +356,7 @@ class ProductsPage extends Component
         $this->price1 = $this->moneyToString($product->price_1);
         $this->price2 = $product->price_2 !== null ? $this->moneyToString($product->price_2) : '';
         $this->price3 = $product->price_3 !== null ? $this->moneyToString($product->price_3) : '';
+        $this->flexiblePrice = $product->flexible_price;
         $this->tracksInventory = $product->tracks_inventory;
         $this->minimumStock = (string) (int) $product->minimum_stock;
         $this->initializeQuantities();
@@ -409,6 +432,7 @@ class ProductsPage extends Component
         $this->cost   = '0';
         $this->taxRate = '0';
         $this->price1 = '0';
+        $this->flexiblePrice = false;
         $this->tracksInventory = true;
         $this->minimumStock    = '0';
         $this->initializeQuantities();

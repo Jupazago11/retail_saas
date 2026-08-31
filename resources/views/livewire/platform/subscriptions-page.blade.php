@@ -42,18 +42,18 @@
         </div>
 
         <div class="mt-6 overflow-x-auto">
-            <table class="w-full table-fixed divide-y divide-stone-200 text-sm">
+            <table class="min-w-full divide-y divide-stone-200 text-sm">
                 <thead>
                     <tr class="text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
-                        <th class="w-[20%] pb-2">Empresa</th>
-                        <th class="w-[13%] pb-2">Propietario</th>
-                        <th class="w-[8%] pb-2">Plan</th>
-                        <th class="w-[7%] pb-2">Equipos</th>
-                        <th class="w-[8%] pb-2">Estado</th>
-                        <th class="w-[10%] pb-2">Vigencia</th>
-                        <th class="w-[11%] pb-2">Pago</th>
-                        <th class="w-[9%] pb-2 text-center">Auto-renovación</th>
-                        <th class="w-[14%] pb-2 text-right">Acción</th>
+                        <th class="pb-2">Empresa</th>
+                        <th class="pb-2">Propietario</th>
+                        <th class="pb-2">Plan</th>
+                        <th class="pb-2">Equipos</th>
+                        <th class="pb-2">Estado</th>
+                        <th class="pb-2">Vigencia</th>
+                        <th class="pb-2">Pago</th>
+                        <th class="pb-2 text-center">Auto-renovación</th>
+                        <th class="pb-2 text-right">Acción</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-stone-100">

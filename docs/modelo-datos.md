@@ -177,8 +177,9 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 #### `products`
 
 - Proposito: producto base.
-- Campos clave: `id`, `company_id`, `category_id`, `brand_id`, `base_unit_id`, `tax_id`, `name`, `sku`, `barcode`, `description`, `cost`, `price_1`, `price_2`, `price_3`, `margin_1`, `margin_2`, `margin_3`, `tracks_inventory`, `minimum_stock`, `status`, `deleted_at`.
+- Campos clave: `id`, `company_id`, `category_id`, `brand_id`, `base_unit_id`, `tax_id`, `name`, `sku`, `barcode`, `description`, `cost`, `price_1`, `price_2`, `price_3`, `flexible_price`, `margin_1`, `margin_2`, `margin_3`, `tracks_inventory`, `minimum_stock`, `status`, `deleted_at`.
 - Nota de implementacion inicial: `tax_id` queda como referencia nullable sin FK mientras no exista catalogo fiscal propio.
+- `flexible_price` (boolean, default false): perecederos/granel con precio que cambia a diario (papa, yuca, frijol...). Cuando esta activo, `saveProduct()` (`ProductsPage`) fuerza `price_1/2/3` a 0/null y `tracks_inventory` a false en el servidor (no solo en la vista) — el precio se define en cada venta desde el POS (ver `flujo-pos.md`), y no tiene sentido llevar stock en kilos que nunca se pesan exactamente.
 
 #### `product_presentations`
 

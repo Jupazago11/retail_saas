@@ -47,6 +47,7 @@
   - Si la empresa tiene habilitada la feature `pos.frozen_sales` y el usuario posee permiso `sales.freeze`, la barra superior expone la accion `Congelar`.
   - La composicion visual del `basic` debe sentirse como terminal de caja: cabecera tecnica, rejilla compacta de iconos, area central de lineas y franja inferior de captura/totales.
   - La tarifa se cambia desde la propia celda `V1/V2/V3` con un clic simple; si el producto solo tiene una tarifa, la celda queda fija.
+  - Si el producto tiene `flexible_price` (perecederos/granel con precio diario, ver `modelo-datos.md`), la linea no muestra cantidad editable ni tarifas `V1/V2/V3`: la celda de precio se vuelve un campo libre donde el cajero escribe el TOTAL de esa venta (ej. "4500" para "$4.500 de papa"). `PosPage::saveSale()` fuerza `quantity = 1` en el servidor sin importar lo que llegue del formulario, asi que `unit_price` termina siendo el total tal cual. Como estos productos siempre tienen `tracks_inventory = false`, no generan movimiento de inventario.
 
 ### Pro y superiores
 

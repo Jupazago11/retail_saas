@@ -276,6 +276,17 @@ class PosPage extends Component
         });
 
         if ($existingIndex !== false) {
+            // Precio flexible: no tiene sentido sumar cantidad (nunca se
+            // pesa exacto), asi que volver a escanear/agregar el mismo
+            // producto solo enfoca la linea existente para que el cajero
+            // corrija el total, en vez de duplicarlo en silencio.
+            if ($product->flexible_price) {
+                $this->quickProductId = null;
+                $this->productLookup = '';
+
+                return;
+            }
+
             $current = (string) ($this->items[$existingIndex]['quantity'] ?? '1');
             if (! preg_match('/^-?\d+(?:\.\d+)?$/', $current)) {
                 $current = '1';
@@ -882,15 +893,25 @@ class PosPage extends Component
             'notes' => $this->blankToNull($validated['notes']),
             'user_id' => auth()->id(),
             'items' => collect($validated['items'])
-                ->map(fn (array $item) => [
-                    'product_id' => (int) $item['product_id'],
-                    'product_presentation_id' => $item['product_presentation_id'] ? (int) $item['product_presentation_id'] : null,
-                    'product_variant_id' => $item['product_variant_id'] ? (int) $item['product_variant_id'] : null,
-                    'quantity' => (string) $item['quantity'],
-                    'unit_price' => (string) $item['unit_price'],
-                    'discount_amount' => $item['discount_amount'] !== null && $item['discount_amount'] !== '' ? (string) $item['discount_amount'] : '0',
-                    'tax_rate' => $item['tax_rate'] !== null && $item['tax_rate'] !== '' ? (string) $item['tax_rate'] : '0',
-                ])
+                ->map(function (array $item) {
+                    // Precio flexible (papa, yuca...): la cantidad no tiene
+                    // sentido (nunca se pesa exacto), asi que se fuerza a 1
+                    // sin importar lo que llegue del formulario — el total
+                    // de la venta es lo que el cajero escribio como
+                    // unit_price (ver newItemLine()/pos-page.blade.php).
+                    $product = $this->products()->firstWhere('id', (int) $item['product_id']);
+                    $isFlexiblePrice = (bool) ($product?->flexible_price);
+
+                    return [
+                        'product_id' => (int) $item['product_id'],
+                        'product_presentation_id' => $item['product_presentation_id'] ? (int) $item['product_presentation_id'] : null,
+                        'product_variant_id' => $item['product_variant_id'] ? (int) $item['product_variant_id'] : null,
+                        'quantity' => $isFlexiblePrice ? '1' : (string) $item['quantity'],
+                        'unit_price' => (string) $item['unit_price'],
+                        'discount_amount' => $item['discount_amount'] !== null && $item['discount_amount'] !== '' ? (string) $item['discount_amount'] : '0',
+                        'tax_rate' => $item['tax_rate'] !== null && $item['tax_rate'] !== '' ? (string) $item['tax_rate'] : '0',
+                    ];
+                })
                 ->all(),
         ];
 

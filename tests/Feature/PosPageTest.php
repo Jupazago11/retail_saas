@@ -90,6 +90,63 @@ class PosPageTest extends TestCase
         ]);
     }
 
+    public function test_pos_page_flexible_price_product_charges_typed_total_with_quantity_one_and_no_inventory_movement(): void
+    {
+        [$owner, $company, $branch, $warehouse, $cashRegister] = $this->posFixture();
+        $cashSession = app(OpenCashSession::class)->handle($company, [
+            'branch_id' => $branch->id,
+            'cash_register_id' => $cashRegister->id,
+            'opened_by' => $owner->id,
+            'opening_amount' => '50000',
+        ]);
+
+        $unit = Unit::query()->where('company_id', $company->id)->firstOrFail();
+        $category = Category::query()->where('company_id', $company->id)->firstOrFail();
+        $papa = Product::query()->create([
+            'company_id' => $company->id,
+            'category_id' => $category->id,
+            'base_unit_id' => $unit->id,
+            'name' => 'Papa',
+            'cost' => 0,
+            'price_1' => 0,
+            'flexible_price' => true,
+            'tracks_inventory' => false,
+            'minimum_stock' => 0,
+            'status' => RecordStatus::Active->value,
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        // Aunque llegue una cantidad distinta de 1 (por ejemplo, un residuo
+        // de un re-escaneo), precio flexible siempre debe guardarse con
+        // cantidad 1 — el total lo define directamente unit_price.
+        Livewire::test(PosPage::class)
+            ->set('branchId', $branch->id)
+            ->set('warehouseId', $warehouse->id)
+            ->set('cashRegisterId', $cashRegister->id)
+            ->set('cashSessionId', $cashSession->id)
+            ->set('saleStatus', SaleStatus::Confirmed->value)
+            ->set('items.0.product_id', (string) $papa->id)
+            ->set('items.0.quantity', '3')
+            ->set('items.0.unit_price', '4500')
+            ->call('saveSale')
+            ->assertHasNoErrors();
+
+        $sale = Sale::query()->where('company_id', $company->id)->latest('id')->firstOrFail();
+
+        $this->assertSame('4500.00', $sale->grand_total);
+        $this->assertDatabaseHas('sale_items', [
+            'sale_id' => $sale->id,
+            'product_id' => $papa->id,
+            'quantity' => '1.000000',
+            'unit_price' => '4500.00',
+        ]);
+        $this->assertDatabaseMissing('inventory_movements', [
+            'product_id' => $papa->id,
+        ]);
+    }
+
     public function test_pos_page_can_backdate_a_sale_when_checkbox_is_marked(): void
     {
         [$owner, $company, $branch, $warehouse, $cashRegister, $product] = $this->posFixture();
