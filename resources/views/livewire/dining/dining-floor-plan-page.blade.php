@@ -97,7 +97,7 @@
                     </template>
 
                     <template x-for="table in tables" :key="table.id">
-                        <div class="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 cursor-move items-center justify-center overflow-hidden border-2 border-blue-300 bg-white text-[11px] font-bold leading-none text-blue-800 shadow-sm"
+                        <div class="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 cursor-move items-center justify-center overflow-hidden border-2 border-blue-600 bg-white text-[11px] font-bold leading-none text-blue-900 shadow-sm"
                             :class="table.shape === 'round' ? 'rounded-full' : 'rounded-md'"
                             :style="`left: ${table.x}%; top: ${table.y}%; width: ${table.size}%; height: ${table.height}%`"
                             x-on:mousedown.stop="startDragTable(table.id)">
@@ -108,7 +108,7 @@
                     </template>
 
                     <template x-for="obstacle in obstacles" :key="'obstacle-' + obstacle.id">
-                        <div class="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 cursor-move rounded-sm border-2 border-neutral-950"
+                        <div class="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 cursor-move rounded-sm border border-neutral-950"
                             :style="`left: ${obstacle.x}%; top: ${obstacle.y}%; width: ${obstacle.width}%; height: ${obstacle.height}%; background-color: ${obstacleColor}`"
                             x-on:mousedown.stop="startDragObstacle(obstacle.id)">
                             <div class="pointer-events-auto absolute -bottom-1 -right-1 h-3 w-3 cursor-nwse-resize rounded-full border-2 border-white bg-neutral-950"

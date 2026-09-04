@@ -56,11 +56,14 @@ class AddDishToDiningOrder
                 $frozenSale->update(['dining_table_id' => $table->id]);
             }
 
+            $notes = trim((string) ($item['notes'] ?? ''));
+
             $diningOrderItem = DiningOrderItem::query()->create([
                 'frozen_sale_id' => $frozenSale->id,
                 'product_id' => (int) $item['product_id'],
                 'product_variant_id' => $item['product_variant_id'] ?? null,
                 'quantity' => (string) ($item['quantity'] ?? 1),
+                'notes' => $notes !== '' ? $notes : null,
                 'kitchen_status' => 'pending',
                 'created_by' => $user->id,
             ]);

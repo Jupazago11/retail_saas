@@ -40,6 +40,36 @@ class DiningTablesFlowTest extends TestCase
         $this->assertSame(1, DiningOrderItem::query()->where('frozen_sale_id', $frozenSale->id)->count());
     }
 
+    public function test_a_dish_can_carry_a_free_text_note_for_the_kitchen(): void
+    {
+        [$owner, $company, $table, $product] = $this->diningFixture();
+
+        app(AddDishToDiningOrder::class)->handle($company, $table, [
+            'product_id' => $product->id,
+            'quantity' => '1',
+            'unit_price' => '18000',
+            'notes' => '  sin cebolla  ',
+        ], $owner);
+
+        $item = DiningOrderItem::query()->where('frozen_sale_id', $table->fresh()->openFrozenSale()->id)->firstOrFail();
+        $this->assertSame('sin cebolla', $item->notes);
+    }
+
+    public function test_a_dish_without_a_note_stores_null_instead_of_an_empty_string(): void
+    {
+        [$owner, $company, $table, $product] = $this->diningFixture();
+
+        app(AddDishToDiningOrder::class)->handle($company, $table, [
+            'product_id' => $product->id,
+            'quantity' => '1',
+            'unit_price' => '18000',
+            'notes' => '   ',
+        ], $owner);
+
+        $item = DiningOrderItem::query()->where('frozen_sale_id', $table->fresh()->openFrozenSale()->id)->firstOrFail();
+        $this->assertNull($item->notes);
+    }
+
     public function test_adding_a_second_dish_appends_to_the_same_open_order(): void
     {
         [$owner, $company, $table, $product] = $this->diningFixture();

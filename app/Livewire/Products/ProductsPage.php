@@ -243,6 +243,14 @@ class ProductsPage extends Component
             $validated['minimumStock']    = 0;
         }
 
+        // Precio flexible es un concepto de tienda/mercado (perecederos a
+        // granel con precio que cambia a diario) que no aplica a un menu de
+        // restaurante — se fuerza aqui, no solo se oculta en el formulario,
+        // para que no dependa de que el cliente mande el campo coherente.
+        if ($company->businessType?->code === 'restaurant') {
+            $validated['flexiblePrice'] = false;
+        }
+
         // Precio flexible nunca lleva inventario ni precios de catalogo: el
         // total lo escribe el cajero en el POS cada vez, no tiene sentido
         // llevar stock en kilos que nunca se pesan exactamente. Se fuerza
@@ -523,6 +531,7 @@ class ProductsPage extends Component
             'suppliers' => $this->suppliers(),
             'warehouses' => $this->warehouses(),
             'hasInventory' => app(\App\Services\Plans\CompanyPlanResolver::class)->hasModule($company, 'inventory'),
+            'isRestaurant' => $company->businessType?->code === 'restaurant',
             'barcodePreviewSvg' => $this->barcodePreviewSvg(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [

@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Actions\Companies\CreateCompany;
+use App\Actions\Companies\ProvisionDefaultRestaurantRoles;
 use App\Enums\RecordStatus;
 use App\Livewire\Admin\RolesPage;
+use App\Models\BusinessType;
 use App\Models\CompanyRole;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
@@ -209,5 +211,33 @@ class RolesPageTest extends TestCase
             ->assertHasErrors(['newInternalUsername']);
 
         $this->assertNull(User::query()->where('username', 'tercero_ext')->first());
+    }
+
+    public function test_roles_page_self_heals_missing_base_users_for_a_legacy_restaurant_company(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Restaurante Legado SAS',
+        ]);
+        $company->update(['business_type_id' => BusinessType::where('code', 'restaurant')->value('id')]);
+        $this->assignCompanyPlan($company, 'basic');
+
+        // Simula una empresa restaurante activada antes de que existiera el
+        // provisioning automatico de usuarios: los 3 roles base ya existen
+        // (via ProvisionDefaultRestaurantRoles, tal como los crea
+        // CompaniesPage::confirmTypeModal) pero ninguno tiene un usuario
+        // vinculado todavia.
+        app(ProvisionDefaultRestaurantRoles::class)->handle($company);
+        $this->assertSame(0, User::query()->where('username', 'like', '%.'.$company->id)->count());
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(RolesPage::class);
+
+        $this->assertSame(3, User::query()->where('username', 'like', '%.'.$company->id)->count());
+        $this->assertNotNull(User::query()->where('username', "cajero.{$company->id}")->first());
+        $this->assertNotNull(User::query()->where('username', "mesero.{$company->id}")->first());
+        $this->assertNotNull(User::query()->where('username', "cocina.{$company->id}")->first());
     }
 }

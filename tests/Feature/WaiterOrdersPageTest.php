@@ -45,6 +45,26 @@ class WaiterOrdersPageTest extends TestCase
         $this->assertSame('occupied', $table->fresh()->occupancy_status);
     }
 
+    public function test_waiter_can_attach_a_note_to_a_dish_and_it_shows_up_in_the_order(): void
+    {
+        [, $company, $table, $product, $waiter] = $this->fixture();
+
+        $this->actingAs($waiter);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(WaiterOrdersPage::class)
+            ->call('selectTable', $table->id)
+            ->set('productId', (string) $product->id)
+            ->set('quantity', '1')
+            ->set('notes', 'sin cebolla')
+            ->call('addDish')
+            ->assertHasNoErrors()
+            ->assertSee('sin cebolla')
+            ->assertSet('notes', '');
+
+        $this->assertSame('sin cebolla', DiningOrderItem::query()->firstOrFail()->notes);
+    }
+
     public function test_selecting_a_table_shows_its_order_and_supports_editing_and_removing_items(): void
     {
         [$owner, $company, $table, $product, $waiter] = $this->fixture();

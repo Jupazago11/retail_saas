@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Actions\Companies\CreateInternalUserForCompany;
+use App\Actions\Companies\ProvisionDefaultRestaurantUsers;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Company;
@@ -34,9 +35,22 @@ class RolesPage extends Component
     public string $newInternalPassword = '';
     public string $newInternalCompanyRoleId = '';
 
-    public function mount(): void
+    public function mount(ProvisionDefaultRestaurantUsers $provisionDefaultRestaurantUsers): void
     {
         $this->ensurePermission('roles.manage');
+
+        $company = $this->currentCompany();
+
+        // Autocura empresas restaurante que quedaron sin Cajero/Mesero/Cocina
+        // (activadas antes de que existiera este provisioning, o a las que
+        // se les agoto el cupo de usuarios del plan en su momento). Solo
+        // crea usuarios para roles que ya existen y siguen sin nadie
+        // vinculado — nunca toca permisos, así que es seguro llamarla en
+        // cada visita a esta pantalla.
+        if ($company->businessType?->code === 'restaurant') {
+            $provisionDefaultRestaurantUsers->handle($company);
+        }
+
         $this->loadMemberships();
     }
 

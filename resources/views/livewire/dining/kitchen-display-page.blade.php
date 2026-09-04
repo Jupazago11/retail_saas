@@ -22,6 +22,9 @@
                                             Novedad
                                         </span>
                                     @endif
+                                    @if ($item->notes)
+                                        <p class="mt-0.5 text-xs font-semibold text-rose-700">"{{ $item->notes }}"</p>
+                                    @endif
                                     <p class="text-[11px] text-gray-400">
                                         {{ $item->creator?->name ?? 'Sin registrar' }}
                                     </p>

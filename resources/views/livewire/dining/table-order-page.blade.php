@@ -40,6 +40,13 @@
                         @error('quantity') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
 
+                    <div class="min-w-[160px] flex-1">
+                        <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Comentario</label>
+                        <input wire:model="notes" type="text" placeholder="Ej: sin cebolla"
+                            class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                        @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    </div>
+
                     <button wire:click="addDish"
                         class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
                         Agregar
@@ -55,6 +62,9 @@
                         <div class="flex items-center justify-between py-2.5 text-sm">
                             <div>
                                 <span class="font-semibold text-gray-800">{{ $item->quantity + 0 }}x {{ $item->product->name }}</span>
+                                @if ($item->notes)
+                                    <p class="mt-0.5 text-xs italic text-gray-500">"{{ $item->notes }}"</p>
+                                @endif
                             </div>
                             <span class="rounded-full px-2.5 py-0.5 text-xs font-medium
                                 {{ match($item->kitchen_status) {

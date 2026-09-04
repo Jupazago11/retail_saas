@@ -25,6 +25,7 @@ class TableOrderPage extends Component
     public int $tableId;
     public string $productId = '';
     public string $quantity = '1';
+    public string $notes = '';
 
     // Estado del panel de cobro: divide la comanda en "pagadores" (1 por
     // defecto, N si se activa "Dividir cuenta"), cada uno con su propia
@@ -60,6 +61,7 @@ class TableOrderPage extends Component
                 Rule::exists('products', 'id')->where(fn ($q) => $q->where('company_id', $company->id)->whereNull('deleted_at')),
             ],
             'quantity' => ['required', 'numeric', 'gt:0'],
+            'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
         $product = $this->products()->firstWhere('id', (int) $validated['productId']);
@@ -69,6 +71,7 @@ class TableOrderPage extends Component
                 'product_id' => (int) $validated['productId'],
                 'quantity' => (string) $validated['quantity'],
                 'unit_price' => (string) $product->price_1,
+                'notes' => $validated['notes'] ?? null,
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
             $this->addError('productId', $exception->getMessage());
@@ -78,6 +81,7 @@ class TableOrderPage extends Component
 
         $this->productId = '';
         $this->quantity = '1';
+        $this->notes = '';
         $this->toast('Plato agregado a la comanda.');
     }
 

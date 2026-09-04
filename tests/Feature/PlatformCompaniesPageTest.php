@@ -9,12 +9,14 @@ use App\Models\CompanyRole;
 use App\Models\User;
 use App\Services\Authorization\AuthorizationCatalogBootstrapper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class PlatformCompaniesPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_confirm_type_modal_activates_a_pending_company_with_business_type(): void
     {
@@ -73,6 +75,39 @@ class PlatformCompaniesPageTest extends TestCase
         $this->assertEqualsCanonicalizing(['sales.view', 'sales.create', 'dining.orders', 'kitchen.manage'], $roles['CAJERO']->permissions->pluck('code')->all());
         $this->assertEqualsCanonicalizing(['dining.orders'], $roles['MESERO']->permissions->pluck('code')->all());
         $this->assertEqualsCanonicalizing(['kitchen.manage'], $roles['COCINA']->permissions->pluck('code')->all());
+    }
+
+    public function test_activating_a_company_as_restaurant_provisions_one_user_per_default_role(): void
+    {
+        app(AuthorizationCatalogBootstrapper::class)->ensureDefaults();
+
+        $admin = User::factory()->create(['is_platform_admin' => true]);
+        $owner = User::factory()->create();
+        $company = Company::factory()->create(['owner_user_id' => $owner->id, 'business_type_id' => null]);
+        $company->users()->attach($owner->id, ['company_role' => 'owner', 'status' => 'active', 'joined_at' => now()]);
+        $company->subscriptions()->create([
+            'plan_id' => null,
+            'bundle_id' => null,
+            'status' => 'pending',
+        ]);
+        $restaurant = BusinessType::query()->where('code', 'restaurant')->firstOrFail();
+
+        $this->actingAs($admin);
+
+        Livewire::test(CompaniesPage::class)
+            ->call('openActivationModal', $company->id)
+            ->set('selectedBusinessTypeId', $restaurant->id)
+            ->call('confirmTypeModal')
+            ->assertHasNoErrors();
+
+        foreach (['cajero', 'mesero', 'cocina'] as $prefix) {
+            $expectedUsername = "{$prefix}.{$company->id}";
+            $user = User::query()->where('username', $expectedUsername)->first();
+
+            $this->assertNotNull($user, "Se esperaba un usuario con username {$expectedUsername}");
+            $this->assertTrue($user->must_change_password);
+            $this->assertTrue(Hash::check($expectedUsername, $user->password));
+        }
     }
 
     public function test_activating_a_company_as_general_does_not_provision_restaurant_roles(): void

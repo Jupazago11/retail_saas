@@ -12,6 +12,7 @@ class DiningOrderItem extends Model
         'product_id',
         'product_variant_id',
         'quantity',
+        'notes',
         'kitchen_status',
         'created_by',
         'modified_by',

@@ -3,6 +3,7 @@
 namespace App\Livewire\Platform;
 
 use App\Actions\Companies\ProvisionDefaultRestaurantRoles;
+use App\Actions\Companies\ProvisionDefaultRestaurantUsers;
 use App\Actions\Subscriptions\RealignSubscriptionPlanForBusinessType;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\HasResponsivePageSize;
@@ -102,7 +103,7 @@ class CompaniesPage extends Component
         $this->showTypeModal = true;
     }
 
-    public function confirmTypeModal(RealignSubscriptionPlanForBusinessType $realignSubscriptionPlan, ProvisionDefaultRestaurantRoles $provisionDefaultRestaurantRoles): void
+    public function confirmTypeModal(RealignSubscriptionPlanForBusinessType $realignSubscriptionPlan, ProvisionDefaultRestaurantRoles $provisionDefaultRestaurantRoles, ProvisionDefaultRestaurantUsers $provisionDefaultRestaurantUsers): void
     {
         abort_unless(auth()->user()?->is_platform_admin, 403);
 
@@ -142,6 +143,7 @@ class CompaniesPage extends Component
 
             if ($businessType->code === 'restaurant') {
                 $provisionDefaultRestaurantRoles->handle($company);
+                $provisionDefaultRestaurantUsers->handle($company);
             }
 
             $this->toast("Empresa \"{$company->display_name}\" activada correctamente.");
@@ -156,6 +158,7 @@ class CompaniesPage extends Component
 
             if ($businessType->code === 'restaurant') {
                 $provisionDefaultRestaurantRoles->handle($company);
+                $provisionDefaultRestaurantUsers->handle($company);
             }
 
             $this->toast("Tipo de negocio de \"{$company->display_name}\" actualizado.");

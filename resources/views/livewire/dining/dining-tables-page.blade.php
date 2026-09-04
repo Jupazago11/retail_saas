@@ -56,6 +56,13 @@
                             </a>
                         @endforeach
 
+                        @foreach ($obstacles->get($branchId, collect()) as $obstacle)
+                            <rect x="{{ (float) $obstacle->pos_x - (float) $obstacle->width / 2 }}"
+                                y="{{ (float) $obstacle->pos_y - (float) $obstacle->height / 2 }}"
+                                width="{{ (float) $obstacle->width }}" height="{{ (float) $obstacle->height }}" rx="0.5"
+                                fill="{{ $obstacleColor }}" stroke="#0a0a0a" stroke-width="0.3"></rect>
+                        @endforeach
+
                         @foreach ($placedCashRegisters->get($branchId, collect()) as $register)
                             @php($registerHalf = (float) $register->size / 2)
                             <g transform="translate({{ $register->pos_x }}, {{ $register->pos_y }})">

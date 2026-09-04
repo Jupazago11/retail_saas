@@ -8,11 +8,14 @@ use App\Actions\Dining\UpdateDiningOrderItemQuantity;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\Branch;
+use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\DiningFloorPlan;
+use App\Models\DiningObstacle;
 use App\Models\DiningOrderItem;
 use App\Models\DiningTable;
 use App\Models\Product;
+use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -40,6 +43,7 @@ class WaiterOrdersPage extends Component
     public ?int $selectedTableId = null;
     public string $productId = '';
     public string $quantity = '1';
+    public string $notes = '';
 
     public function mount(): void
     {
@@ -61,6 +65,7 @@ class WaiterOrdersPage extends Component
         $this->selectedTableId = $tableId;
         $this->productId = '';
         $this->quantity = '1';
+        $this->notes = '';
         $this->resetValidation();
     }
 
@@ -69,6 +74,7 @@ class WaiterOrdersPage extends Component
         $this->selectedTableId = null;
         $this->productId = '';
         $this->quantity = '1';
+        $this->notes = '';
         $this->resetValidation();
     }
 
@@ -84,6 +90,7 @@ class WaiterOrdersPage extends Component
                 Rule::exists('products', 'id')->where(fn ($q) => $q->where('company_id', $company->id)->whereNull('deleted_at')),
             ],
             'quantity' => ['required', 'numeric', 'gt:0'],
+            'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
         $product = Product::query()->findOrFail((int) $validated['productId']);
@@ -93,6 +100,7 @@ class WaiterOrdersPage extends Component
                 'product_id' => (int) $validated['productId'],
                 'quantity' => (string) $validated['quantity'],
                 'unit_price' => (string) $product->price_1,
+                'notes' => $validated['notes'] ?? null,
             ], auth()->user());
         } catch (InvalidArgumentException $exception) {
             $this->addError('productId', $exception->getMessage());
@@ -102,6 +110,7 @@ class WaiterOrdersPage extends Component
 
         $this->productId = '';
         $this->quantity = '1';
+        $this->notes = '';
         $this->toast('Plato agregado a la comanda.');
     }
 
@@ -174,6 +183,24 @@ class WaiterOrdersPage extends Component
             ->first();
     }
 
+    public function obstacles(): Collection
+    {
+        return DiningObstacle::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->where('branch_id', $this->branchId)
+            ->get();
+    }
+
+    public function placedCashRegisters(): Collection
+    {
+        return CashRegister::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->where('branch_id', $this->branchId)
+            ->where('status', RecordStatus::Active->value)
+            ->whereNotNull('pos_x')
+            ->get();
+    }
+
     public function selectedTable(): ?DiningTable
     {
         if (! $this->selectedTableId) {
@@ -237,6 +264,9 @@ class WaiterOrdersPage extends Component
             'branches' => $this->branches(),
             'tables' => $this->tables(),
             'floorPlan' => $this->floorPlan(),
+            'obstacles' => $this->obstacles(),
+            'placedCashRegisters' => $this->placedCashRegisters(),
+            'obstacleColor' => app(CompanySettings::class)->get($this->currentCompany(), 'dining', 'obstacle_color'),
             'selectedTable' => $this->selectedTable(),
             'products' => $this->products(),
             'orderItems' => $this->orderItems(),

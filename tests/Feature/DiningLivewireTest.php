@@ -71,6 +71,33 @@ class DiningLivewireTest extends TestCase
         $this->assertDatabaseHas('payments', ['amount' => '36000.00', 'payment_method_code' => 'cash']);
     }
 
+    public function test_a_dish_note_added_from_the_table_order_page_shows_up_in_the_kitchen_display(): void
+    {
+        [$owner, $company, $branch, $product] = $this->fixture();
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(DiningTablesPage::class)
+            ->set('branchId', $branch->id)
+            ->set('capacity', '4')
+            ->call('save');
+
+        $table = DiningTable::query()->where('company_id', $company->id)->firstOrFail();
+
+        Livewire::test(TableOrderPage::class, ['table' => $table->id])
+            ->set('productId', (string) $product->id)
+            ->set('quantity', '1')
+            ->set('notes', 'sin cebolla')
+            ->call('addDish')
+            ->assertHasNoErrors()
+            ->assertSee('sin cebolla');
+
+        Livewire::test(KitchenDisplayPage::class)
+            ->assertSee('Hamburguesa')
+            ->assertSee('sin cebolla');
+    }
+
     public function test_kitchen_display_shows_an_elapsed_time_badge_that_gets_more_urgent(): void
     {
         [$owner, $company, $branch, $product] = $this->fixture();

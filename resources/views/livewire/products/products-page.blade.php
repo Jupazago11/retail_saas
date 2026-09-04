@@ -340,7 +340,10 @@
 
                         {{-- Precio flexible: perecederos/granel (papa, yuca, frijol...) cuyo
                              precio cambia a diario. En vez de editar price_1 cada dia, el
-                             cajero escribe el total de la venta directamente en el POS. --}}
+                             cajero escribe el total de la venta directamente en el POS. No
+                             aplica a restaurante (menu de precio fijo, no granel) — se
+                             oculta aqui y se fuerza a false en el servidor (ver saveProduct()). --}}
+                        @unless ($isRestaurant)
                         <div class="rounded-xl border border-gray-200 p-3">
                             <label class="flex cursor-pointer items-center gap-3 text-sm text-gray-700">
                                 <input wire:model.live="flexiblePrice" type="checkbox"
@@ -353,6 +356,7 @@
                                 </p>
                             @endif
                         </div>
+                        @endunless
 
                         @if ($hasInventory && ! $flexiblePrice)
                         {{-- Inventario: primero se pregunta si el producto lo lleva --}}

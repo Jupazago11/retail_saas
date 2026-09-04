@@ -8,7 +8,9 @@ use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\Company;
 use App\Models\DiningFloorPlan;
+use App\Models\DiningObstacle;
 use App\Models\DiningTable;
+use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -173,6 +175,14 @@ class DiningTablesPage extends Component
             ->groupBy('branch_id');
     }
 
+    public function obstacles(): Collection
+    {
+        return DiningObstacle::query()
+            ->where('company_id', $this->currentCompany()->id)
+            ->get()
+            ->groupBy('branch_id');
+    }
+
     public function isOwner(): bool
     {
         return auth()->id() === $this->currentCompany()->owner_user_id;
@@ -185,6 +195,8 @@ class DiningTablesPage extends Component
             'branches' => $this->branches(),
             'floorPlans' => $this->floorPlans(),
             'placedCashRegisters' => $this->placedCashRegisters(),
+            'obstacles' => $this->obstacles(),
+            'obstacleColor' => app(CompanySettings::class)->get($this->currentCompany(), 'dining', 'obstacle_color'),
             'isOwner' => $this->isOwner(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [

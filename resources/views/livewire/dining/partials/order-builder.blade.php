@@ -1,4 +1,4 @@
-{{-- Constructor de pedido reutilizado por la vista simple (inline) y la vista de mapa (dentro del modal) de WaiterOrdersPage. Espera $selectedTable, $products, $orderItems, $orderTotal, $canCharge en el scope. --}}
+{{-- Constructor de pedido reutilizado por la vista simple (inline) y la vista de mapa (panel lateral) de WaiterOrdersPage. Espera $selectedTable, $products, $orderItems, $orderTotal, $canCharge en el scope. --}}
 <div class="space-y-4">
     <div class="rounded-xl bg-white p-4 ring-1 ring-gray-200">
         <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Agregar plato</p>
@@ -6,12 +6,12 @@
         <div class="mt-3 flex flex-wrap items-end gap-3">
             <div class="min-w-[200px] flex-1">
                 <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Plato</label>
-                <select wire:model="productId" class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
-                    <option value="">Seleccionar...</option>
-                    @foreach ($products as $product)
-                        <option value="{{ $product->id }}">{{ $product->name }} &middot; {{ number_format((float) $product->price_1, 0, ',', '.') }}</option>
-                    @endforeach
-                </select>
+                <x-searchable-select
+                    class="mt-1"
+                    model="productId"
+                    placeholder="Buscar plato..."
+                    :options="$products->map(fn ($product) => ['id' => $product->id, 'label' => $product->name.' · '.number_format((float) $product->price_1, 0, ',', '.')])"
+                />
                 @error('productId') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
             </div>
 
@@ -20,6 +20,13 @@
                 <input wire:model="quantity" type="number" min="1" step="1"
                     class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                 @error('quantity') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+            </div>
+
+            <div class="min-w-[160px] flex-1">
+                <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Comentario</label>
+                <input wire:model="notes" type="text" placeholder="Ej: sin cebolla"
+                    class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
+                @error('notes') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
             </div>
 
             <button wire:click="addDish"
@@ -35,20 +42,25 @@
         <div class="mt-3 divide-y divide-gray-100">
             @forelse ($orderItems as $item)
                 <div class="flex flex-wrap items-center justify-between gap-2 py-2.5 text-sm">
-                    <div class="flex items-center gap-2">
-                        <span class="font-semibold text-gray-800">{{ $item->product->name }}</span>
-                        <span class="rounded-full px-2 py-0.5 text-xs font-medium
-                            {{ match ($item->kitchen_status) {
-                                'pending' => 'bg-gray-100 text-gray-600',
-                                'preparing' => 'bg-amber-50 text-amber-700',
-                                'on_hold' => 'bg-sky-100 text-sky-700',
-                                'ready' => 'bg-emerald-50 text-emerald-700',
-                                'served' => 'bg-blue-50 text-blue-700',
-                                'cancelled' => 'bg-rose-100 text-rose-700',
-                                default => 'bg-blue-50 text-blue-700',
-                            } }}">
-                            {{ $this->kitchenStatusLabel($item->kitchen_status) }}
-                        </span>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-semibold text-gray-800">{{ $item->product->name }}</span>
+                            <span class="rounded-full px-2 py-0.5 text-xs font-medium
+                                {{ match ($item->kitchen_status) {
+                                    'pending' => 'bg-gray-100 text-gray-600',
+                                    'preparing' => 'bg-amber-50 text-amber-700',
+                                    'on_hold' => 'bg-sky-100 text-sky-700',
+                                    'ready' => 'bg-emerald-50 text-emerald-700',
+                                    'served' => 'bg-blue-50 text-blue-700',
+                                    'cancelled' => 'bg-rose-100 text-rose-700',
+                                    default => 'bg-blue-50 text-blue-700',
+                                } }}">
+                                {{ $this->kitchenStatusLabel($item->kitchen_status) }}
+                            </span>
+                        </div>
+                        @if ($item->notes)
+                            <p class="mt-0.5 text-xs italic text-gray-500">"{{ $item->notes }}"</p>
+                        @endif
                     </div>
 
                     @if ($item->kitchen_status !== 'cancelled')

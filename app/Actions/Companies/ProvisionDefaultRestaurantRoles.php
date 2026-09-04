@@ -17,7 +17,7 @@ use App\Models\Permission;
  */
 class ProvisionDefaultRestaurantRoles
 {
-    protected const ROLES = [
+    public const ROLES = [
         'CAJERO' => [
             'display_name' => 'Cajero',
             // sales.* para su modulo de ventas normal; dining.orders para
