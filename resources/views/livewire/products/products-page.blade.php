@@ -81,10 +81,7 @@
                                     @if ($product->deleted_at)
                                         <x-status-badge color="amber" class="w-20">archivado</x-status-badge>
                                     @else
-                                        <button wire:click="toggleProductStatus({{ $product->id }})"
-                                            class="inline-flex w-20 justify-center rounded-full px-3 py-1 text-xs font-semibold transition {{ $product->status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 hover:bg-emerald-100' : 'bg-stone-200 text-gray-600 hover:bg-stone-300' }}">
-                                            {{ $product->status === 'active' ? 'activo' : 'inactivo' }}
-                                        </button>
+                                        <x-status-toggle :active="$product->status === 'active'" action="toggleProductStatus({{ $product->id }})" />
                                     @endif
                                 </td>
                                 <td class="py-2 align-middle">

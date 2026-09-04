@@ -156,9 +156,11 @@
                                     <p>P3: {{ $presentation->price_3 !== null ? \App\Support\Money::format((float) $presentation->price_3) : 'No aplica' }}</p>
                                 </td>
                                 <td class="py-4 align-top">
-                                    <x-status-badge :color="$presentation->status === 'active' ? 'emerald' : ($presentation->status === 'inactive' ? 'stone' : 'amber')">
-                                        {{ $presentation->status }}
-                                    </x-status-badge>
+                                    @if ($presentation->deleted_at)
+                                        <x-status-badge color="amber">archivado</x-status-badge>
+                                    @else
+                                        <x-status-toggle :active="$presentation->status === 'active'" action="togglePresentationStatus({{ $presentation->id }})" />
+                                    @endif
                                 </td>
                                 <td class="py-4 align-top text-right">
                                     <div class="flex justify-end gap-2">
@@ -169,9 +171,6 @@
                                         @else
                                             <button wire:click="editPresentation({{ $presentation->id }})" class="rounded-full border border-gray-300 px-3 py-1 font-medium text-gray-700">
                                                 Editar
-                                            </button>
-                                            <button wire:click="togglePresentationStatus({{ $presentation->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                {{ $presentation->status === 'active' ? 'Desactivar' : 'Activar' }}
                                             </button>
                                             <button wire:click="archivePresentation({{ $presentation->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                 Archivar

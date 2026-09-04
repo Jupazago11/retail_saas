@@ -1,5 +1,226 @@
 # Registro de Cambios IA
 
+## 2026-09-03 - Guardado en vivo al crear/mover/eliminar una mesa en el editor del plano
+
+- Objetivo: el usuario reporto que borrar una mesa en vivo no renumeraba las restantes (solo al pulsar "Guardar plano"), y pidio que crear, mover y eliminar una mesa se guarden solos, sin depender de ese boton.
+- Archivos modificados:
+  - `app/Livewire/Dining/DiningFloorPlanPage.php` — metodos nuevos `createTable()`, `updateTablePosition()`, `deleteTable()` (mas el helper `tablePayload()`)
+  - `resources/views/livewire/dining/dining-floor-plan-page.blade.php` — `addTable()`/`removeTable()` ahora llaman al servidor de inmediato (`async`, via `$wire`); `onMouseUp()` guarda la posicion de una mesa al soltarla; se quitaron `nextTableName()` y el contador de ids temporales (ya sin uso)
+  - `tests/Feature/DiningFloorPlanPageTest.php` — 3 tests nuevos
+- Decisiones: contorno/redimensionado/cajas siguen requiriendo "Guardar plano" (no se pidieron); `deleteTable()` devuelve la lista completa ya renumerada (misma logica de `DiningTable::renumberActiveTables()` que ya usaba el guardado en lote) para que el cliente la reemplace entera, en vez de solo quitar el elemento borrado — eso es lo que corrige la renumeracion en vivo.
+- Pruebas: `DiningFloorPlanPageTest` (3 nuevos: crear con numero correcto, mover persiste posicion, borrar devuelve la lista renumerada). Suite completa: 492 passed, 0 failed.
+- Resultado: crear, mover y eliminar una mesa en el editor del plano quedan guardados al instante (sin pulsar "Guardar plano"), y los numeros de las mesas restantes se corrigen en pantalla apenas se borra una, no despues.
+
+## 2026-09-03 - Modulo de pedidos del mesero/cajero, division de cuenta por items, pagos mixtos y cuenta sin pagar
+
+- Objetivo: el usuario pidio el modulo unico del mesero (2 vistas — select simple y plano visual — alternables con un icono de ojo, edicion de pedidos, novedad visible en cocina), que la cajera tambien pueda tomar pedidos y ver cocina, division de cuenta por items al cobrar (cada quien paga lo que pidio), impresion de una cuenta sin pagar, y pagos mixtos (efectivo/tarjeta/transferencia) reales al cerrar una mesa (antes se cerraba sin cobrar nada).
+- Archivos creados:
+  - `app/Support/Authorization/PermissionCatalog.php` — permiso nuevo `dining.orders`
+  - `app/Livewire/Dining/WaiterOrdersPage.php`, `resources/views/livewire/dining/waiter-orders-page.blade.php`, `resources/views/livewire/dining/partials/order-builder.blade.php`
+  - `app/Actions/Dining/SplitDiningTableBill.php`
+  - `app/Services/Printing/BuildDiningOrderPreviewTicketData.php`, `app/Http/Controllers/Dining/DiningOrderPreviewTicketController.php`, `resources/views/printing/dining/order-preview-ticket.blade.php`
+  - `resources/views/printing/partials/ticket-styles.blade.php` (CSS del ticket extraida de `printing/sales/ticket.blade.php`, compartida por el ticket real y la cuenta sin pagar)
+  - `tests/Feature/WaiterOrdersPageTest.php`, `tests/Feature/SplitDiningTableBillTest.php`, `tests/Feature/TableOrderCheckoutTest.php`, `tests/Feature/DiningOrderPreviewTicketTest.php`
+- Archivos modificados:
+  - `app/Actions/Companies/ProvisionDefaultRestaurantRoles.php` — Mesero pasa de `dining.manage` a `dining.orders`; Cajero gana `dining.orders` + `kitchen.manage`
+  - `app/Http/Middleware/EnsureCompanyPermission.php` — acepta variios codigos de permiso (`hasAny`), retrocompatible
+  - `app/Livewire/Dining/TableOrderPage.php` — `chargeTable()` (un clic, sin cobrar) reemplazado por `openCheckout()`/`submitCheckout()` (panel de pagadores + pagos mixtos + division por items); acepta `dining.orders` ademas de `dining.manage`
+  - `resources/views/livewire/dining/table-order-page.blade.php` — modal de cobro, enlace "Imprimir cuenta (sin pagar)", panel de tickets cuando la cuenta se dividio
+  - `resources/views/dashboard.blade.php` — tile "Pedidos" nuevo, gateado por `dining.orders`
+  - `routes/web.php` — rutas `dining.orders`, `dining.tables.preview-ticket`; `dining.tables.order` acepta `dining.manage,dining.orders`
+  - `resources/views/printing/sales/ticket.blade.php` — usa el partial de estilos compartido (mismo HTML generado, verificado con `SaleTicketViewTest`)
+  - `docs/decisiones-tecnicas.md`, `docs/modelo-datos.md` — seccion "Roles automaticos..." actualizada (ya no placeholder) + nueva seccion completa de este cambio
+- Decisiones:
+  - `dining.manage` (CRUD de mesas/plano, dueño) vs `dining.orders` (tomar pedidos, mesero/cajero) — permisos separados a proposito, ver `PermissionCatalog`.
+  - `WaiterOrdersPage` reusa el mismo partial de constructor de pedido en sus 2 vistas (no duplica markup); el toggle de vista es puro Alpine, sin ida y vuelta al servidor.
+  - Division de cuenta = N `Sale` confirmadas (no N pagos sobre 1 sola venta) porque `frozen_sales.converted_sale_id` es una FK 1:1 — se creo `SplitDiningTableBill` en vez de reusar `ConvertFrozenSaleToSale`; cada venta generada usa `sales.frozen_sale_id`/`payer_label` (columnas ya migradas en la sesion anterior, sin usar hasta ahora).
+  - CSS del ticket extraida a un partial compartido (no reescrita a mano en la cuenta sin pagar) para garantizar formato identico sin riesgo de transcripcion en un bloque de +500 lineas calibrado en mm reales para impresoras termicas.
+- Pruebas: `SplitDiningTableBillTest` (5), `TableOrderCheckoutTest` (2, a traves del componente Livewire real), `WaiterOrdersPageTest` (4), `DiningOrderPreviewTicketTest` (3); `DiningLivewireTest`/`PlatformCompaniesPageTest` actualizados al nuevo flujo. Suite completa: 489 passed, 0 failed. Assets recompilados (`npm run build` via `vite`).
+- Limitacion honesta: sin navegador/Playwright disponible en este entorno, no se verifico visualmente el plano/modal/ticket impresos — solo via los tests de Livewire (renderizan el HTML real) y lectura cuidadosa del CSS. Pendiente que el usuario lo revise en su navegador.
+- Resultado: el mesero tiene su propio modulo de pedidos (simple + mapa), la cajera puede tomar pedidos y ver cocina, cobrar una mesa exige pagos mixtos reales (ya no cierra "gratis"), se puede dividir la cuenta por items entre varios pagadores con su propio pago cada uno, y se puede imprimir la cuenta antes de pagar con el mismo formato del ticket final.
+
+## 2026-09-03 - Plano visual e interactivo del salon (Mesas)
+
+- Objetivo: el usuario referencio una foto de un POS de restaurante con un plano visual del salon (mesas dibujadas donde estan realmente, no una lista) y pidio construir algo similar: contorno del salon a mano libre (cuadrado, en L o cualquier forma), mesas numeradas y ubicables arrastrando, que quede guardado, y que solo el dueño de la empresa pueda editar el plano.
+- Archivos creados:
+  - `database/migrations/2026_09_03_120000_create_dining_floor_plans_table.php`
+  - `database/migrations/2026_09_03_120100_add_layout_fields_to_dining_tables_table.php`
+  - `app/Models/DiningFloorPlan.php`
+  - `app/Livewire/Dining/DiningFloorPlanPage.php`
+  - `resources/views/livewire/dining/dining-floor-plan-page.blade.php`
+  - `tests/Feature/DiningFloorPlanPageTest.php`
+- Archivos modificados:
+  - `app/Models/DiningTable.php` — `pos_x`, `pos_y`, `shape` en `$fillable`
+  - `app/Livewire/Dining/DiningTablesPage.php` — expone `floorPlans()` (por sucursal) e `isOwner()` a la vista
+  - `resources/views/livewire/dining/dining-tables-page.blade.php` — boton "Editar plano" (solo dueño) y mapa visual SVG de solo lectura por sucursal cuando existe plano guardado, con fallback a la cuadricula anterior si no
+  - `routes/web.php` — ruta `dining/floor-plan`
+  - `docs/modelo-datos.md` — tabla `dining_floor_plans` y columnas nuevas de `dining_tables`
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - `dining_floor_plans` (contorno del salon por sucursal, `outline_points` JSON de puntos `{x,y}` en porcentaje 0-100 de un viewBox cuadrado fijo).
+  - `dining_tables` gana `pos_x`, `pos_y` (decimal nullable, mismo porcentaje 0-100) y `shape` (`round`/`square`, default `square`).
+- Decisiones:
+  - Contorno **libre** (poligono dibujado punto a punto), no plantillas fijas de rectangulo/L — decision explicita del usuario tras comparar ambas opciones, para poder replicar la forma real del salon sin importar que tan irregular sea.
+  - El lienzo es un `<svg viewBox="0 0 100 100">` cuadrado (no rectangular) para que la conversion pixel-a-porcentaje sea identica en X y en Y; el poligono dibujado adentro puede tener cualquier forma igual, incluida una L.
+  - Todo el arrastre (puntos del contorno y mesas) vive en estado de Alpine.js puro mientras se edita — sin llamada a Livewire por cada `mousemove`, solo un "Guardar plano" que manda el estado completo en una sola llamada (`$wire.call('save', outline, tables)`), mismo patron de guardado en lote que `PrinterSetupGate`.
+  - Bug de interaccion encontrado y corregido antes de dar el cambio por terminado (sin navegador real disponible en esta sesion para probarlo interactivo, se razono con cuidado el orden de eventos del DOM): arrastrar un punto del contorno y soltarlo dispara igual un `click` final ademas del `mousedown`+`mousemove`+`mouseup` — la primera version borraba el punto justo despues de moverlo. Se reemplazo el borrado-por-click en el circulo por logica en `onMouseUp` basada en una bandera `moved` (si hubo `mousemove` durante el arrastre, no se borra), mas una bandera `justDragged` que ignora el siguiente click sobre el lienzo vacio (evita agregar un punto nuevo por accidente justo donde se solto un arrastre).
+  - Acceso: editar el plano (contorno + posiciones + formas) exige `auth()->id() === company->owner_user_id` en `DiningFloorPlanPage`, chequeo explicito e independiente del permiso `dining.manage` (que sigue gobernando el uso operativo diario — abrir comandas desde el mapa o la lista). Ningun rol personalizado, por amplio que sea, puede editar el plano si no es el dueño.
+  - La pagina operativa de Mesas (`DiningTablesPage`) no obliga a tener un plano: sin `dining_floor_plans` para una sucursal, sigue mostrando la cuadricula de siempre; el mapa visual (de solo lectura, clic en una mesa navega igual que antes a `dining.tables.order`) solo aparece cuando el dueño ya guardo un contorno.
+  - Numeracion de mesas: se reutiliza el campo `name` que ya existia (unico por sucursal) como etiqueta visible en el mapa — no se agrego un campo nuevo de "numero".
+- Pruebas:
+  - `DiningFloorPlanPageTest` (4 tests nuevos): el dueño guarda contorno + posiciones + forma en una sola llamada, un contorno de menos de 3 puntos se rechaza sin guardar nada, un usuario no-dueño con `dining.manage` y `settings.manage` amplios es rechazado con 403, y agregar una mesa nueva la deja en el plano con posicion por defecto.
+  - Suite dirigida sin regresiones: `DiningTablesFlowTest`, `DiningLivewireTest`, `NavigationVisibilityTest`, `CompanySelectionTest`, `Auth/AuthenticationTest`, `TrackingModeGateTest`, `PrinterSetupGateTest` — 30 tests, todos en verde.
+  - Assets de frontend reconstruidos (`npm run build` via el servicio `vite`) para que las clases nuevas de Tailwind (`aspect-square`, `cursor-move`, grid con columna arbitraria) queden en el CSS compilado; contenedores `app`/`web` reiniciados despues.
+  - Limitacion honesta: esta sesion no tiene un navegador real ni Playwright disponible, asi que el arrastre en si (mousedown/mousemove/mouseup reales, no solo la lectura del codigo) no se probo interactivo — solo verificado por lectura cuidadosa del orden de eventos del DOM y por los tests de Livewire (que cubren el guardado server-side, no el drag client-side). Pendiente que el usuario lo prueba en su propio navegador.
+- Resultado:
+  - El dueño de una empresa restaurante ya puede dibujar el contorno de su salon (cualquier forma, no solo rectangulo/L) desde "Mesas y comandas" -> "Editar plano", agregar mesas, elegir si son redondas o cuadradas, y arrastrarlas a su posicion real. Guardado, la pagina operativa de Mesas muestra ese mismo mapa (sin poder editarlo) para que cualquiera con `dining.manage` abra comandas haciendo clic en la mesa correcta visualmente, en vez de una cuadricula generica.
+
+## 2026-09-03 - Plano de mesas: caja redimensionable sin modo propio, y numeracion de mesas sin huecos
+
+- Objetivo: tres pedidos tras ver el plano funcionando con sillas/cajas: (1) el modo "Cajas" de la barra superior sobra, el checkbox del panel lateral ya alcanza para activarla; (2) la caja no se podia redimensionar; (3) borrar una mesa debe renumerar las siguientes para que la numeracion activa nunca tenga huecos (borrar la "3" de 8 mesas debe dejar 1-7, no 1,2,4,5,6,7,8).
+- Archivos creados:
+  - `database/migrations/2026_09_03_150000_add_size_to_cash_registers_table.php`
+  - `database/migrations/2026_09_03_150100_drop_unique_name_from_dining_tables_table.php`
+- Archivos modificados:
+  - `app/Models/CashRegister.php` — `size` en `$fillable`
+  - `app/Models/DiningTable.php` — `nextNumberFor()` simplificado a "cuantas activas hay + 1"; nuevo `renumberActiveTables()`
+  - `app/Livewire/Dining/DiningFloorPlanPage.php` — `save()` llama `renumberActiveTables()` cuando archiva alguna mesa; persiste `size` de las cajas; `usedNames` ahora solo considera mesas activas (ya no `withTrashed()`)
+  - `app/Livewire/Dining/DiningTablesPage.php` — `toggleStatus()` tambien renumera al archivar; la regla `Rule::unique` de "Editar mesa" ahora solo choca contra otras mesas activas
+  - `resources/views/livewire/dining/dining-floor-plan-page.blade.php` — se quita el boton/modo "Cajas" de la barra superior; `startDragRegister()` ya no depende de `mode`; nuevo tirador de tamaño en el marcador de caja (`startResizeRegister()`, mismo patron que las mesas)
+  - `resources/views/livewire/dining/dining-tables-page.blade.php` — el mapa de solo lectura dibuja la caja con su `size` real en vez de un tamaño fijo
+  - `docs/modelo-datos.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - `cash_registers` gana `size` (decimal, mismo esquema porcentual que `dining_tables.size`, default `6`).
+  - `dining_tables` pierde el indice unico plano de `(company_id, branch_id, name)`.
+- Decisiones:
+  - **Se elimino el indice unico de `name`** porque contradecia directamente el pedido: un indice plano no distingue `status`, asi que el numero de una mesa archivada quedaba bloqueado para siempre, impidiendo que la renumeracion reutilizara ese hueco. La unicidad de `name` ahora es solo entre mesas **activas**, garantizada a nivel de aplicacion (`uniqueName()` en el guardado del plano, `Rule::unique` con filtro de status en la edicion simple).
+  - `renumberActiveTables()` ordena las mesas activas por su numero actual y las reasigna `1..N` en ese mismo orden relativo, recorriendo ascendente — asi cada mesa cede su numero anterior antes de que otra lo necesite, sin colisiones intermedias. Se llama desde los dos lugares donde una mesa se archiva (el editor de plano al guardar sin ella, y el toggle de "Archivar" de la pagina operativa) para que el comportamiento sea identico sin importar por donde se borre.
+  - La caja ya no necesita su propio "modo" en la barra: a diferencia de una mesa (que compite por el mismo gesto de arrastre que los puntos del contorno), el marcador de la caja es un elemento aparte con su propio `mousedown.stop`, asi que puede quedar siempre arrastrable/redimensionable sin ambigüedad, sin importar si el modo activo es "Contorno" o "Mesas".
+- Pruebas:
+  - `DiningFloorPlanPageTest`: reemplazado el test de numeracion que asumia que un numero archivado quedaba reservado para siempre (comportamiento ahora incorrecto a proposito) por dos nuevos — `nextNumberFor` reutiliza el numero tras archivar la unica mesa activa, y `renumberActiveTables()` cierra el hueco preservando el orden relativo e ignorando mesas inactivas. Nuevo test de extremo a extremo simulando el caso real del usuario (archivar la mesa 3 de 8 desde `save()`, verificar que 4-8 bajan a 3-7). Nuevo test de `size` de caja. 12 tests en el archivo, todos en verde.
+  - Suite dirigida sin regresiones: `DiningFloorPlanPageTest`, `DiningTablesFlowTest`, `DiningLivewireTest`, `PrinterSetupGateTest`, `PrintersPageTest`, `CompanyStructurePageTest`, `CashSessionsPageTest` — 50 tests, todos en verde.
+  - Misma verificacion rigurosa que la entrada anterior (dado el bug de comillas de la vez pasada): se extrajo el `x-data` real renderizado por el servidor, se confirmo sintaxis valida con Node, y se ejecutaron en runtime `startDragRegister` (ya sin depender de `mode`), `startResizeRegister`, la matematica de redimension, y `addTable`/`removeTable`/`nextTableName`, confirmando el comportamiento esperado antes de responder al usuario.
+  - Assets reconstruidos, contenedores reiniciados.
+- Resultado:
+  - La caja se activa con un solo checkbox y ya se puede arrastrar y redimensionar sin cambiar de modo. Borrar cualquier mesa del plano (o archivarla desde la pagina operativa) cierra automaticamente el hueco que deja: la numeracion activa de una sucursal es siempre `1..N` consecutivos, tal como se pidio.
+
+## 2026-09-03 - Bug real: comillas dobles dentro de un comentario JS rompian el x-data del editor de plano
+
+- Contexto: el usuario reporto que tras el cambio anterior (sillas medio-tapadas, borrar mesas, ocultar capacidad) el editor quedo completamente roto — texto JS crudo visible en la pantalla, ningun punto/mesa se dibujaba, `mode is not defined` y una decena de errores mas en consola.
+- Causa real: un comentario nuevo dentro de `removeTable()` uso comillas dobles literales (`"Guardar plano"`) **dentro del bloque `x-data="{ ... }"`**, que esta delimitado por comillas dobles a nivel de atributo HTML. El parser HTML corta el atributo en la primera comilla doble que encuentra, sin importar que este dentro de un comentario `//` de JS — Blade no sabe nada de sintaxis JS, solo sustituye texto crudo en el HTML. El atributo `x-data` quedaba truncado a la mitad (sin su `}` de cierre), y todo el texto restante del componente se imprimia como HTML/texto plano en la pagina en vez de quedar dentro del atributo.
+- Arreglo: se reescribio el comentario sin comillas dobles (`el boton Guardar plano la archiva...` en vez de `"Guardar plano"`).
+- Verificacion mas rigurosa que las veces anteriores en esta misma sesion (para no repetir el mismo tipo de error dos veces mas): se genero el HTML real del componente con un test HTTP completo, se extrajo el contenido exacto del atributo `x-data` ya renderizado por el servidor, se valido su sintaxis con Node (`new Function('return ' + src)`, sin lanzar `SyntaxError`), y se instancio el objeto real para EJECUTAR sus metodos (`chairPositions()`, `polygonPoints()`, `nextTableName()`, `removeTable()`, `snapToAxis()`) confirmando que el comportamiento en runtime es el esperado — no solo que el archivo compila.
+- Regla para el resto de esta pagina (y cualquier `x-data` inline futuro en este proyecto): **nunca usar comillas dobles literales dentro del bloque `x-data="{ ... }"`, ni siquiera dentro de comentarios `//` o `/* */`** — usar comillas simples o evitarlas del todo.
+- Pruebas: `DiningFloorPlanPageTest`, `DiningTablesFlowTest`, `DiningLivewireTest` — 15 tests, sin cambios de comportamiento (el bug era puramente de sintaxis HTML/JS, no de logica PHP). Assets reconstruidos, contenedores reiniciados.
+
+## 2026-09-03 - Plano de mesas: sillas medio-tapadas, borrar mesas, y se oculta el campo de capacidad
+
+- Objetivo: tres ajustes de pulido tras ver el plano con sillas y cajas funcionando: (1) las sillas deben verse solo a la mitad (la otra mitad tapada por la mesa, que va encima) y un poco mas grandes; (2) falta forma de quitar una mesa del plano; (3) el input de capacidad en la lista "Mesas" quedaba cortado (ancho fijo muy chico) — se decidio ocultarlo del todo por innecesario, en vez de agrandarlo.
+- Archivos modificados:
+  - `app/Livewire/Dining/DiningFloorPlanPage.php` — `save()` ahora archiva (`status` inactive) cualquier mesa activa que ya existia pero no vino en el arreglo `tables` del guardado
+  - `resources/views/livewire/dining/dining-floor-plan-page.blade.php` — distancia de las sillas baja a `size/2` (el centro de la silla cae en el borde de la mesa, mitad tapada) y tamaño sube de 2.6% a 3.6%; nuevo `removeTable()` (con `confirm()`) y boton de borrar (icono X) en cada fila de "Mesas"; se quita el input de capacidad de esa lista
+  - `resources/views/livewire/dining/dining-tables-page.blade.php` — mismo ajuste de distancia/tamaño de sillas en el mapa de solo lectura
+  - `docs/registro-cambios-ia.md`
+- Decisiones:
+  - **Borrar = archivar, no eliminar fisico** — mismo principio que el resto del proyecto para registros comerciales. El cliente solo saca la mesa del arreglo `tables` (si era nueva sin guardar, desaparece sin dejar rastro en BD); el servidor compara ese arreglo contra las mesas activas que ya existian y archiva las que falten. No fue necesario un boton "Borrar" server-side aparte.
+  - El tamaño/distancia de las sillas se calcula igual en los dos lugares (JS del editor, PHP del mapa de solo lectura) — se actualizaron ambos a proposito para no dejar el mapa operativo con un estilo distinto al editor.
+  - Capacidad se oculta de la UI (no se elimina el campo ni la logica: sigue existiendo en `dining_tables.capacity`, sigue alimentando el numero de sillas si algun dato viejo la tiene, y sigue editable desde el modal de "+ Nueva mesa"/editar de `DiningTablesPage`) — el usuario decidio que no vale la pena exponerla en el editor de plano.
+- Pruebas:
+  - `DiningFloorPlanPageTest`: nuevo test que confirma que una mesa activa se archiva (`status` inactive) cuando el guardado no la incluye. 8 tests, todos en verde.
+  - Suite dirigida sin regresiones: `DiningFloorPlanPageTest`, `DiningTablesFlowTest`, `DiningLivewireTest` — 15 tests, todos en verde.
+  - Assets reconstruidos y contenedores `app`/`web` reiniciados.
+- Resultado:
+  - Las mesas en el plano ahora se ven con sillas mas grandes y parcialmente escondidas detras de la mesa (mas realista). Hay un boton para quitar cualquier mesa del plano (con confirmacion). La lista "Mesas" quedo mas limpia sin el campo de capacidad que no cabia bien.
+
+## 2026-09-03 - Plano de mesas: sillas alrededor de cada mesa y cajas registradoras opcionales en el mapa
+
+- Objetivo: con el editor ya funcionando, el usuario pidio (1) mejorar el estilo visual para que las mesas se vean como mesa+sillas de verdad, y (2) poder ubicar en el plano la(s) caja(s) registradora(s) de la empresa, si el dueño lo desea (opcional, no obligatorio).
+- Archivos creados:
+  - `database/migrations/2026_09_03_140000_add_layout_position_to_cash_registers_table.php`
+- Archivos modificados:
+  - `app/Models/CashRegister.php` — `pos_x`, `pos_y` en `$fillable`
+  - `app/Livewire/Dining/DiningFloorPlanPage.php` — `save()` acepta un tercer arreglo `registers`; nuevo `cashRegisters()` para la vista
+  - `app/Livewire/Dining/DiningTablesPage.php` — nuevo `placedCashRegisters()` (solo las que ya tienen posicion) agrupado por sucursal, para el mapa de solo lectura
+  - `resources/views/livewire/dining/dining-floor-plan-page.blade.php` — sillas alrededor de cada mesa (`chairPositions()`), tercer modo "Cajas" en la barra, panel lateral "Cajas" con checkbox "En el plano" por caja, marcador de caja arrastrable en el lienzo
+  - `resources/views/livewire/dining/dining-tables-page.blade.php` — mismas sillas y cajas en el mapa de solo lectura (PHP con `cos()`/`sin()`, mismo calculo que el JS del editor)
+  - `docs/modelo-datos.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - `cash_registers` gana `pos_x`/`pos_y` (decimal nullable, mismo porcentaje 0-100 que `dining_tables`).
+- Decisiones:
+  - **Sillas son puramente visuales**, sin tabla ni campo propio: se calculan repartiendo `capacity` (o 4 por defecto si no hay capacidad) en circulo alrededor de la mesa, a una distancia fija mas alla del borde. Mismo calculo implementado dos veces a proposito (JS en el editor, PHP con `cos()`/`sin()` en el mapa de solo lectura) porque son dos superficies de render distintas (una interactiva client-side, otra server-side) — no valia la pena una fuente de verdad compartida para algo puramente decorativo.
+  - **Las cajas no se crean desde este editor** — ya existen (se crean en Admin > Estructura, con su `printer_type` etc., flujo de hace dos semanas). El panel "Cajas" solo lista las que ya existen en la sucursal activa con un checkbox "En el plano": marcarlo la coloca en el centro del lienzo lista para arrastrar; desmarcarlo limpia `pos_x`/`pos_y` (vuelve a `null`) y desaparece tanto del editor como del mapa operativo — "opcional" tal como se pidio, nunca una caja aparece sola sin que el dueño la active.
+  - Tercer modo "Cajas" en la barra superior (ademas de "Contorno"/"Mesas") para que arrastrar una caja no compita con arrastrar una mesa al mismo tiempo — mismo patron de aislar la interaccion por modo que ya se uso para mesas vs contorno.
+  - Estilo de mesa mas suave (borde y numero en azul de marca en vez de gris oscuro, esquinas redondeadas), consistente con el resto de la app en vez de copiar el rosa de la foto de referencia que trajo el usuario — el concepto visual (mesa + sillas alrededor) es el mismo, la paleta es la de esta app.
+- Pruebas:
+  - `DiningFloorPlanPageTest`: nuevo test que activa una caja (queda con `pos_x`/`pos_y`) y luego la desactiva (vuelven a `null`) en dos llamadas a `save()` separadas.
+  - Suite dirigida sin regresiones: `DiningFloorPlanPageTest`, `DiningTablesFlowTest`, `DiningLivewireTest`, `PrinterSetupGateTest`, `PrintersPageTest`, `CompanyStructurePageTest`, `CashSessionsPageTest` — 46 tests, todos en verde (relevante porque `CashRegister` es un modelo muy usado — Printers, Estructura, Caja — y esta entrada le agrega columnas).
+  - Assets reconstruidos y contenedores `app`/`web` reiniciados.
+  - Sigue sin haber navegador real en esta sesion; las sillas y las cajas se razonaron con cuidado pero no se probaron interactivas.
+- Resultado:
+  - Cada mesa en el plano ahora se ve acompañada de sus sillas (segun capacidad). El dueño puede activar cualquier caja existente de la sucursal desde el panel "Cajas" del editor, ubicarla arrastrandola, y esa misma posicion se refleja en el mapa operativo que ve el personal.
+
+## 2026-09-03 - Plano de mesas: dos bugs reales encontrados probando en navegador, paredes rectas, numeracion automatica y mesas redimensionables
+
+- Objetivo: iteracion sobre el editor de plano del mismo dia. El usuario probo el editor recien construido en su propio navegador (esta sesion no tiene uno disponible) y reporto dos fallas reales antes de pedir cuatro mejoras: que las paredes del contorno queden rectas, que las mesas se numeren solas siempre arrancando en 1, que capacidad sea un dato puramente informativo, y un boton "+" (como los CRUD del resto de la app) que ponga la mesa directo en el mapa para reubicarla o redimensionarla — si se redimensiona una, las siguientes mesas nuevas heredan ese mismo tamaño.
+- Archivos creados:
+  - `database/migrations/2026_09_03_130000_add_size_to_dining_tables_table.php`
+- Archivos modificados:
+  - `app/Models/DiningTable.php` — `size` en `$fillable`; nuevo `nextNumberFor()` estatico (siguiente numero libre, arrancando en 1, considerando tambien archivadas via `withTrashed`)
+  - `app/Livewire/Dining/DiningFloorPlanPage.php` — se elimina `createTable()` (Livewire); `save()` ahora crea mesas nuevas ademas de actualizar existentes, distinguiendo por si el `id` recibido es una mesa real de la sucursal o un id temporal generado en el cliente
+  - `app/Livewire/Dining/DiningTablesPage.php` — el "+ Nueva mesa" tambien numera solo (mismo `nextNumberFor()`); orden de la lista corregido a numerico (antes ordenaba "10" antes que "2", como texto)
+  - `resources/views/livewire/dining/dining-floor-plan-page.blade.php` — reescritura grande (ver Bugs y Decisiones)
+  - `resources/views/livewire/dining/dining-tables-page.blade.php` — el campo "Nombre" del modal solo se muestra al editar (crear ya no lo pide); el mapa de solo lectura usa `size` en vez de un radio fijo
+  - `docs/modelo-datos.md`, `docs/registro-cambios-ia.md`
+- Migraciones:
+  - `dining_tables` gana `size` (decimal, porcentaje 0-100 del mismo viewBox que `pos_x`/`pos_y`, default `8`).
+- **Bugs reales encontrados en navegador (no en teoria) — el usuario los reporto probando el editor recien construido:**
+  - **Bug 1 — nada se dibujaba en el lienzo:** `<template x-if>`/`<template x-for>` dentro de `<svg>` no son confiables — el parser HTML no le da a ese `<template>` el `.content` (DocumentFragment) que Alpine necesita para clonar, sintoma "Cannot read properties of undefined (reading 'cloneNode')" en consola, mas notorio todavia insertando via `wire:navigate` (morph). El log de consola del usuario confirmo el diagnostico exacto. Arreglo: los puntos del contorno y las mesas se dibujan como `<div>` normales superpuestos por porcentaje (posicion absoluta) en una capa aparte; el `<svg>` se dejo solo para el `<polygon>` del contorno (un solo binding `:points`, sin `<template>`, eso si es seguro ahi).
+  - **Bug 2 — la nueva capa tapaba los clics:** al sacar los puntos/mesas del svg a un `<div>` superpuesto, ese div (aunque transparente) quedo encima del `<rect x-on:click="canvasClick">` del svg y le bloqueaba los clics — el usuario recargo y "ya no se ponen puntos". Arreglo: la capa contenedora es `pointer-events-none`, y solo cada punto/mesa individual (`pointer-events-auto`) vuelve a ser clickeable.
+- Decisiones (mejoras pedidas por el usuario tras confirmar que el plano ya funcionaba):
+  - **Paredes rectas:** al agregar un punto nuevo (clic en el lienzo), se ajusta solo a horizontal o vertical respecto al punto anterior (`snapToAxis`, compara cual eje se movio menos). Al arrastrar una esquina existente, las DOS paredes que llegan a ella se mantienen rectas moviendo la coordenada compartida del punto vecino correspondiente — mismo comportamiento que redimensionar un rectangulo arrastrando una esquina, calculado en `startDragPoint`/`onMouseMove` a partir de si cada pared vecina era horizontal o vertical al empezar el arrastre.
+  - **Numeracion automatica:** `DiningTable::nextNumberFor()` es ahora la unica fuente de verdad para el numero de una mesa nueva, usada tanto por el editor de plano como por "+ Nueva mesa" en la pagina operativa — nunca se vuelve a escribir a mano. Considera mesas archivadas porque el indice unico `(company_id, branch_id, name)` no las excluye a nivel de Postgres.
+  - **Creacion 100% client-side hasta guardar:** el boton "+" del editor de plano ya NO pega al servidor — solo agrega una fila al arreglo `tables` de Alpine (numero calculado en JS a partir de lo que ya esta cargado, tamaño heredado de `defaultTableSize`). Se evito a proposito una llamada a Livewire en este punto: un `wire:call` intermedio reevalua `x-data` completo en el re-render, lo que hubiera perdido cualquier arrastre sin guardar todavia (mismo riesgo que ya se habia identificado y evitado para el guardado en lote). `save()` ahora distingue mesa existente de nueva por si el `id` recibido coincide con una mesa real de la sucursal (los ids nuevos del cliente son strings tipo `new-0-<timestamp>`, nunca colisionan con un id numerico real).
+  - **Redimensionar mesas:** cada mesa tiene un tirador circular en su esquina inferior derecha (visible solo en modo "Mesas"), que al arrastrarse cambia `size` (porcentaje del mismo lienzo, clamped 4-20). Al soltar el arrastre, ese tamaño queda como `defaultTableSize` para la siguiente mesa que se agregue con "+" — asi todas las mesas nuevas heredan el ultimo tamaño usado, tal como se pidio.
+  - **Capacidad informativa:** se quito del flujo de creacion (ya no bloquea nada) y se dejo como input numerico editable en linea en la lista lateral "Mesas" del editor — no afecta `size` ni ninguna regla de negocio, exactamente como se pidio.
+- Pruebas:
+  - `DiningFloorPlanPageTest`: se reemplazo el test de `createTable()` (metodo eliminado) por dos nuevos — creacion de mesa nueva via `save()` con id temporal (persiste nombre/capacidad/forma/tamaño/posicion), y colision de numero contra una mesa existente (el guardado la bumpea a la siguiente libre en vez de fallar) — mas un test nuevo directo sobre `nextNumberFor()` (arranca en 1, no reutiliza el numero de una archivada). 6 tests, todos en verde.
+  - `DiningLivewireTest`: actualizado para el nuevo flujo (ya no se envia `name` al crear; se verifica el numero autogenerado en vez de un nombre fijo).
+  - Suite dirigida sin regresiones: `DiningFloorPlanPageTest`, `DiningTablesFlowTest`, `DiningLivewireTest`, `NavigationVisibilityTest`, `TrackingModeGateTest`, `PrinterSetupGateTest` — 24 tests, todos en verde.
+  - Assets reconstruidos dos veces (una por cada arreglo de bug) y contenedores `app`/`web` reiniciados.
+  - Sigue sin haber navegador real en esta sesion para probar el arrastre/redimension interactivo — los dos bugs de esta entrada se diagnosticaron a partir del log de consola real que compartio el usuario, no de teoria sola. El redimensionar-mesa y el ajuste automatico de paredes rectas se razonaron con cuidado pero **todavia no los confirmo un navegador real**; pendiente que el usuario los pruebe.
+- Resultado:
+  - El editor de plano ya dibuja correctamente el contorno y las mesas (los dos bugs que impedian verlo estan corregidos). Agregar una mesa es un clic en "+" que la pone lista para arrastrar, siempre numerada secuencialmente desde 1, con el mismo tamaño de la ultima mesa redimensionada. Las paredes del contorno se mantienen rectas solas, tanto al dibujarlas como al ajustarlas despues.
+
+## 2026-09-03 - Sincronizacion de la BD local con Railway, cuenta pendiente de prueba, y paso de onboarding faltante (modo de venta simple/receta)
+
+- Objetivo: el usuario reporto que al crear su primera empresa restaurante ("Primer Restaurante", local) no se le pregunto si sus platos serian productos simples o llevarian receta por insumos, y pidio ademas que la base de datos local quedara igual a la de Railway (el unico entorno real desplegado, `kioscco.com`), con una empresa nueva sin activar para probar el flujo de activacion el mismo.
+- Archivos creados:
+  - `app/Livewire/Company/TrackingModeGate.php`
+  - `resources/views/livewire/company/tracking-mode-gate.blade.php`
+  - `tests/Feature/TrackingModeGateTest.php`
+- Archivos modificados:
+  - `resources/views/dashboard.blade.php` — se agrega `<livewire:company.tracking-mode-gate />` junto al gate de impresora existente
+  - `docs/decisiones-tecnicas.md` — nota del bug encontrado (decision documentada, UI nunca construida) y su correccion
+  - `docs/configuracion-empresa.md` — se agrega `tracking_mode` al listado de claves de `inventory` y nota de que todavia no alimenta ninguna logica de negocio
+  - `docs/registro-cambios-ia.md`
+- Migraciones:
+  - Ninguna nueva. Se corrieron localmente las 10 migraciones que ya existian en el repo pero no se habian aplicado en este dispositivo (`business_types`, `is_recipe`, `recipes`/`recipe_items`, `dining_tables`, `dining_order_items`, `equipment_types`).
+- Sincronizacion de base de datos (accion operativa, no de codigo):
+  - Se confirmo que no existe entorno de "preproduccion" documentado; el unico entorno real es el proyecto Railway `empowering-growth` (servicio `retail_saas`, `https://kioscco.com`, Postgres `postgres-volume`), 85 migraciones aplicadas ahi (6 menos que en el repo local).
+  - Se actualizo el CLI de Railway en WSL (5.18.0 -> 5.49.0, `~/.railway/bin/railway`) para poder usar `railway connect Postgres --tunnel-only`, y se uso ese tunel SSH (sin exponer un proxy publico) para correr `pg_dump` de solo lectura contra Railway.
+  - La base local (`retail_saas_db`, contenedor `postgres`) se reemplazo por completo: `DROP SCHEMA public CASCADE` + restauracion del dump de Railway, luego `php artisan migrate --force` para traer el esquema a la version actual del repo, y `db:seed --class=AuthorizationCatalogSeeder`/`--class=PlanCatalogSeeder` (idempotentes) para completar el catalogo de permisos y planes del vertical restaurante que Railway todavia no tiene. Esto descarto las 6 empresas que solo existian en local (`Debug SAS`, `Debug SAS 2`, 3 empresas `Demo ...`, y la `Primer Restaurante` original) y dejo exactamente las 5 empresas reales de Railway (`la tiendita`, `Competencias Doña Papa`, `Heladeria Topping`, `Minni Tienda`, `Los Rolos`), todas retro-asignadas a `business_type = general` por la propia migracion. El superadmin (`jupazago11@gmail.com`) quedo con su password real de Railway, sin resetear.
+  - Se creo una empresa de prueba nueva ("Segundo Restaurante", usuario dueño `segundo_restaurante`) via `App\Actions\Companies\CreateCompany` (la misma accion que usa el registro real) con suscripcion en estado `pending` y sin `business_type_id`, para que el usuario la active manualmente desde Plataforma > Empresas y elija el tipo de negocio ahi mismo.
+- Decisiones:
+  - El gate de impresora (`PrinterSetupGate`) no tenia ningun bug: para "Primer Restaurante" ya estaba resuelto (`printer_type` guardado), simplemente no quedaba nada pendiente que preguntar en el momento del reporte. El vacio real estaba solo en `inventory.tracking_mode`.
+  - `TrackingModeGate` sigue el mismo patron exacto que `PrinterSetupGate` (modal bloqueante sin boton de cerrar, mensaje de solo lectura para roles sin `settings.manage`) para no introducir un segundo patron de "gate" en el dashboard. Solo se muestra si `businessType->code === 'restaurant'` y no existe fila `company_settings` para `inventory.tracking_mode` (no se agrego una bandera `*_answered` aparte porque la propia fila ya es la respuesta).
+  - Pendiente, fuera de alcance de este cambio: `products.is_recipe` todavia no es editable desde `ProductsPage` (crear/editar producto) — la respuesta de este modal queda registrada pero sin ningun efecto practico hasta que exista esa UI. El usuario no pidio esa pieza todavia.
+- Pruebas:
+  - `TrackingModeGateTest` (5 tests nuevos): aparece solo para restaurante, oculto para general, oculto si ya se respondio, mensaje de solo lectura sin permiso, y guardado persiste el valor elegido.
+  - Suite dirigida sin regresiones: `PrinterSetupGateTest`, `RecipeInventoryTest`, `DiningLivewireTest`, `DiningTablesFlowTest`, `CompanySettingsTest`, `PlatformCompaniesPageTest`, `SettingsPageTest` — 28 tests, todos en verde.
+  - Verificado en vivo tras la sincronizacion: `/login` responde 200, `/dashboard` redirige (302) sin sesion, y `tinker` confirma las 5 empresas de Railway con `business_type = general`, 6 planes, 2 tipos de negocio y el superadmin intacto.
+- Resultado:
+  - La base local ahora refleja exactamente el estado real de Railway mas el esquema mas reciente del repo. Existe una empresa "Segundo Restaurante" pendiente de activar para que el usuario recorra el flujo de activacion (incluyendo elegir "Restaurante" como tipo de negocio) el mismo. Toda empresa restaurante nueva vera desde ahora el paso de "modo de venta" al primer ingreso al dashboard, cerrando el vacio que el usuario reporto.
+
 ## 2026-08-10 - Correo de bienvenida mas calido, y guardia de salida accidental del POS con venta sin terminar
 
 - Objetivo: el usuario pidio dos cosas separadas: (1) que el correo de bienvenida de una cuenta nueva se sienta agradecido y personal, no generico, con mejor estilo visual; (2) que si un cajero tiene productos en el carrito del POS y hace click por error en el logo (volviendo al dashboard), se le pregunte que hacer en vez de perder la venta en curso sin avisar.

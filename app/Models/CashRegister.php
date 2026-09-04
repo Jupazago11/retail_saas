@@ -25,6 +25,9 @@ class CashRegister extends Model
         'status',
         'is_primary',
         'printer_type',
+        'pos_x',
+        'pos_y',
+        'size',
     ];
 
     protected function casts(): array

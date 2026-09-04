@@ -17,7 +17,9 @@ class DemoCompaniesSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertDatabaseCount('users', 3);
+        // 3 usuarios demo + el platform_super_admin (PlatformSuperAdminSeeder,
+        // ya forma parte permanente de DatabaseSeeder::run()).
+        $this->assertDatabaseCount('users', 4);
         $this->assertDatabaseCount('companies', 3);
 
         $this->assertDemoCompanyPlan('demo.basic@retailsaas.test', 'Demo Basic Market SAS', 'basic');
@@ -30,7 +32,9 @@ class DemoCompaniesSeederTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertDatabaseCount('users', 3);
+        // 3 usuarios demo + el platform_super_admin (PlatformSuperAdminSeeder,
+        // ya forma parte permanente de DatabaseSeeder::run()).
+        $this->assertDatabaseCount('users', 4);
         $this->assertDatabaseCount('companies', 3);
         $this->assertSame(6, Subscription::query()->count());
 

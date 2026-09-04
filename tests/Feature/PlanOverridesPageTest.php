@@ -10,11 +10,12 @@ use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class PlanOverridesPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_plan_overrides_page_can_create_and_update_module_feature_and_limit_overrides(): void
     {
@@ -22,6 +23,7 @@ class PlanOverridesPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Overrides Demo SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
 
         $moduleId = \App\Models\Module::query()->where('code', 'loyalty')->value('id');
         $featureId = \App\Models\Feature::query()->where('code', 'pos.frozen_sales')->value('id');
@@ -103,6 +105,7 @@ class PlanOverridesPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Overrides Restringido SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [

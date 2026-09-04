@@ -8,13 +8,13 @@ use App\Actions\Plans\ReconcileCompanyStructureLimits;
 use App\Actions\Subscriptions\AttachPaymentProof;
 use App\Actions\Subscriptions\ChangeCompanySubscription;
 use App\Enums\EquipmentRentalStatus;
-use App\Enums\EquipmentType;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\AuditLog;
 use App\Models\Company;
 use App\Models\EquipmentRental;
+use App\Models\EquipmentType;
 use App\Models\PaymentAttachment;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -305,9 +305,15 @@ class SubscriptionsPage extends Component
         $this->toast('Comprobante archivado.');
     }
 
-    public function plans(): Collection
+    public function plans(?Company $company = null): Collection
     {
-        return Plan::orderBy('id')->get();
+        return Plan::query()
+            ->when(
+                $company?->business_type_id,
+                fn ($query) => $query->where('business_type_id', $company->business_type_id)
+            )
+            ->orderBy('id')
+            ->get();
     }
 
     /**
@@ -328,7 +334,7 @@ class SubscriptionsPage extends Component
             ->get()
             ->groupBy('company_id')
             ->map(fn ($rentals) => $rentals
-                ->groupBy(fn (EquipmentRental $rental) => $rental->equipment_type->value)
+                ->groupBy(fn (EquipmentRental $rental) => $rental->equipment_type)
                 ->map(fn ($group) => $group->countBy(fn (EquipmentRental $rental) => $rental->status->value)))
             ->all();
     }
@@ -418,11 +424,9 @@ class SubscriptionsPage extends Component
         $typeCode = $snapshot['equipment_type'] ?? null;
         $sequence = $snapshot['company_sequence'] ?? null;
 
-        $typeLabel = match ($typeCode) {
-            'thermal_printer' => 'Impresora termica',
-            'barcode_scanner' => 'Lector de codigo de barras',
-            default => 'Equipo',
-        };
+        $typeLabel = $typeCode
+            ? (EquipmentType::where('code', $typeCode)->value('name') ?? 'Equipo')
+            : 'Equipo';
 
         $identifier = $sequence ? "{$typeLabel} #{$sequence}" : $typeLabel;
 
@@ -447,7 +451,7 @@ class SubscriptionsPage extends Component
         $company = $this->equipmentCompany();
         abort_unless($company, 404);
 
-        $action->requestUnit($company, EquipmentType::from($type), auth()->user(), $this->blankToNull($this->equipmentNotes));
+        $action->requestUnit($company, EquipmentType::where('code', $type)->firstOrFail(), auth()->user(), $this->blankToNull($this->equipmentNotes));
         $this->equipmentNotes = '';
         $this->toast('Solicitud registrada.');
     }
@@ -459,7 +463,7 @@ class SubscriptionsPage extends Component
         $company = $this->equipmentCompany();
         abort_unless($company, 404);
 
-        $action->addUnit($company, EquipmentType::from($type), auth()->user(), $this->blankToNull($this->equipmentNotes));
+        $action->addUnit($company, EquipmentType::where('code', $type)->firstOrFail(), auth()->user(), $this->blankToNull($this->equipmentNotes));
         $this->equipmentNotes = '';
         $this->toast('Unidad agregada, se factura desde hoy.');
     }
@@ -545,9 +549,10 @@ class SubscriptionsPage extends Component
 
         return view('livewire.platform.subscriptions-page', [
             'subscriptions' => $subscriptions,
-            'plans' => $this->plans(),
+            'editPlans' => $this->editingId ? $this->plans(Subscription::find($this->editingId)?->company) : collect(),
+            'activatePlans' => $this->activateCompanyId ? $this->plans(Company::find($this->activateCompanyId)) : collect(),
             'latestSubscriptionIds' => $latestSubscriptionIds,
-            'equipmentTypes' => EquipmentType::cases(),
+            'equipmentTypes' => EquipmentType::orderBy('name')->get(),
             'equipmentByCompany' => $this->equipmentByCompany($companyIds),
             'equipmentDisplaySubscriptionIds' => $this->equipmentDisplaySubscriptionIds($companyIds),
         ])->layout('layouts.platform');

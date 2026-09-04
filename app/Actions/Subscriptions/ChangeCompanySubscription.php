@@ -43,10 +43,22 @@ class ChangeCompanySubscription
 
         $plan = Plan::query()
             ->where('status', RecordStatus::Active->value)
+            ->when(
+                $company->business_type_id,
+                fn ($query) => $query->where('business_type_id', $company->business_type_id)
+            )
             ->find($planId);
 
         if (! $plan) {
-            throw new InvalidArgumentException('Debes seleccionar un plan activo.');
+            throw new InvalidArgumentException('Debes seleccionar un plan activo del vertical de la empresa.');
+        }
+
+        // Si la empresa todavia no tiene vertical asignado (pendiente de que
+        // el platform_super_admin la active desde Plataforma > Empresas),
+        // elegir un plan aqui mismo define su vertical — igual que ya hace
+        // CompaniesPage::confirmTypeModal() cuando se activa desde ahi.
+        if (! $company->business_type_id) {
+            $company->update(['business_type_id' => $plan->business_type_id]);
         }
 
         $startsAt = $startsAt instanceof Carbon ? $startsAt : Carbon::parse((string) $startsAt);

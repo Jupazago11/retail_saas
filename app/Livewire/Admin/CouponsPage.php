@@ -138,6 +138,20 @@ class CouponsPage extends Component
         $this->toast($wasEditing ? 'Cupon actualizado correctamente.' : 'Cupon guardado correctamente.');
     }
 
+    public function toggleStatus(int $couponId): void
+    {
+        $this->ensurePermission('settings.manage');
+
+        $coupon = Coupon::query()->findOrFail($couponId);
+        $coupon->update([
+            'status' => $coupon->status === RecordStatus::Active->value
+                ? RecordStatus::Inactive->value
+                : RecordStatus::Active->value,
+        ]);
+
+        $this->toast('Estado del cupon actualizado.');
+    }
+
     public function coupons(): Collection
     {
         return Coupon::query()
@@ -173,15 +187,6 @@ class CouponsPage extends Component
             ->with('owner')
             ->orderBy('name')
             ->get();
-    }
-
-    public function statusLabel(string $status): string
-    {
-        return match ($status) {
-            'active' => 'Activo',
-            'inactive' => 'Inactivo',
-            default => ucfirst($status),
-        };
     }
 
     public function formatMoney(mixed $value): string

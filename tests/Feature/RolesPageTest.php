@@ -37,7 +37,6 @@ class RolesPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(RolesPage::class)
-            ->set('roleCode', 'ops_specialist')
             ->set('displayName', 'Especialista Operativo')
             ->set('selectedPermissionCodes', ['products.view', 'purchases.view', 'suppliers.view'])
             ->call('saveRole')
@@ -45,10 +44,11 @@ class RolesPageTest extends TestCase
 
         $role = CompanyRole::query()
             ->where('company_id', $company->id)
-            ->where('code', 'ops_specialist')
+            ->where('display_name', 'Especialista Operativo')
             ->firstOrFail();
 
-        $this->assertSame('Especialista Operativo', $role->display_name);
+        $this->assertSame('ESPECIALISTA_OPERATIVO', $role->code);
+        $this->assertSame(RecordStatus::Active->value, $role->status);
         $this->assertEqualsCanonicalizing(
             ['products.view', 'purchases.view', 'suppliers.view'],
             $role->permissions()->pluck('code')->all()
@@ -65,12 +65,71 @@ class RolesPageTest extends TestCase
         $this->assertSame('custom', $membership->company_role);
     }
 
+    public function test_roles_page_auto_generates_unique_code_on_name_collision(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Roles Codigo SAS',
+        ]);
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(RolesPage::class)
+            ->set('displayName', 'Supervisor')
+            ->set('selectedPermissionCodes', ['products.view'])
+            ->call('saveRole')
+            ->assertHasNoErrors();
+
+        Livewire::test(RolesPage::class)
+            ->set('displayName', 'Supervisor')
+            ->set('selectedPermissionCodes', ['products.view'])
+            ->call('saveRole')
+            ->assertHasNoErrors();
+
+        $codes = CompanyRole::query()
+            ->where('company_id', $company->id)
+            ->where('display_name', 'Supervisor')
+            ->pluck('code')
+            ->all();
+
+        $this->assertCount(2, $codes);
+        $this->assertEqualsCanonicalizing(['SUPERVISOR', 'SUPERVISOR_2'], $codes);
+    }
+
+    public function test_roles_page_can_toggle_role_status(): void
+    {
+        $owner = User::factory()->create();
+        $company = app(CreateCompany::class)->handle($owner, [
+            'legal_name' => 'Roles Toggle SAS',
+        ]);
+        $role = $this->companyRolePreset($company, 'seller');
+
+        $this->actingAs($owner);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        $this->assertSame(RecordStatus::Active->value, $role->status);
+
+        Livewire::test(RolesPage::class)
+            ->call('toggleRoleStatus', $role->id)
+            ->assertHasNoErrors();
+
+        $this->assertSame(RecordStatus::Inactive->value, $role->fresh()->status);
+
+        Livewire::test(RolesPage::class)
+            ->call('toggleRoleStatus', $role->id)
+            ->assertHasNoErrors();
+
+        $this->assertSame(RecordStatus::Active->value, $role->fresh()->status);
+    }
+
     public function test_roles_page_route_is_forbidden_without_roles_manage_permission(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Roles Restringidos SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [
@@ -86,15 +145,11 @@ class RolesPageTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_roles_page_can_attach_existing_user_to_company(): void
+    public function test_roles_page_can_create_internal_user_and_attach_to_company(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
-            'legal_name' => 'Roles Attach SAS',
-        ]);
-        $candidate = User::factory()->create([
-            'username' => 'operario_ext',
-            'email' => 'operario@example.com',
+            'legal_name' => 'Roles Internal User SAS',
         ]);
         $role = $this->companyRolePreset($company, 'seller');
 
@@ -102,30 +157,30 @@ class RolesPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(RolesPage::class)
-            ->set('newUserIdentifier', 'operario_ext')
-            ->set('newUserCompanyRoleId', (string) $role->id)
-            ->call('addUserToCompany')
+            ->set('newInternalName', 'Laura Gomez')
+            ->set('newInternalUsername', 'laura_g')
+            ->set('newInternalPassword', 'password123')
+            ->set('newInternalCompanyRoleId', (string) $role->id)
+            ->call('createInternalUser')
             ->assertHasNoErrors()
-            ->assertSee('operario@example.com');
+            ->assertSee('laura_g');
 
-        $membership = $company->users()->where('users.id', $candidate->id)->firstOrFail()->pivot;
+        $user = User::query()->where('username', 'laura_g')->firstOrFail();
+        $membership = $company->users()->where('users.id', $user->id)->firstOrFail()->pivot;
 
         $this->assertSame('custom', $membership->company_role);
         $this->assertSame($role->id, $membership->company_role_id);
     }
 
-    public function test_roles_page_blocks_attach_when_company_reaches_max_users(): void
+    public function test_roles_page_blocks_creating_internal_user_when_company_reaches_max_users(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Roles Limit SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $employeeOne = User::factory()->create();
         $employeeTwo = User::factory()->create();
-        $candidate = User::factory()->create([
-            'username' => 'tercero_ext',
-            'email' => 'tercero@example.com',
-        ]);
 
         $sellerRole = $this->companyRolePreset($company, 'seller');
 
@@ -146,11 +201,13 @@ class RolesPageTest extends TestCase
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
         Livewire::test(RolesPage::class)
-            ->set('newUserIdentifier', 'tercero@example.com')
-            ->set('newUserCompanyRoleId', (string) $sellerRole->id)
-            ->call('addUserToCompany')
-            ->assertHasErrors(['newUserIdentifier']);
+            ->set('newInternalName', 'Tercero Externo')
+            ->set('newInternalUsername', 'tercero_ext')
+            ->set('newInternalPassword', 'password123')
+            ->set('newInternalCompanyRoleId', (string) $sellerRole->id)
+            ->call('createInternalUser')
+            ->assertHasErrors(['newInternalUsername']);
 
-        $this->assertNull($company->users()->where('users.id', $candidate->id)->first());
+        $this->assertNull(User::query()->where('username', 'tercero_ext')->first());
     }
 }

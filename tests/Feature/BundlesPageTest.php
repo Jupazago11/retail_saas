@@ -14,11 +14,12 @@ use App\Services\Plans\PlanCatalogBootstrapper;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class BundlesPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_bundles_page_can_create_and_update_bundle_for_current_company(): void
     {
@@ -109,6 +110,7 @@ class BundlesPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Bundle Restringido SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [

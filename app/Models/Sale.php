@@ -13,6 +13,8 @@ class Sale extends Model
         'company_id',
         'branch_id',
         'warehouse_id',
+        'frozen_sale_id',
+        'payer_label',
         'document_sequence',
         'document_number',
         'cash_register_id',
@@ -65,6 +67,11 @@ class Sale extends Model
     public function warehouse(): BelongsTo
     {
         return $this->belongsTo(Warehouse::class);
+    }
+
+    public function frozenSale(): BelongsTo
+    {
+        return $this->belongsTo(FrozenSale::class);
     }
 
     public function cashRegister(): BelongsTo

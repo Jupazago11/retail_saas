@@ -22,11 +22,12 @@ use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class AuditLogsPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_audit_logs_page_can_filter_and_expand_snapshots(): void
     {
@@ -105,6 +106,7 @@ class AuditLogsPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Auditoria Restringida SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
 
         $viewer = User::factory()->create();
         $companyRole = CompanyRole::query()->create([
@@ -137,6 +139,7 @@ class AuditLogsPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Auditoria UI SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $branch = $company->branches()->firstOrFail();
         $warehouse = $company->warehouses()->firstOrFail();
         $cashRegister = $company->cashRegisters()->firstOrFail();

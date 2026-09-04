@@ -118,8 +118,8 @@
 
                         <div class="flex items-start gap-3">
                             <div class="rounded-lg bg-gray-50 px-4 py-3 text-right text-sm">
-                                <div class="font-semibold text-gray-900">{{ $this->statusLabel($coupon->status) }}</div>
-                                <div class="text-gray-500">{{ $this->discountTypeLabel($coupon->discount_type) }} - {{ $this->formatMoney($coupon->discount_value) }}</div>
+                                <x-status-toggle :active="$coupon->status === 'active'" activeLabel="Activo" inactiveLabel="Inactivo" action="toggleStatus({{ $coupon->id }})" />
+                                <div class="mt-2 text-gray-500">{{ $this->discountTypeLabel($coupon->discount_type) }} - {{ $this->formatMoney($coupon->discount_value) }}</div>
                             </div>
                             <button type="button" wire:click="startEditingCoupon({{ $coupon->id }})" class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700">
                                 Editar

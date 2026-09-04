@@ -72,11 +72,7 @@
                                     </x-status-badge>
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
-                                    <button wire:click="toggleSupplierStatus({{ $supplier->id }})"
-                                        class="inline-flex w-20 justify-center rounded-full px-3 py-1 text-xs font-semibold transition
-                                            {{ $supplier->status === 'active' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 hover:bg-emerald-100' : 'bg-stone-200 text-gray-600 hover:bg-stone-300' }}">
-                                        {{ $supplier->status === 'active' ? 'activo' : 'inactivo' }}
-                                    </button>
+                                    <x-status-toggle :active="$supplier->status === 'active'" action="toggleSupplierStatus({{ $supplier->id }})" />
                                 </td>
                                 <td class="py-3 align-middle">
                                     <div class="flex justify-end gap-1"

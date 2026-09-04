@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
@@ -32,6 +33,7 @@ class Product extends Model
         'margin_2',
         'margin_3',
         'tracks_inventory',
+        'is_recipe',
         'minimum_stock',
         'status',
     ];
@@ -49,6 +51,7 @@ class Product extends Model
             'margin_3' => 'decimal:2',
             'minimum_stock' => 'decimal:3',
             'tracks_inventory' => 'boolean',
+            'is_recipe' => 'boolean',
             'flexible_price' => 'boolean',
         ];
     }
@@ -81,6 +84,11 @@ class Product extends Model
     public function presentations(): HasMany
     {
         return $this->hasMany(ProductPresentation::class);
+    }
+
+    public function recipe(): HasOne
+    {
+        return $this->hasOne(Recipe::class);
     }
 
     public function variants(): HasMany

@@ -135,7 +135,9 @@ class AuditLoggingTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame('open', $closeLog->before_snapshot['status']);
-        $this->assertSame('closed', $closeLog->after_snapshot['status']);
+        // El conteo (51800) coincide exacto con lo esperado (50000 + 1800),
+        // asi que el cierre queda "reconciled", no "closed" con diferencia.
+        $this->assertSame('reconciled', $closeLog->after_snapshot['status']);
         $this->assertSame('50000.00', $closeLog->before_snapshot['opening_amount']);
         $this->assertSame('51800.00', $closeLog->after_snapshot['closing_counted_amount']);
     }
@@ -178,7 +180,7 @@ class AuditLoggingTest extends TestCase
                 'sale_item_id' => $sale->items->first()->id,
                 'quantity' => '1',
             ],
-        ]);
+        ], 'Cliente no lo quiso');
 
         $log = AuditLog::query()
             ->where('action', 'sale.returned')

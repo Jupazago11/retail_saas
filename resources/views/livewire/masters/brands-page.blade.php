@@ -53,9 +53,11 @@
                             <tr wire:key="brand-{{ $brand->id }}" class="even:bg-gray-50">
                                 <td class="py-4 font-medium text-gray-900">{{ $brand->name }}</td>
                                 <td class="py-4">
-                                    <x-status-badge :color="$brand->status === 'active' ? 'emerald' : ($brand->status === 'inactive' ? 'stone' : 'amber')">
-                                        {{ $brand->status }}
-                                    </x-status-badge>
+                                    @if ($brand->deleted_at)
+                                        <x-status-badge color="amber">archivado</x-status-badge>
+                                    @else
+                                        <x-status-toggle :active="$brand->status === 'active'" action="toggleBrandStatus({{ $brand->id }})" />
+                                    @endif
                                 </td>
                                 <td class="py-4 text-right">
                                     <div class="flex justify-end gap-2">
@@ -66,9 +68,6 @@
                                         @else
                                             <button wire:click="editBrand({{ $brand->id }})" class="rounded-full border border-gray-300 px-3 py-1 font-medium text-gray-700">
                                                 Editar
-                                            </button>
-                                            <button wire:click="toggleBrandStatus({{ $brand->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                {{ $brand->status === 'active' ? 'Desactivar' : 'Activar' }}
                                             </button>
                                             <button wire:click="archiveBrand({{ $brand->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                 Archivar

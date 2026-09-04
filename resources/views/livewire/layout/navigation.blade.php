@@ -61,6 +61,8 @@ new class extends Component
     $canViewReports = auth()->user()?->hasCurrentCompanyPermission('reports.view') ?? false;
     $canManagePromotions = auth()->user()?->hasCurrentCompanyPermission('promotions.manage') ?? false;
     $canManageLoyalty = auth()->user()?->hasCurrentCompanyPermission('loyalty.manage') ?? false;
+    $canManageDining = auth()->user()?->hasCurrentCompanyPermission('dining.manage') ?? false;
+    $canManageKitchen = auth()->user()?->hasCurrentCompanyPermission('kitchen.manage') ?? false;
     $canManageSettings = auth()->user()?->hasCurrentCompanyPermission('settings.manage') ?? false;
     $canManageRoles = auth()->user()?->hasCurrentCompanyPermission('roles.manage') ?? false;
     $hasProductsModule = (bool) ($planModules['products'] ?? false);
@@ -72,6 +74,8 @@ new class extends Component
     $hasPromotionsModule = (bool) ($planModules['promotions'] ?? false);
     $hasReportsModule = (bool) ($planModules['reports'] ?? false);
     $hasInventoryModule = (bool) ($planModules['inventory'] ?? false);
+    $hasDiningModule = (bool) ($planModules['dining'] ?? false);
+    $hasKitchenModule = (bool) ($planModules['kitchen'] ?? false);
     $hasImportsModule = (bool) ($planModules['imports'] ?? false);
     $hasCreditFeature = (bool) ($planFeatures['credit.enabled'] ?? false);
     $hasLoyaltyFeature = (bool) ($planFeatures['loyalty.enabled'] ?? false);
@@ -119,6 +123,20 @@ new class extends Component
             'active' => request()->routeIs('sales.*'),
             'visible' => $hasPosModule && $canViewSales,
             'icon' => 'sales',
+        ],
+        [
+            'label' => 'Mesas',
+            'href' => route('dining.tables'),
+            'active' => request()->routeIs('dining.*'),
+            'visible' => $hasDiningModule && $canManageDining,
+            'icon' => 'dining',
+        ],
+        [
+            'label' => 'Cocina',
+            'href' => route('kitchen.index'),
+            'active' => request()->routeIs('kitchen.*'),
+            'visible' => $hasKitchenModule && $canManageKitchen,
+            'icon' => 'kitchen',
         ],
         [
             'label' => 'Inventario',
@@ -267,6 +285,12 @@ new class extends Component
                                 @break
                             @case('inventory')
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4z" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10l9 4 9-4V7" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 11v10" /></svg>
+                                @break
+                            @case('dining')
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9" /><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2" /></svg>
+                                @break
+                            @case('kitchen')
+                                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M6 3v6M9 3v6M6 6h3M12 3l1 6a3 3 0 003 0l1-6" /><path stroke-linecap="round" stroke-linejoin="round" d="M4 21V11M20 21V11" /></svg>
                                 @break
                             @case('cash')
                                 <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="12" rx="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M8 14h.01M12 14h4" /></svg>

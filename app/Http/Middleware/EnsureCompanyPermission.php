@@ -14,11 +14,11 @@ class EnsureCompanyPermission
     ) {
     }
 
-    public function handle(Request $request, Closure $next, string $permissionCode): Response
+    public function handle(Request $request, Closure $next, string ...$permissionCodes): Response
     {
         $user = $request->user();
 
-        if (! $user || ! $this->permissionResolver->has($user, $permissionCode)) {
+        if (! $user || ! $this->permissionResolver->hasAny($user, $permissionCodes)) {
             abort(403, 'No tienes permiso para acceder a este modulo.');
         }
 

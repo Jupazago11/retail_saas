@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Dining\DiningFloorPlanObstaclesController;
+use App\Http\Controllers\Dining\DiningFloorPlanTablesController;
+use App\Http\Controllers\Dining\DiningOrderPreviewTicketController;
 use App\Http\Controllers\Sales\PublicSaleReceiptController;
 use App\Http\Controllers\Sales\SaleTicketController;
 use App\Http\Controllers\Admin\ExportAuditLogsController;
@@ -17,12 +20,18 @@ use App\Livewire\Platform\DashboardPage as PlatformDashboardPage;
 use App\Livewire\Platform\SubscriptionsPage as PlatformSubscriptionsPage;
 use App\Livewire\Platform\PlansPage as PlatformPlansPage;
 use App\Livewire\Platform\PlatformCouponsPage;
+use App\Livewire\Platform\PlatformEquipmentPage;
 use App\Livewire\Platform\PlatformPrintersPage;
 use App\Livewire\Platform\UsersPage as PlatformUsersPage;
 use App\Livewire\Platform\PlatformSettingsPage;
 use App\Livewire\Cash\CashSessionsPage;
 use App\Livewire\Credit\CreditAccountsPage;
 use App\Livewire\Credit\CustomerImportsPage;
+use App\Livewire\Dining\DiningFloorPlanPage;
+use App\Livewire\Dining\DiningTablesPage;
+use App\Livewire\Dining\KitchenDisplayPage;
+use App\Livewire\Dining\TableOrderPage;
+use App\Livewire\Dining\WaiterOrdersPage;
 use App\Livewire\Loyalty\LoyaltyAccountsPage;
 use App\Livewire\Inventory\InventoryAdjustmentImportsPage;
 use App\Livewire\Inventory\InventoryAdjustmentPage;
@@ -70,6 +79,7 @@ Route::middleware('auth')->group(function () {
         Route::get('plans',        PlatformPlansPage::class)      ->name('plans');
         Route::get('coupons',      PlatformCouponsPage::class)    ->name('coupons');
         Route::get('printers',     PlatformPrintersPage::class)   ->name('printers');
+        Route::get('equipment',    PlatformEquipmentPage::class)  ->name('equipment');
         Route::get('users',        PlatformUsersPage::class)      ->name('users');
         Route::get('settings',     PlatformSettingsPage::class)   ->name('settings');
     });
@@ -178,6 +188,61 @@ Route::get('cash/sessions', CashSessionsPage::class)
         Route::get('loyalty', LoyaltyAccountsPage::class)
             ->middleware('company.permission:loyalty.manage')
             ->name('loyalty.index');
+
+        Route::get('dining/tables', DiningTablesPage::class)
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.tables');
+
+        Route::get('dining/tables/{table}', TableOrderPage::class)
+            ->middleware('company.permission:dining.manage,dining.orders')
+            ->name('dining.tables.order');
+
+        Route::get('dining/floor-plan', DiningFloorPlanPage::class)
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan');
+
+        // Endpoints JSON planos (no acciones de Livewire) que usa el editor
+        // del plano para guardar crear/mover/eliminar una mesa al instante —
+        // ver el comentario de DiningFloorPlanTablesController.
+        Route::post('dining/floor-plan/tables', [DiningFloorPlanTablesController::class, 'store'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.tables.store');
+
+        Route::patch('dining/floor-plan/tables/{table}', [DiningFloorPlanTablesController::class, 'updatePosition'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.tables.update-position');
+
+        Route::delete('dining/floor-plan/tables/{table}', [DiningFloorPlanTablesController::class, 'destroy'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.tables.destroy');
+
+        Route::post('dining/floor-plan/obstacles', [DiningFloorPlanObstaclesController::class, 'store'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.obstacles.store');
+
+        Route::patch('dining/floor-plan/obstacles/{obstacle}', [DiningFloorPlanObstaclesController::class, 'updatePosition'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.obstacles.update-position');
+
+        Route::delete('dining/floor-plan/obstacles/{obstacle}', [DiningFloorPlanObstaclesController::class, 'destroy'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.obstacles.destroy');
+
+        Route::patch('dining/floor-plan/obstacle-color', [DiningFloorPlanObstaclesController::class, 'updateColor'])
+            ->middleware('company.permission:dining.manage')
+            ->name('dining.floor-plan.obstacles.update-color');
+
+        Route::get('dining/orders', WaiterOrdersPage::class)
+            ->middleware('company.permission:dining.orders')
+            ->name('dining.orders');
+
+        Route::get('dining/tables/{table}/preview-ticket', DiningOrderPreviewTicketController::class)
+            ->middleware('company.permission:dining.manage,dining.orders')
+            ->name('dining.tables.preview-ticket');
+
+        Route::get('kitchen', KitchenDisplayPage::class)
+            ->middleware('company.permission:kitchen.manage')
+            ->name('kitchen.index');
 
         Route::get('sales/{sale}/ticket', SaleTicketController::class)
             ->middleware('company.permission:sales.view')

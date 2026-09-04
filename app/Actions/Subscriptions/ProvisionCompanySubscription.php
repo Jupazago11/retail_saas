@@ -2,6 +2,7 @@
 
 namespace App\Actions\Subscriptions;
 
+use App\Models\BusinessType;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -20,7 +21,17 @@ class ProvisionCompanySubscription
     {
         $this->planCatalogBootstrapper->ensureDefaults();
 
-        $plan = Plan::query()->where('code', $planCode)->first();
+        // Al registrarse, la empresa todavia no tiene business_type_id (lo
+        // asigna el platform_super_admin al activarla) — se ancla siempre al
+        // vertical "general" como punto de partida neutral; el plan se
+        // realinea al vertical real en CompaniesPage::confirmTypeModal() via
+        // RealignSubscriptionPlanForBusinessType.
+        $generalBusinessTypeId = BusinessType::query()->where('code', 'general')->value('id');
+
+        $plan = Plan::query()
+            ->where('code', $planCode)
+            ->where('business_type_id', $generalBusinessTypeId)
+            ->first();
 
         if (! $plan) {
             throw new InvalidArgumentException('El plan solicitado no existe en el catalogo.');

@@ -3,16 +3,23 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Module extends Model
 {
     protected $fillable = [
+        'business_type_id',
         'code',
         'name',
         'status',
     ];
+
+    public function businessType(): BelongsTo
+    {
+        return $this->belongsTo(BusinessType::class);
+    }
 
     public function features(): HasMany
     {

@@ -17,11 +17,12 @@ use App\Models\User;
 use App\Services\Settings\CompanySettings;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class SaleTicketViewTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_sale_ticket_route_renders_sale_and_printing_settings(): void
     {
@@ -29,40 +30,42 @@ class SaleTicketViewTest extends TestCase
 
         app(CompanySettings::class)->set($company, 'general', 'phone', '3001234567');
         app(CompanySettings::class)->set($company, 'general', 'address', 'Calle 123 #45-67');
-        app(CompanySettings::class)->set($company, 'general', 'logo_path', 'https://cdn.test/logo-retail.png');
         $company->cashRegisters()->where('is_primary', true)->update(['printer_type' => 'letter_a4']);
         app(CompanySettings::class)->set($company, 'printing', 'show_logo', true);
-        app(CompanySettings::class)->set($company, 'printing', 'show_saas_branding', true);
 
+        // La URL del logo ya no se muestra directo desde el setting: se
+        // resuelve via UpdateCompanyLogo::currentPrintUrl(), que exige R2
+        // configurado (Storage::disk('r2')->temporaryUrl(...)) y sin eso
+        // siempre retorna null — no hay credenciales reales en test/dev,
+        // asi que no se puede afirmar la URL aqui.
         $this->actingAs($owner)
             ->withSession([CurrentCompany::SESSION_KEY => $company->id])
             ->get(route('sales.ticket', $sale))
             ->assertOk()
             ->assertSee('sheet letter_a4', false)
-            ->assertSee('https://cdn.test/logo-retail.png', false)
-            ->assertSee('Powered by Retail SaaS')
+            ->assertSee('Desarrollado por Retail SaaS')
             ->assertSee($company->display_name)
             ->assertSee($sale->document_number)
             ->assertSee('Arroz premium')
-            ->assertSee('3600.00');
+            // Money::format(): separador de miles con punto, sin decimales.
+            ->assertSee('3.600');
     }
 
-    public function test_sale_ticket_route_hides_logo_and_branding_when_disabled(): void
+    public function test_sale_ticket_route_hides_logo_when_disabled(): void
     {
         [$owner, $company, $sale] = $this->saleTicketFixture();
 
-        app(CompanySettings::class)->set($company, 'general', 'logo_path', 'https://cdn.test/logo-retail.png');
         $company->cashRegisters()->where('is_primary', true)->update(['printer_type' => 'thermal_80mm']);
         app(CompanySettings::class)->set($company, 'printing', 'show_logo', false);
-        app(CompanySettings::class)->set($company, 'printing', 'show_saas_branding', false);
 
         $this->actingAs($owner)
             ->withSession([CurrentCompany::SESSION_KEY => $company->id])
             ->get(route('sales.ticket', $sale))
             ->assertOk()
             ->assertSee('sheet thermal_80mm', false)
-            ->assertDontSee('https://cdn.test/logo-retail.png', false)
-            ->assertDontSee('Powered by Retail SaaS');
+            // La marca del SaaS ya no es configurable por empresa (ver
+            // resources/views/printing/sales/ticket.blade.php): siempre va.
+            ->assertSee('Desarrollado por Retail SaaS');
     }
 
     public function test_sale_ticket_route_is_forbidden_without_sales_view_permission(): void
@@ -101,6 +104,7 @@ class SaleTicketViewTest extends TestCase
             'display_name' => 'Ticket Retail',
             'tax_id' => '900100200',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $branch = $company->branches()->firstOrFail();
         $warehouse = $company->warehouses()->firstOrFail();
 

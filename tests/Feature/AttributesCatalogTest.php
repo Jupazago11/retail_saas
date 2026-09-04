@@ -10,11 +10,12 @@ use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class AttributesCatalogTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_attributes_page_can_create_update_archive_and_restore_attributes_and_values(): void
     {
@@ -100,7 +101,9 @@ class AttributesCatalogTest extends TestCase
             'status' => RecordStatus::Active->value,
         ]);
 
-        $otherCompany = app(CreateCompany::class)->handle($user, [
+        // Dueño distinto: la empresa del usuario principal ya esta en el
+        // limite de 1 empresa del plan basic (ver assignCompanyPlan arriba).
+        $otherCompany = app(CreateCompany::class)->handle(User::factory()->create(), [
             'legal_name' => 'Segunda Empresa SAS',
         ]);
 
@@ -124,6 +127,7 @@ class AttributesCatalogTest extends TestCase
         $company = app(CreateCompany::class)->handle($user, [
             'legal_name' => 'Atributos Retail SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
 
         session([CurrentCompany::SESSION_KEY => $company->id]);
 

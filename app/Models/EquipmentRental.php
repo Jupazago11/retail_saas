@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\EquipmentRentalStatus;
-use App\Enums\EquipmentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -28,7 +27,6 @@ class EquipmentRental extends Model
     protected function casts(): array
     {
         return [
-            'equipment_type' => EquipmentType::class,
             'status' => EquipmentRentalStatus::class,
             'unit_cost' => 'decimal:2',
             'monthly_price' => 'decimal:2',

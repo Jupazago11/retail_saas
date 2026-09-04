@@ -33,6 +33,7 @@ Ventas congeladas ya no es una clave de esta empresa: es 100% la feature de plan
 - `inventory_enabled`
 - `minimum_stock_alerts_enabled`
 - `default_cost_method`
+- `tracking_mode` (solo vertical restaurante: `simple`/`recipe`, ver "Recetas y costeo por insumo" en `modelo-datos.md`)
 
 ### `cash`
 
@@ -95,4 +96,5 @@ Ventas congeladas ya no es una clave de esta empresa: es 100% la feature de plan
 - El backend ya consume `pos.allow_manual_discounts` para bloquear descuentos manuales cuando la empresa no los permite.
 - El backend ya consume `pos.allow_negative_stock` para permitir o bloquear salidas `sale_out` sin saldo disponible.
 - El backend ya consume `pos.sale_document_prefix` y `pos.sale_document_starting_sequence` para emitir la numeracion interna de ventas POS sin depender de facturacion electronica.
+- `inventory.tracking_mode` ya se pregunta una vez por empresa restaurante (modal `App\Livewire\Company\TrackingModeGate`, no la pagina de Configuracion general), pero todavia no alimenta ninguna logica: `PostSaleToInventory`/`ReturnSaleToInventory` deciden por producto segun `products.is_recipe`, no leen esta clave. Y `products.is_recipe` en si mismo todavia no es editable desde `ProductsPage` (el formulario de crear/editar producto) — falta esa UI para que la respuesta de este modal tenga un efecto practico completo.
 - El grupo `electronic_billing` ya existe a nivel de configuracion tipada, pero por ahora funciona como base operativa y de integracion futura, no como emision electronica completa.

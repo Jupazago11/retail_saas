@@ -3,7 +3,9 @@
 namespace App\Livewire\Platform;
 
 use App\Actions\Plans\UpdatePlan;
+use App\Enums\RecordStatus;
 use App\Livewire\Concerns\InteractsWithToast;
+use App\Models\BusinessType;
 use App\Models\Feature;
 use App\Models\Module;
 use App\Models\Plan;
@@ -16,8 +18,11 @@ class PlansPage extends Component
 {
     use InteractsWithToast;
 
+    public string $filter = 'all';
+
     public bool   $showModal      = false;
     public ?int   $editingId      = null;
+    public ?int   $editingBusinessTypeId = null;
     public string $editName       = '';
     public string $editPrice      = '';
     public string $editPeriod     = 'monthly';
@@ -31,13 +36,23 @@ class PlansPage extends Component
         abort_unless(auth()->user()?->is_platform_admin, 403);
     }
 
+    public function setFilter(string $filter): void
+    {
+        if ($filter !== 'all' && ! BusinessType::where('code', $filter)->exists()) {
+            return;
+        }
+
+        $this->filter = $filter;
+    }
+
     public function startEdit(int $id): void
     {
         $plan = Plan::with(['modules', 'features', 'limits'])->findOrFail($id);
 
         $this->editingId  = $plan->id;
+        $this->editingBusinessTypeId = $plan->business_type_id;
         $this->editName   = $plan->name;
-        $this->editPrice  = (string) $plan->base_price;
+        $this->editPrice  = (string) (int) $plan->base_price;
         $this->editPeriod = $plan->billing_period;
         $this->editStatus = $plan->status;
 
@@ -87,12 +102,22 @@ class PlansPage extends Component
     {
         abort_unless(auth()->user()?->is_platform_admin, 403);
 
+        // El vertical restaurante siempre trae 3 roles automaticos (Cajero,
+        // Mesero, Cocina) ademas del dueño — ver
+        // ProvisionDefaultRestaurantRoles — asi que su max_users no puede
+        // bajar de 4, o una empresa recien activada ya nace por encima del
+        // limite de su propio plan.
+        $isRestaurantPlan = BusinessType::find($this->editingBusinessTypeId)?->code === 'restaurant';
+
         $this->validate([
             'editName'    => ['required', 'string', 'max:255'],
             'editPrice'   => ['required', 'numeric', 'min:0'],
             'editPeriod'  => ['required', 'in:monthly,yearly,one_time'],
             'editStatus'  => ['required', 'in:active,inactive'],
             'editLimits.*' => ['required', 'integer', 'min:0'],
+            'editLimits.max_users' => ['required', 'integer', $isRestaurantPlan ? 'min:4' : 'min:0'],
+        ], [], [
+            'editLimits.max_users' => 'usuarios maximos',
         ]);
 
         try {
@@ -115,10 +140,21 @@ class PlansPage extends Component
         $this->toast('Plan actualizado.');
     }
 
+    public function toggleStatus(int $id): void
+    {
+        abort_unless(auth()->user()?->is_platform_admin, 403);
+
+        $plan = Plan::findOrFail($id);
+        $plan->update(['status' => $plan->status === 'active' ? 'inactive' : 'active']);
+
+        $this->toast('Estado del plan actualizado.');
+    }
+
     public function closeModal(): void
     {
         $this->showModal      = false;
         $this->editingId      = null;
+        $this->editingBusinessTypeId = null;
         $this->editName       = '';
         $this->editPrice      = '';
         $this->editPeriod     = 'monthly';
@@ -130,11 +166,36 @@ class PlansPage extends Component
 
     public function render(): View
     {
-        $plans = Plan::with(['modules', 'limits'])->orderBy('id')->get();
-        $modules = Module::with('features')->orderBy('code')->get();
-        $limitDefinitions = PlanLimitCatalog::definitions();
+        $plans = Plan::with(['modules', 'limits', 'businessType'])
+            ->when($this->filter !== 'all', fn ($q) => $q->whereHas('businessType', fn ($bq) => $bq->where('code', $this->filter)))
+            ->orderBy('id')
+            ->get();
 
-        return view('livewire.platform.plans-page', compact('plans', 'modules', 'limitDefinitions'))
+        $modules = Module::with('features')
+            ->when(
+                $this->editingBusinessTypeId,
+                fn ($q) => $q->where(fn ($inner) => $inner
+                    ->whereNull('business_type_id')
+                    ->orWhere('business_type_id', $this->editingBusinessTypeId)),
+                fn ($q) => $q->whereNull('business_type_id')
+            )
+            ->orderBy('code')
+            ->get();
+
+        $limitDefinitions = PlanLimitCatalog::definitions();
+        $businessTypes = BusinessType::where('status', RecordStatus::Active->value)->orderBy('id')->get();
+
+        // Un carrusel por vertical en vez de una sola grilla con todos los
+        // planes mezclados (ver plans-page.blade.php).
+        $plansByBusinessType = $businessTypes
+            ->map(fn (BusinessType $businessType) => [
+                'businessType' => $businessType,
+                'plans' => $plans->where('business_type_id', $businessType->id)->values(),
+            ])
+            ->filter(fn (array $group) => $group['plans']->isNotEmpty())
+            ->values();
+
+        return view('livewire.platform.plans-page', compact('plans', 'modules', 'limitDefinitions', 'businessTypes', 'plansByBusinessType'))
             ->layout('layouts.platform');
     }
 }

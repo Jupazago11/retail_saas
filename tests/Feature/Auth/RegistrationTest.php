@@ -26,7 +26,10 @@ class RegistrationTest extends TestCase
             ->set('username', 'testuser')
             ->set('email', 'test@example.com')
             ->set('password', 'password')
-            ->set('password_confirmation', 'password');
+            ->set('password_confirmation', 'password')
+            // Codigo de acceso fijo del registro (ver
+            // resources/views/livewire/pages/auth/register.blade.php).
+            ->set('accessCode', '1998');
 
         $component->call('register');
 

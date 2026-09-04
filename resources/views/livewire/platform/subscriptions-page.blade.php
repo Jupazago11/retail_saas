@@ -74,7 +74,7 @@
                                         class="flex items-center gap-2 rounded-full border border-transparent p-1 transition hover:border-gray-200">
                                         @foreach ($equipmentTypes as $type)
                                             @php
-                                                $counts = $companyEquipment[$type->value] ?? collect();
+                                                $counts = $companyEquipment[$type->code] ?? collect();
                                                 $activeCount = $counts['active'] ?? 0;
                                                 $requestedCount = $counts['requested'] ?? 0;
                                                 $pendingCount = $counts['pending_return'] ?? 0;
@@ -85,13 +85,9 @@
                                                     default => 'bg-gray-50 text-gray-300',
                                                 };
                                             @endphp
-                                            <span title="{{ $type->label() }}: {{ $activeCount }} en uso, {{ $requestedCount }} solicitada(s), {{ $pendingCount }} pendiente(s) de devolucion"
+                                            <span title="{{ $type->name }}: {{ $activeCount }} en uso, {{ $requestedCount }} solicitada(s), {{ $pendingCount }} pendiente(s) de devolucion"
                                                 class="relative inline-flex h-6 w-6 items-center justify-center rounded-full {{ $badgeColor }}">
-                                                @if ($type === \App\Enums\EquipmentType::ThermalPrinter)
-                                                    <x-heroicon-o-printer class="h-3.5 w-3.5" />
-                                                @else
-                                                    <x-heroicon-o-qr-code class="h-3.5 w-3.5" />
-                                                @endif
+                                                <x-heroicon-o-printer class="h-3.5 w-3.5" />
                                                 @if ($activeCount > 1)
                                                     <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-emerald-600 text-[9px] font-bold text-white">{{ $activeCount }}</span>
                                                 @endif
@@ -192,7 +188,7 @@
                         <select wire:model="editPlanId"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Seleccionar plan...</option>
-                            @foreach ($plans as $plan)
+                            @foreach ($editPlans as $plan)
                                 <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                             @endforeach
                         </select>
@@ -233,7 +229,7 @@
                         <select wire:model="activatePlanId"
                             class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                             <option value="">Seleccionar plan...</option>
-                            @foreach ($plans as $plan)
+                            @foreach ($activatePlans as $plan)
                                 <option value="{{ $plan->id }}">{{ $plan->name }}</option>
                             @endforeach
                         </select>
@@ -298,25 +294,29 @@
                 <div class="mt-5 space-y-4">
                     @foreach ($equipmentTypes as $type)
                         @php
-                            $typeRentals = $rentals->where('equipment_type', $type);
+                            $typeRentals = $rentals->where('equipment_type', $type->code);
                             $activeCount = $typeRentals->where('status', \App\Enums\EquipmentRentalStatus::Active)->count();
                         @endphp
                         <div class="rounded-lg border border-gray-200 p-4">
                             <div class="flex items-center justify-between gap-4">
                                 <div>
-                                    <p class="font-semibold text-gray-900">{{ $type->label() }}</p>
-                                    <p class="text-xs text-gray-500">${{ $this->formatMoney(\App\Support\EquipmentRentalCatalog::monthlyPrice($type)) }}/mes por unidad — {{ $activeCount }} activa(s)</p>
+                                    <p class="font-semibold text-gray-900">{{ $type->name }}</p>
+                                    <p class="text-xs text-gray-500">${{ $this->formatMoney($type->monthly_price) }}/mes por unidad — {{ $activeCount }} activa(s)</p>
                                 </div>
-                                <div class="flex gap-2">
-                                    <button type="button" wire:click="requestEquipment('{{ $type->value }}')"
-                                        class="whitespace-nowrap rounded-full border border-blue-300 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">
-                                        Solicitar
-                                    </button>
-                                    <button type="button" wire:click="addEquipment('{{ $type->value }}')"
-                                        class="whitespace-nowrap rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700">
-                                        + Agregar unidad
-                                    </button>
-                                </div>
+                                @if ($type->status === 'active')
+                                    <div class="flex gap-2">
+                                        <button type="button" wire:click="requestEquipment('{{ $type->code }}')"
+                                            class="whitespace-nowrap rounded-full border border-blue-300 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50">
+                                            Solicitar
+                                        </button>
+                                        <button type="button" wire:click="addEquipment('{{ $type->code }}')"
+                                            class="whitespace-nowrap rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-blue-700">
+                                            + Agregar unidad
+                                        </button>
+                                    </div>
+                                @else
+                                    <span class="text-xs text-gray-400">Tipo inactivo</span>
+                                @endif
                             </div>
 
                             @if ($typeRentals->isNotEmpty())

@@ -40,8 +40,10 @@ class NavigationVisibilityTest extends TestCase
             ->withSession([CurrentCompany::SESSION_KEY => $company->id])
             ->get(route('sales.index'));
 
+        // Ventas congeladas ya no tiene ruta propia (se uso Ventas + POS en
+        // un solo workspace, ver App\Livewire\Sales\SalesWorkspacePage) —
+        // solo queda por verificar que el texto del tab no aparezca.
         $response->assertOk();
-        $response->assertDontSee(route('sales.frozen'), false);
         $response->assertDontSee('Congeladas');
     }
 

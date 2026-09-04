@@ -1,5 +1,6 @@
 <x-app-layout>
     <livewire:company.printer-setup-gate />
+    <livewire:company.tracking-mode-gate />
 
     @php
         $snapshot = app(\App\Services\Plans\CompanyPlanResolver::class)->snapshot($company);
@@ -28,6 +29,9 @@
         $canManageLoyalty = auth()->user()?->hasCurrentCompanyPermission('loyalty.manage') ?? false;
         $canManageSettings = auth()->user()?->hasCurrentCompanyPermission('settings.manage') ?? false;
         $canManageRoles = auth()->user()?->hasCurrentCompanyPermission('roles.manage') ?? false;
+        $canManageDining = auth()->user()?->hasCurrentCompanyPermission('dining.manage') ?? false;
+        $canTakeDiningOrders = auth()->user()?->hasCurrentCompanyPermission('dining.orders') ?? false;
+        $canManageKitchen = auth()->user()?->hasCurrentCompanyPermission('kitchen.manage') ?? false;
 
         $launcherItems = collect([
             [
@@ -53,6 +57,30 @@
                 'visible' => ($planModules['pos'] ?? false) && ($canCreateSales || $canViewSales),
                 'color' => 'emerald',
                 'icon' => 'sales',
+            ],
+            [
+                'label' => 'Mesas',
+                'description' => 'Plano de mesas, comandas y cobro en sitio.',
+                'href' => route('dining.tables'),
+                'visible' => ($planModules['dining'] ?? false) && $canManageDining,
+                'color' => 'amber',
+                'icon' => 'dining',
+            ],
+            [
+                'label' => 'Pedidos',
+                'description' => 'Toma y edita pedidos sobre las mesas (mesero/cajero).',
+                'href' => route('dining.orders'),
+                'visible' => ($planModules['dining'] ?? false) && $canTakeDiningOrders,
+                'color' => 'teal',
+                'icon' => 'orders',
+            ],
+            [
+                'label' => 'Cocina',
+                'description' => 'Platos pendientes de preparar, por mesa.',
+                'href' => route('kitchen.index'),
+                'visible' => ($planModules['kitchen'] ?? false) && $canManageKitchen,
+                'color' => 'rose',
+                'icon' => 'kitchen',
             ],
             [
                 'label' => 'Inventario',
@@ -151,6 +179,15 @@
         @break
     @case('sales')
         <x-heroicon-o-shopping-cart class="h-6 w-6" />
+        @break
+    @case('dining')
+        <x-heroicon-o-table-cells class="h-6 w-6" />
+        @break
+    @case('kitchen')
+        <x-heroicon-o-fire class="h-6 w-6" />
+        @break
+    @case('orders')
+        <x-heroicon-o-clipboard-document-list class="h-6 w-6" />
         @break
     @case('inventory')
         <x-heroicon-o-archive-box class="h-6 w-6" />

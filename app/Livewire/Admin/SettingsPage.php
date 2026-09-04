@@ -81,6 +81,9 @@ class SettingsPage extends Component
             'pos.allow_negative_stock',
             'pos.require_customer_for_credit_sale',
             'printing.show_logo',
+            // Se administra desde el editor del plano del salon (Mesas y
+            // comandas -> Plano del salon), no desde esta pagina general.
+            'dining.obstacle_color',
         ];
 
         return collect(CompanySettingCatalog::definitions())

@@ -41,9 +41,431 @@ function capitalizeIfAllLowercase(text) {
 }
 window.retailSaas.capitalizeIfAllLowercase = capitalizeIfAllLowercase;
 
+// fetch() liso con el CSRF token de la pagina, usado por el editor del
+// plano de mesas (diningFloorPlanEditor mas abajo) para guardar
+// crear/mover/eliminar una mesa sin pasar por una accion de Livewire.
+async function csrfFetch(url, options = {}) {
+    const response = await fetch(url, {
+        ...options,
+        headers: {
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            Accept: 'application/json',
+            ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+            ...options.headers,
+        },
+    });
+
+    if (! response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+
+    return response.status === 204 ? null : response.json();
+}
+
 document.addEventListener('alpine:init', () => {
     Alpine.magic('capitalize', () => capitalizeIfAllLowercase);
 
+    // Editor visual del plano del salon (dining-floor-plan-page.blade.php).
+    // Vive aca (no inline en x-data="{...}") a proposito: ese atributo es un
+    // valor HTML delimitado por comillas dobles, y una comilla doble suelta
+    // dentro de CUALQUIER comentario del objeto corta el atributo a la mitad
+    // (el resto se cae como texto suelto en la pagina y Alpine nunca llega a
+    // inicializar `mode`/`tables`/etc.) — nos paso varias veces seguidas
+    // editando esto inline. Aca adentro (contenido de <script>, no un
+    // atributo) esa clase de bug es imposible.
+    //
+    // Crear/mover/eliminar una mesa o un obstaculo (addTable/addObstacle y
+    // companeros mas abajo, via csrfFetch) NO pasan por $wire ni por
+    // ninguna accion de Livewire: cada accion de Livewire dispara un
+    // re-render + remorfeo de TODO el componente, y el x-for anidado de las
+    // sillas (mesa > silla) no sobrevivia ese remorfeo de forma confiable en
+    // cada interaccion real de navegador (ni siquiera con wire:ignore en el
+    // contenedor: una mesa creada DESPUES del montaje inicial quedaba sin
+    // poder arrastrarse hasta refrescar la pagina). Un fetch() liso contra
+    // DiningFloorPlanTablesController/DiningFloorPlanObstaclesController
+    // nunca toca el ciclo de Livewire, asi que ese problema no puede volver
+    // a pasar por esta via. El tamaño (ancho/alto de una mesa cuadrada, o
+    // de cualquier obstaculo) se sigue guardando solo con "Guardar plano"
+    // (submit(), accion de Livewire de siempre — nunca causo el bug de
+    // arriba porque no crea elementos nuevos, solo ajusta los existentes).
+    Alpine.data('diningFloorPlanEditor', ({ branchId, outline, tables, registers, obstacles, obstacleColor }) => ({
+        branchId,
+        outline,
+        tables,
+        registers,
+        obstacles,
+        obstacleColor,
+        dragging: null,
+        justDragged: false,
+        // Tamaño/forma de la PROXIMA mesa a crear: arrancan igual a la
+        // ultima mesa existente y se actualizan cada vez que el dueño
+        // redimensiona (onMouseUp) o cambia la forma (toggleShape) una
+        // mesa — asi, si quiere todas redondas, solo cambia la primera y
+        // el resto que cree con "+" ya nacen redondas, sin repetir el
+        // cambio mesa por mesa.
+        defaultTableSize: tables.length ? Math.max(...tables.map((t) => t.size)) : 8,
+        defaultTableHeight: tables.length ? tables[tables.length - 1].height : 8,
+        defaultTableShape: tables.length ? tables[tables.length - 1].shape : 'square',
+
+        // Sillas alrededor de la mesa, repartidas en circulo segun la
+        // capacidad (4 por defecto si no se definio). Puramente visual. La
+        // distancia es el radio de la mesa en cada eje por separado (no un
+        // solo radio): en una mesa rectangular, un solo radio dejaria las
+        // sillas flotando lejos del lado corto o encimadas en el largo.
+        chairPositions(table) {
+            const count = table.capacity && table.capacity > 0 ? Math.min(table.capacity, 12) : 4;
+            const distanceX = table.size / 2;
+            const distanceY = table.height / 2;
+            const chairs = [];
+
+            for (let i = 0; i < count; i++) {
+                const angle = ((2 * Math.PI) / count) * i - (Math.PI / 2);
+                chairs.push({
+                    x: table.x + Math.cos(angle) * distanceX,
+                    y: table.y + Math.sin(angle) * distanceY,
+                });
+            }
+
+            return chairs;
+        },
+
+        svgPoint(event) {
+            const rect = this.$refs.canvas.getBoundingClientRect();
+            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+            const x = ((clientX - rect.left) / rect.width) * 100;
+            const y = ((clientY - rect.top) / rect.height) * 100;
+
+            return {
+                x: Math.min(100, Math.max(0, Math.round(x * 100) / 100)),
+                y: Math.min(100, Math.max(0, Math.round(y * 100) / 100)),
+            };
+        },
+
+        // Ajusta un punto para que la linea hacia `anchor` quede horizontal
+        // o vertical (la que este mas cerca de lo que realmente se movio),
+        // asi las paredes del salon salen rectas sin necesidad de pulso.
+        snapToAxis(point, anchor) {
+            const dx = Math.abs(point.x - anchor.x);
+            const dy = Math.abs(point.y - anchor.y);
+
+            return dx > dy ? { x: point.x, y: anchor.y } : { x: anchor.x, y: point.y };
+        },
+
+        canvasClick(event) {
+            // Un mousedown+drag+mouseup termina disparando igual un evento
+            // click final (aunque haya movido el mouse) — sin este guard,
+            // soltar un punto arrastrado o una mesa sobre el lienzo vacio
+            // agregaria un punto nuevo justo ahi por accidente.
+            if (this.justDragged) return;
+
+            let point = this.svgPoint(event);
+            if (this.outline.length > 0) {
+                point = this.snapToAxis(point, this.outline[this.outline.length - 1]);
+            }
+            this.outline.push(point);
+        },
+
+        startDragPoint(index) {
+            const n = this.outline.length;
+            const current = this.outline[index];
+            const prevIndex = n > 1 ? (index - 1 + n) % n : null;
+            const nextIndex = n > 2 ? (index + 1) % n : null;
+
+            // Al arrastrar una esquina, las dos paredes que llegan a ella se
+            // mantienen rectas moviendo la coordenada compartida del punto
+            // vecino correspondiente (igual que redimensionar un rectangulo
+            // arrastrando una esquina).
+            this.dragging = {
+                type: 'point',
+                index: index,
+                moved: false,
+                prevIndex: (prevIndex !== null && prevIndex !== index) ? prevIndex : null,
+                nextIndex: (nextIndex !== null && nextIndex !== index && nextIndex !== prevIndex) ? nextIndex : null,
+                prevHorizontal: prevIndex !== null ? Math.abs(this.outline[prevIndex].y - current.y) <= Math.abs(this.outline[prevIndex].x - current.x) : null,
+                nextHorizontal: nextIndex !== null ? Math.abs(this.outline[nextIndex].y - current.y) <= Math.abs(this.outline[nextIndex].x - current.x) : null,
+            };
+        },
+
+        startDragTable(id) {
+            this.dragging = { type: 'table', id: id, moved: false };
+        },
+
+        startResizeTable(id) {
+            this.dragging = { type: 'resize', id: id, moved: false };
+        },
+
+        startDragRegister(id) {
+            this.dragging = { type: 'register', id: id, moved: false };
+        },
+
+        startResizeRegister(id) {
+            this.dragging = { type: 'resize-register', id: id, moved: false };
+        },
+
+        startDragObstacle(id) {
+            this.dragging = { type: 'obstacle', id: id, moved: false };
+        },
+
+        startResizeObstacle(id) {
+            this.dragging = { type: 'resize-obstacle', id: id, moved: false };
+        },
+
+        onMouseMove(event) {
+            if (! this.dragging) return;
+            this.dragging.moved = true;
+            const point = this.svgPoint(event);
+
+            if (this.dragging.type === 'point') {
+                this.outline[this.dragging.index] = point;
+
+                if (this.dragging.prevIndex !== null) {
+                    if (this.dragging.prevHorizontal) {
+                        this.outline[this.dragging.prevIndex].y = point.y;
+                    } else {
+                        this.outline[this.dragging.prevIndex].x = point.x;
+                    }
+                }
+
+                if (this.dragging.nextIndex !== null) {
+                    if (this.dragging.nextHorizontal) {
+                        this.outline[this.dragging.nextIndex].y = point.y;
+                    } else {
+                        this.outline[this.dragging.nextIndex].x = point.x;
+                    }
+                }
+            } else if (this.dragging.type === 'table') {
+                const table = this.tables.find((t) => t.id === this.dragging.id);
+                if (table) {
+                    table.x = point.x;
+                    table.y = point.y;
+                }
+            } else if (this.dragging.type === 'resize') {
+                const table = this.tables.find((t) => t.id === this.dragging.id);
+                if (table) {
+                    // Redonda: un solo radio, sigue siendo circulo perfecto.
+                    // Cuadrada: ancho y alto se sueltan por separado, asi
+                    // arrastrar la esquina la puede dejar rectangular.
+                    if (table.shape === 'round') {
+                        const half = Math.max(point.x - table.x, point.y - table.y, 2);
+                        const size = Math.min(20, Math.max(4, Math.round(half * 2 * 100) / 100));
+                        table.size = size;
+                        table.height = size;
+                    } else {
+                        const halfW = Math.max(point.x - table.x, 2);
+                        const halfH = Math.max(point.y - table.y, 2);
+                        table.size = Math.min(20, Math.max(4, Math.round(halfW * 2 * 100) / 100));
+                        table.height = Math.min(20, Math.max(4, Math.round(halfH * 2 * 100) / 100));
+                    }
+                }
+            } else if (this.dragging.type === 'register') {
+                const register = this.registers.find((r) => r.id === this.dragging.id);
+                if (register) {
+                    register.x = point.x;
+                    register.y = point.y;
+                }
+            } else if (this.dragging.type === 'resize-register') {
+                const register = this.registers.find((r) => r.id === this.dragging.id);
+                if (register) {
+                    const half = Math.max(point.x - register.x, point.y - register.y, 2);
+                    register.size = Math.min(20, Math.max(4, Math.round(half * 2 * 100) / 100));
+                }
+            } else if (this.dragging.type === 'obstacle') {
+                const obstacle = this.obstacles.find((o) => o.id === this.dragging.id);
+                if (obstacle) {
+                    obstacle.x = point.x;
+                    obstacle.y = point.y;
+                }
+            } else if (this.dragging.type === 'resize-obstacle') {
+                const obstacle = this.obstacles.find((o) => o.id === this.dragging.id);
+                if (obstacle) {
+                    const halfW = Math.max(point.x - obstacle.x, 1);
+                    const halfH = Math.max(point.y - obstacle.y, 1);
+                    obstacle.width = Math.min(60, Math.max(2, Math.round(halfW * 2 * 100) / 100));
+                    obstacle.height = Math.min(60, Math.max(2, Math.round(halfH * 2 * 100) / 100));
+                }
+            }
+        },
+
+        onMouseUp() {
+            if (! this.dragging) return;
+
+            // Click sin arrastre sobre un punto = borrarlo. Si hubo
+            // movimiento, el punto ya quedo reposicionado y no se borra.
+            if (this.dragging.type === 'point' && ! this.dragging.moved) {
+                this.outline.splice(this.dragging.index, 1);
+            }
+
+            // El tamaño que quede tras redimensionar una mesa se vuelve el
+            // tamaño por defecto de las siguientes mesas que se agreguen.
+            if (this.dragging.type === 'resize' && this.dragging.moved) {
+                const table = this.tables.find((t) => t.id === this.dragging.id);
+                if (table) {
+                    this.defaultTableSize = table.size;
+                    this.defaultTableHeight = table.height;
+                }
+            }
+
+            // Mover una mesa o un obstaculo se guarda solo al soltarlo (no
+            // en cada mousemove) — a diferencia del contorno, el
+            // redimensionado y las cajas, que siguen quedando pendientes
+            // hasta pulsar "Guardar plano".
+            if (this.dragging.type === 'table' && this.dragging.moved) {
+                const table = this.tables.find((t) => t.id === this.dragging.id);
+                if (table) {
+                    csrfFetch(`/dining/floor-plan/tables/${table.id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ x: table.x, y: table.y }),
+                    }).catch(() => alert('No se pudo guardar la posicion de la mesa. Intenta de nuevo.'));
+                }
+            }
+
+            if (this.dragging.type === 'obstacle' && this.dragging.moved) {
+                const obstacle = this.obstacles.find((o) => o.id === this.dragging.id);
+                if (obstacle) {
+                    csrfFetch(`/dining/floor-plan/obstacles/${obstacle.id}`, {
+                        method: 'PATCH',
+                        body: JSON.stringify({ x: obstacle.x, y: obstacle.y }),
+                    }).catch(() => alert('No se pudo guardar la posicion del obstaculo. Intenta de nuevo.'));
+                }
+            }
+
+            if (this.dragging.moved) {
+                this.justDragged = true;
+                setTimeout(() => { this.justDragged = false; }, 0);
+            }
+
+            this.dragging = null;
+        },
+
+        toggleShape(id) {
+            const table = this.tables.find((t) => t.id === id);
+            if (table) {
+                table.shape = table.shape === 'round' ? 'square' : 'round';
+                // Redonda siempre uniforme: una mesa rectangular que se
+                // vuelve redonda pierde el estiramiento (una "redonda
+                // rectangular" no tiene sentido visual).
+                if (table.shape === 'round') {
+                    table.height = table.size;
+                }
+                this.defaultTableShape = table.shape;
+                this.defaultTableHeight = table.height;
+            }
+        },
+
+        // Quitar una mesa la archiva de inmediato en el servidor (no solo
+        // al guardar el plano) — la respuesta trae la lista ya renumerada,
+        // asi los numeros de las mesas restantes quedan correctos al
+        // instante en pantalla.
+        async removeTable(id) {
+            if (! confirm('¿Quitar esta mesa del plano?')) return;
+
+            try {
+                this.tables = await csrfFetch(`/dining/floor-plan/tables/${id}`, { method: 'DELETE' });
+            } catch (error) {
+                alert('No se pudo quitar la mesa. Intenta de nuevo.');
+            }
+        },
+
+        // Crear una mesa tambien queda persistida de inmediato — el
+        // servidor calcula el numero real (siguiente libre) y devuelve la
+        // mesa ya creada, asi que aca no se adivina ningun id ni nombre.
+        //
+        // La posicion inicial se escalona en una cuadricula (no siempre el
+        // mismo 50,50 del centro): crear varias mesas seguidas sin moverlas
+        // las apilaba exactas una sobre otra, asi que solo la de encima
+        // quedaba visible/arrastrable — parecia que las demas "no se
+        // dejaban mover" cuando en realidad estaban escondidas debajo.
+        async addTable() {
+            const index = this.tables.length;
+            const x = Math.min(80, 20 + (index % 5) * 14);
+            const y = Math.min(80, 20 + Math.floor(index / 5) * 14);
+
+            try {
+                const created = await csrfFetch('/dining/floor-plan/tables', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        branch_id: this.branchId,
+                        x,
+                        y,
+                        shape: this.defaultTableShape,
+                        size: this.defaultTableSize,
+                        height: this.defaultTableHeight,
+                    }),
+                });
+                this.tables.push(created);
+            } catch (error) {
+                alert('No se pudo crear la mesa. Intenta de nuevo.');
+            }
+        },
+
+        // Igual que addTable(): queda creado en el servidor de inmediato y
+        // escalonado en cuadricula para no apilarse con obstaculos previos.
+        async addObstacle() {
+            const index = this.obstacles.length;
+            const x = Math.min(80, 20 + (index % 5) * 14);
+            const y = Math.min(80, 55 + Math.floor(index / 5) * 14);
+
+            try {
+                const created = await csrfFetch('/dining/floor-plan/obstacles', {
+                    method: 'POST',
+                    body: JSON.stringify({ branch_id: this.branchId, x, y }),
+                });
+                this.obstacles.push(created);
+            } catch (error) {
+                alert('No se pudo crear el obstaculo. Intenta de nuevo.');
+            }
+        },
+
+        async removeObstacle(id) {
+            if (! confirm('¿Quitar este obstaculo del plano?')) return;
+
+            try {
+                await csrfFetch(`/dining/floor-plan/obstacles/${id}`, { method: 'DELETE' });
+                this.obstacles = this.obstacles.filter((o) => o.id !== id);
+            } catch (error) {
+                alert('No se pudo quitar el obstaculo. Intenta de nuevo.');
+            }
+        },
+
+        // Un solo color por empresa (no por obstaculo) — se guarda al
+        // cerrar el selector nativo (evento "change", no "input", para no
+        // mandar una peticion por cada pixel de matiz que el usuario
+        // arrastra dentro del selector).
+        saveObstacleColor() {
+            csrfFetch('/dining/floor-plan/obstacle-color', {
+                method: 'PATCH',
+                body: JSON.stringify({ color: this.obstacleColor }),
+            }).catch(() => alert('No se pudo guardar el color de los obstaculos. Intenta de nuevo.'));
+        },
+
+        polygonPoints() {
+            return this.outline.map((p) => p.x + ',' + p.y).join(' ');
+        },
+
+        submit() {
+            this.$wire.call('save', this.outline, this.tables.map((t) => ({
+                id: t.id,
+                name: t.name,
+                capacity: t.capacity,
+                shape: t.shape,
+                size: t.size,
+                height: t.height,
+                x: t.x,
+                y: t.y,
+            })), this.registers.map((r) => ({
+                id: r.id,
+                placed: r.placed,
+                size: r.size,
+                x: r.x,
+                y: r.y,
+            })), this.obstacles.map((o) => ({
+                id: o.id,
+                width: o.width,
+                height: o.height,
+            })));
+        },
+    }));
 
     // Input numerico con puntos de miles mientras se escribe (ej "200.000").
     // No depende del detector global de campos "money" (que solo actua sobre

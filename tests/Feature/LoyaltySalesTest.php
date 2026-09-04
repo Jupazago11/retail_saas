@@ -191,7 +191,7 @@ class LoyaltySalesTest extends TestCase
                 'sale_item_id' => $sale->items->first()->id,
                 'quantity' => '1',
             ],
-        ]);
+        ], 'Cliente no lo quiso');
 
         $account = $customer->loyaltyAccount()->firstOrFail()->fresh();
 
@@ -226,7 +226,7 @@ class LoyaltySalesTest extends TestCase
             ],
         ]);
 
-        app(CancelSale::class)->handle($company, $sale);
+        app(CancelSale::class)->handle($company, $sale, 'Prueba de anulacion');
 
         $account = $customer->loyaltyAccount()->firstOrFail()->fresh();
 
@@ -362,7 +362,7 @@ class LoyaltySalesTest extends TestCase
                 'sale_item_id' => $sale->items->first()->id,
                 'quantity' => '1',
             ],
-        ]);
+        ], 'Cliente no lo quiso');
 
         $account = $customer->loyaltyAccount()->firstOrFail()->fresh();
 
@@ -413,7 +413,7 @@ class LoyaltySalesTest extends TestCase
             ],
         ]);
 
-        app(CancelSale::class)->handle($company, $sale);
+        app(CancelSale::class)->handle($company, $sale, 'Prueba de anulacion');
 
         $account = $customer->loyaltyAccount()->firstOrFail()->fresh();
 

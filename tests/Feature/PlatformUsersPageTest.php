@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Actions\Companies\CreateCompany;
 use App\Livewire\Platform\UsersPage;
+use App\Models\BusinessType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -132,4 +134,33 @@ class PlatformUsersPageTest extends TestCase
         $this->assertNull(session('impersonator_id'));
     }
 
+    public function test_users_page_filters_by_status_business_type_and_role(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+
+        $generalOwner = User::factory()->create(['name' => 'Dueño General']);
+        $generalCompany = app(CreateCompany::class)->handle($generalOwner, ['legal_name' => 'Tienda General SAS']);
+        $generalCompany->update(['business_type_id' => BusinessType::where('code', 'general')->value('id')]);
+
+        $restaurantOwner = User::factory()->create(['name' => 'Dueño Restaurante']);
+        $restaurantCompany = app(CreateCompany::class)->handle($restaurantOwner, ['legal_name' => 'Restaurante Prueba SAS']);
+        $restaurantCompany->update(['business_type_id' => BusinessType::where('code', 'restaurant')->value('id')]);
+
+        $inactiveUser = User::factory()->create(['status' => 'inactive']);
+
+        $this->actingAs($platformAdmin);
+
+        Livewire::test(UsersPage::class)
+            ->call('setStatusFilter', 'inactive')
+            ->assertSee($inactiveUser->name)
+            ->assertDontSee($generalOwner->name)
+            ->call('setStatusFilter', 'all')
+            ->call('setBusinessTypeFilter', 'restaurant')
+            ->assertSee($restaurantOwner->name)
+            ->assertDontSee($generalOwner->name)
+            ->call('setBusinessTypeFilter', 'all')
+            ->call('setRoleFilter', 'admin')
+            ->assertSee($platformAdmin->name)
+            ->assertDontSee($generalOwner->name);
+    }
 }

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Actions\Companies\CreateCompany;
 use App\Actions\Subscriptions\ChangeCompanySubscription;
+use App\Models\BusinessType;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -45,13 +46,24 @@ class DemoCompaniesSeeder extends Seeder
                 $company = app(CreateCompany::class)->handle($owner, $profile['company']);
             }
 
+            // Las empresas demo son negocios de retail general — si todavia
+            // no tienen vertical asignado (creadas antes de business_types,
+            // o recien creadas arriba sin pasar por la activacion manual del
+            // superadmin), se dejan explicitamente en "general".
+            if (! $company->business_type_id) {
+                $company->update(['business_type_id' => BusinessType::where('code', 'general')->value('id')]);
+            }
+
             $this->ensureDirectPlan($company, $profile['plan_code'], $owner);
         });
     }
 
     protected function ensureDirectPlan(Company $company, string $planCode, User $owner): void
     {
-        $plan = Plan::query()->where('code', $planCode)->firstOrFail();
+        $plan = Plan::query()
+            ->where('code', $planCode)
+            ->where('business_type_id', $company->business_type_id)
+            ->firstOrFail();
 
         $activeDirectSubscription = Subscription::query()
             ->with('plan')

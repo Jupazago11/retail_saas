@@ -16,6 +16,52 @@
                 </div>
             </div>
 
+            <div class="mt-4 flex flex-wrap items-center gap-4">
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setStatusFilter('all')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todos
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('active')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'active' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Activos
+                    </button>
+                    <button type="button" wire:click="setStatusFilter('inactive')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $statusFilter === 'inactive' ? 'bg-stone-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Inactivos
+                    </button>
+                </div>
+
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setBusinessTypeFilter('all')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $businessTypeFilter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todos los negocios
+                    </button>
+                    @foreach ($businessTypes as $type)
+                        <button type="button" wire:click="setBusinessTypeFilter('{{ $type->code }}')"
+                            class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold transition {{ $businessTypeFilter === $type->code ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                            <x-business-type-icon :icon="$type->icon" class="h-3.5 w-3.5" />
+                            {{ $type->name }}
+                        </button>
+                    @endforeach
+                </div>
+
+                <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                    <button type="button" wire:click="setRoleFilter('all')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $roleFilter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Todos los roles
+                    </button>
+                    <button type="button" wire:click="setRoleFilter('user')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $roleFilter === 'user' ? 'bg-stone-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Usuarios
+                    </button>
+                    <button type="button" wire:click="setRoleFilter('admin')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $roleFilter === 'admin' ? 'bg-amber-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        Superadmins
+                    </button>
+                </div>
+            </div>
+
             <div class="mt-5 overflow-x-auto">
                 <table class="min-w-full divide-y divide-stone-200 text-sm">
                     <thead>
@@ -38,7 +84,15 @@
                                 </td>
                                 <td class="px-4 py-3 align-middle text-xs text-gray-600">{{ $user->email ?? '—' }}</td>
                                 <td class="px-4 py-3 align-middle text-center text-xs text-gray-600 w-px whitespace-nowrap">
-                                    {{ $user->companies_count }}
+                                    @php($userBusinessTypes = $user->companies->pluck('businessType')->filter()->unique('id'))
+                                    <div class="flex items-center justify-center gap-1.5">
+                                        <span>{{ $user->companies_count }}</span>
+                                        @foreach ($userBusinessTypes as $businessType)
+                                            <span title="{{ $businessType->name }}" class="text-gray-400">
+                                                <x-business-type-icon :icon="$businessType->icon" class="h-4 w-4" />
+                                            </span>
+                                        @endforeach
+                                    </div>
                                 </td>
                                 <td class="px-4 py-3 align-middle text-xs text-gray-400 w-px whitespace-nowrap">
                                     {{ $user->created_at->format('d/m/Y') }}
@@ -51,15 +105,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 align-middle w-px whitespace-nowrap">
-                                    <button type="button" wire:click="toggleStatus({{ $user->id }})"
-                                        title="Clic para {{ $user->status === 'active' ? 'desactivar' : 'activar' }}"
-                                        class="transition hover:opacity-75">
-                                        @if ($user->status === 'active')
-                                            <x-status-badge color="emerald">Activo</x-status-badge>
-                                        @else
-                                            <x-status-badge color="rose">Inactivo</x-status-badge>
-                                        @endif
-                                    </button>
+                                    <x-status-toggle :active="$user->status === 'active'" activeLabel="Activo" inactiveLabel="Inactivo" action="toggleStatus({{ $user->id }})" />
                                 </td>
                                 <td class="pl-4 pr-0 py-3 align-middle w-px whitespace-nowrap text-right">
                                     <div class="flex items-center justify-end gap-2">

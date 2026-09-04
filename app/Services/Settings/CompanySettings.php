@@ -154,7 +154,7 @@ class CompanySettings
         $definition = CompanySettingCatalog::definition($groupKey, $settingKey);
 
         if (! $definition) {
-            throw new InvalidArgumentException('La configuracion solicitada no existe en el catalogo.');
+            throw new InvalidArgumentException("La configuracion solicitada no existe en el catalogo ({$groupKey}.{$settingKey}).");
         }
 
         return $definition;

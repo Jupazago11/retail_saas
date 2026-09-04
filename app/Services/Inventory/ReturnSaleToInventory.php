@@ -8,12 +8,18 @@ use App\Models\InventoryBalance;
 use App\Models\InventoryMovement;
 use App\Models\Sale;
 use App\Models\SaleItem;
+use App\Services\Products\ProductPresentationConverter;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class ReturnSaleToInventory
 {
+    public function __construct(
+        protected ProductPresentationConverter $productPresentationConverter,
+    ) {
+    }
+
     public function handle(Sale $sale, array $items, ?SaleStatus $forcedStatus = null): Sale
     {
         $sale->loadMissing(['items.product', 'warehouse']);
@@ -72,22 +78,60 @@ class ReturnSaleToInventory
 
     protected function returnItem(Sale $sale, SaleItem $saleItem, string $returnedQuantity, string $returnedBaseQuantity): void
     {
-        if (! $saleItem->product->tracks_inventory) {
-            $saleItem->update([
-                'returned_quantity' => bcadd((string) $saleItem->returned_quantity, $returnedQuantity, 6),
-                'returned_base_quantity' => bcadd((string) $saleItem->returned_base_quantity, $returnedBaseQuantity, 6),
-            ]);
+        if ($saleItem->product->is_recipe) {
+            $this->returnRecipeItem($sale, $saleItem, $returnedBaseQuantity);
+        } elseif ($saleItem->product->tracks_inventory) {
+            $incomingUnitCost = (string) ($saleItem->cost_snapshot ?? '0.0000');
+            $this->returnProductIn($sale, $saleItem->product_id, $saleItem->product_variant_id, $returnedBaseQuantity, $incomingUnitCost, $saleItem);
+        }
 
+        $saleItem->update([
+            'returned_quantity' => bcadd((string) $saleItem->returned_quantity, $returnedQuantity, 6),
+            'returned_base_quantity' => bcadd((string) $saleItem->returned_base_quantity, $returnedBaseQuantity, 6),
+        ]);
+    }
+
+    /**
+     * Espejo de PostSaleToInventory::postRecipeItem(): un plato con receta no
+     * tiene stock propio, asi que devolverlo restituye cada insumo de su
+     * receta en vez del plato.
+     */
+    protected function returnRecipeItem(Sale $sale, SaleItem $saleItem, string $returnedBaseQuantity): void
+    {
+        $recipe = $saleItem->product->recipe()->with(['items.ingredientProduct', 'items.ingredientPresentation'])->first();
+
+        if (! $recipe) {
             return;
         }
 
+        $yieldQuantity = (string) $recipe->yield_quantity;
+        $portions = bccomp($yieldQuantity, '0', 6) === 0 ? $returnedBaseQuantity : bcdiv($returnedBaseQuantity, $yieldQuantity, 6);
+
+        foreach ($recipe->items as $recipeItem) {
+            if (! $recipeItem->ingredientProduct->tracks_inventory) {
+                continue;
+            }
+
+            $baseQuantityPerPortion = $recipeItem->ingredientPresentation
+                ? $this->productPresentationConverter->presentationToBase($recipeItem->ingredientPresentation, (string) $recipeItem->quantity)
+                : (string) $recipeItem->quantity;
+
+            $incomingQuantity = bcmul($baseQuantityPerPortion, $portions, 6);
+            $incomingCost = bcadd((string) ($recipeItem->ingredientProduct->cost ?? '0'), '0', 4);
+
+            $this->returnProductIn($sale, $recipeItem->ingredient_product_id, null, $incomingQuantity, $incomingCost, $saleItem);
+        }
+    }
+
+    protected function returnProductIn(Sale $sale, int $productId, ?int $productVariantId, string $incomingQuantity, string $incomingUnitCost, SaleItem $referenceItem): void
+    {
         $balance = InventoryBalance::query()
             ->where('company_id', $sale->company_id)
             ->where('warehouse_id', $sale->warehouse_id)
-            ->where('product_id', $saleItem->product_id)
+            ->where('product_id', $productId)
             ->when(
-                $saleItem->product_variant_id,
-                fn ($query) => $query->where('product_variant_id', $saleItem->product_variant_id),
+                $productVariantId,
+                fn ($query) => $query->where('product_variant_id', $productVariantId),
                 fn ($query) => $query->whereNull('product_variant_id')
             )
             ->lockForUpdate()
@@ -95,24 +139,23 @@ class ReturnSaleToInventory
 
         $currentQuantity = $balance?->quantity_on_hand ?? '0.000000';
         $currentAverageCost = $balance?->average_cost ?? '0.0000';
-        $incomingUnitCost = (string) ($saleItem->cost_snapshot ?? '0.0000');
-        $newQuantity = bcadd($currentQuantity, $returnedBaseQuantity, 6);
+        $newQuantity = bcadd($currentQuantity, $incomingQuantity, 6);
         $newAverageCost = $this->weightedAverage(
             $currentQuantity,
             $currentAverageCost,
-            $returnedBaseQuantity,
+            $incomingQuantity,
             $incomingUnitCost,
         );
 
         InventoryMovement::query()->create([
             'company_id' => $sale->company_id,
             'warehouse_id' => $sale->warehouse_id,
-            'product_id' => $saleItem->product_id,
-            'product_variant_id' => $saleItem->product_variant_id,
+            'product_id' => $productId,
+            'product_variant_id' => $productVariantId,
             'movement_type' => InventoryMovementType::SaleReturnIn->value,
             'reference_type' => SaleItem::class,
-            'reference_id' => $saleItem->id,
-            'quantity_in' => $returnedBaseQuantity,
+            'reference_id' => $referenceItem->id,
+            'quantity_in' => $incomingQuantity,
             'quantity_out' => '0.000000',
             'unit_cost' => $incomingUnitCost,
             'balance_quantity' => $newQuantity,
@@ -129,17 +172,12 @@ class ReturnSaleToInventory
             InventoryBalance::query()->create([
                 'company_id' => $sale->company_id,
                 'warehouse_id' => $sale->warehouse_id,
-                'product_id' => $saleItem->product_id,
-                'product_variant_id' => $saleItem->product_variant_id,
+                'product_id' => $productId,
+                'product_variant_id' => $productVariantId,
                 'quantity_on_hand' => $newQuantity,
                 'average_cost' => $newAverageCost,
             ]);
         }
-
-        $saleItem->update([
-            'returned_quantity' => bcadd((string) $saleItem->returned_quantity, $returnedQuantity, 6),
-            'returned_base_quantity' => bcadd((string) $saleItem->returned_base_quantity, $returnedBaseQuantity, 6),
-        ]);
     }
 
     protected function resolveStatusAfterReturn(Collection $items): string

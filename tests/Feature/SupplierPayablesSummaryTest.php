@@ -95,6 +95,7 @@ class SupplierPayablesSummaryTest extends TestCase
         ]);
         app(ApplySupplierCreditToPurchase::class)->handle($company, $openBetaPurchase, [
             'amount' => '1000',
+            'reference' => 'APLICACION-SALDO-BETA',
         ]);
 
         $gammaCreditSource = app(CreatePurchase::class)->handle($company, [

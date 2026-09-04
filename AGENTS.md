@@ -6,8 +6,10 @@ Construir un SaaS multiempresa para comercio minorista: tiendas, minimercados, s
 
 ## Alcance
 
-- Dominio unico: retail.
-- Excluido del MVP: farmacia, restaurante, mecanica, hospital, estaciones de servicio y otros verticales.
+- Dominio multi-vertical: cada empresa tiene un tipo de negocio (`business_types`) que determina que vertical opera. Verticales soportados: negocio general (retail: tiendas, minimercados, supermercados pequenos, San Andresito, ropa, calzado y accesorios) y restaurante.
+- El tipo de negocio lo define una unica vez el `platform_super_admin` al activar la empresa en Plataforma > Empresas (editable despues por el superadmin si hace falta corregirlo); el dueño de la empresa nunca lo elige.
+- Modulos por vertical: se documentan y se implementan por fases a medida que se definen. Algunos modulos existentes (compras, credito, reportes, configuracion) se reutilizan sin cambios entre verticales; los especificos de restaurante se disenan aparte.
+- Excluido del MVP: farmacia, mecanica, hospital, estaciones de servicio y otros verticales no listados arriba.
 - Arquitectura inicial: monolito modular en Laravel con una sola base de datos PostgreSQL y aislamiento por `company_id`.
 
 ## Stack base

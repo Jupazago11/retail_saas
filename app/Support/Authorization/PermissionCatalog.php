@@ -44,6 +44,14 @@ class PermissionCatalog
             ['code' => 'credit.manage', 'name' => 'Gestionar credito', 'module_code' => 'credit'],
             ['code' => 'loyalty.manage', 'name' => 'Gestionar fidelizacion', 'module_code' => 'loyalty'],
             ['code' => 'promotions.manage', 'name' => 'Gestionar promociones', 'module_code' => 'promotions'],
+            ['code' => 'dining.manage', 'name' => 'Gestionar mesas y comandas', 'module_code' => 'dining'],
+            // Distinto de dining.manage a proposito: dining.manage es el
+            // CRUD de mesas (crear/archivar mesas, pensado para el dueño);
+            // dining.orders es solo tomar/editar pedidos sobre mesas ya
+            // existentes (mesero, cajero) — asi el mesero no ve el modulo
+            // de administracion de mesas, solo el de tomar pedidos.
+            ['code' => 'dining.orders', 'name' => 'Tomar pedidos en mesas', 'module_code' => 'dining'],
+            ['code' => 'kitchen.manage', 'name' => 'Gestionar cocina', 'module_code' => 'kitchen'],
             ['code' => 'reports.view', 'name' => 'Ver reportes', 'module_code' => 'reports'],
             ['code' => 'reports.view_costs', 'name' => 'Ver costos en reportes', 'module_code' => 'reports'],
             ['code' => 'settings.manage', 'name' => 'Gestionar configuracion', 'module_code' => 'settings'],

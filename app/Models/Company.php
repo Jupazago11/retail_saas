@@ -19,6 +19,7 @@ class Company extends Model
 
     protected $fillable = [
         'owner_user_id',
+        'business_type_id',
         'legal_name',
         'display_name',
         'slug',
@@ -37,6 +38,11 @@ class Company extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    public function businessType(): BelongsTo
+    {
+        return $this->belongsTo(BusinessType::class);
     }
 
     public function users(): BelongsToMany

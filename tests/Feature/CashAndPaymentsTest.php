@@ -248,7 +248,9 @@ class CashAndPaymentsTest extends TestCase
         ]);
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('La suma de los pagos debe coincidir exactamente con el total de la venta.');
+        // El pago ya no debe coincidir exacto: solo debe cubrir el total
+        // (el efectivo puede exceder para dar vuelto, ver RegisterSalePayments).
+        $this->expectExceptionMessage('El monto pagado no cubre el total de la venta.');
 
         app(RegisterSalePayments::class)->handle($company, $sale, [
             'cash_session_id' => $session->id,

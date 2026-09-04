@@ -67,9 +67,11 @@
                                 <td class="py-4 text-gray-700">{{ $unit->name }}</td>
                                 <td class="py-4 text-gray-600">{{ $unit->precision_scale }}</td>
                                 <td class="py-4">
-                                    <x-status-badge :color="$unit->status === 'active' ? 'emerald' : ($unit->status === 'inactive' ? 'stone' : 'amber')">
-                                        {{ $unit->status }}
-                                    </x-status-badge>
+                                    @if ($unit->status === 'archived')
+                                        <x-status-badge color="amber">archivado</x-status-badge>
+                                    @else
+                                        <x-status-toggle :active="$unit->status === 'active'" action="toggleUnitStatus({{ $unit->id }})" />
+                                    @endif
                                 </td>
                                 <td class="py-4 text-right">
                                     <div class="flex justify-end gap-2">
@@ -81,9 +83,6 @@
                                                 Restaurar
                                             </button>
                                         @else
-                                            <button wire:click="toggleUnitStatus({{ $unit->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                {{ $unit->status === 'active' ? 'Desactivar' : 'Activar' }}
-                                            </button>
                                             <button wire:click="archiveUnit({{ $unit->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                 Archivar
                                             </button>

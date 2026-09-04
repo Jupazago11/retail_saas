@@ -60,9 +60,11 @@
                                 <td class="py-4 font-medium text-gray-900">{{ $category->name }}</td>
                                 <td class="py-4 text-gray-600">{{ $category->code }}</td>
                                 <td class="py-4">
-                                    <x-status-badge :color="$category->status === 'active' ? 'emerald' : ($category->status === 'inactive' ? 'stone' : 'amber')">
-                                        {{ $category->status }}
-                                    </x-status-badge>
+                                    @if ($category->deleted_at)
+                                        <x-status-badge color="amber">archivado</x-status-badge>
+                                    @else
+                                        <x-status-toggle :active="$category->status === 'active'" action="toggleCategoryStatus({{ $category->id }})" />
+                                    @endif
                                 </td>
                                 <td class="py-4 text-right">
                                     <div class="flex justify-end gap-2">
@@ -73,9 +75,6 @@
                                         @else
                                             <button wire:click="editCategory({{ $category->id }})" class="rounded-full border border-gray-300 px-3 py-1 font-medium text-gray-700">
                                                 Editar
-                                            </button>
-                                            <button wire:click="toggleCategoryStatus({{ $category->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                {{ $category->status === 'active' ? 'Desactivar' : 'Activar' }}
                                             </button>
                                             <button wire:click="archiveCategory({{ $category->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                 Archivar

@@ -59,9 +59,12 @@ class CompanyProvisioningTest extends TestCase
             'is_primary' => true,
         ]);
 
+        // La suscripcion nace "pending": el platform_super_admin debe elegir
+        // el vertical de la empresa y activarla antes de que quede "active"
+        // (ver docs/decisiones-tecnicas.md, "Tipo de negocio por empresa").
         $this->assertDatabaseHas('subscriptions', [
             'company_id' => $company->id,
-            'status' => 'trialing',
+            'status' => 'pending',
         ]);
     }
 
@@ -89,9 +92,10 @@ class CompanyProvisioningTest extends TestCase
     {
         $owner = User::factory()->create();
 
-        app(CreateCompany::class)->handle($owner, [
+        $firstCompany = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Primera Basic SAS',
         ]);
+        $this->assignCompanyPlan($firstCompany, 'basic');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('El limite actual permite hasta 1 empresa(s) para este propietario.');

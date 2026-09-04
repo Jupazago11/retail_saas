@@ -6,6 +6,7 @@ use App\Enums\RecordStatus;
 use App\Livewire\Concerns\HasResponsivePageSize;
 use App\Livewire\Concerns\InteractsWithToast;
 use App\Models\AuditLog;
+use App\Models\BusinessType;
 use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Contracts\View\View;
@@ -21,6 +22,12 @@ class UsersPage extends Component
     public int $perPage = 25;
 
     public string $search = '';
+
+    public string $statusFilter = 'all';
+
+    public string $businessTypeFilter = 'all';
+
+    public string $roleFilter = 'all';
 
     public bool   $showResetModal    = false;
     public ?int   $resettingUserId   = null;
@@ -41,6 +48,36 @@ class UsersPage extends Component
     }
 
     public function updatedSearch(): void { $this->resetPage(); }
+
+    public function setStatusFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'active', 'inactive'], true)) {
+            return;
+        }
+
+        $this->statusFilter = $filter;
+        $this->resetPage();
+    }
+
+    public function setBusinessTypeFilter(string $filter): void
+    {
+        if ($filter !== 'all' && ! BusinessType::where('code', $filter)->exists()) {
+            return;
+        }
+
+        $this->businessTypeFilter = $filter;
+        $this->resetPage();
+    }
+
+    public function setRoleFilter(string $filter): void
+    {
+        if (! in_array($filter, ['all', 'admin', 'user'], true)) {
+            return;
+        }
+
+        $this->roleFilter = $filter;
+        $this->resetPage();
+    }
 
     public function startResetPassword(int $id): void
     {
@@ -219,6 +256,7 @@ class UsersPage extends Component
     {
         $users = User::query()
             ->withCount('companies')
+            ->with(['companies' => fn ($q) => $q->with('businessType')])
             ->when($this->search !== '', function ($q) {
                 $s = '%'.trim($this->search).'%';
                 $q->where(fn ($inner) => $inner
@@ -226,10 +264,18 @@ class UsersPage extends Component
                     ->orWhereLike('email', $s)
                     ->orWhereLike('username', $s));
             })
+            ->when($this->statusFilter !== 'all', fn ($q) => $q->where('status', $this->statusFilter))
+            ->when($this->roleFilter !== 'all', fn ($q) => $q->where('is_platform_admin', $this->roleFilter === 'admin'))
+            ->when($this->businessTypeFilter !== 'all', fn ($q) => $q->whereHas(
+                'companies',
+                fn ($cq) => $cq->whereHas('businessType', fn ($bq) => $bq->where('code', $this->businessTypeFilter))
+            ))
             ->orderByDesc('created_at')
             ->paginate($this->perPage);
 
-        return view('livewire.platform.users-page', compact('users'))
-            ->layout('layouts.platform');
+        return view('livewire.platform.users-page', [
+            'users' => $users,
+            'businessTypes' => BusinessType::where('status', RecordStatus::Active->value)->orderBy('id')->get(),
+        ])->layout('layouts.platform');
     }
 }

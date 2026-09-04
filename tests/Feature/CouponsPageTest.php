@@ -15,11 +15,12 @@ use App\Services\Plans\PlanCatalogBootstrapper;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class CouponsPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_coupons_page_can_create_and_update_coupon_with_scope_and_audit(): void
     {
@@ -30,7 +31,13 @@ class CouponsPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Coupon Scope SAS',
         ]);
-        $proPlan = Plan::query()->where('code', 'pro')->firstOrFail();
+        // plans.code ya no es unico global (unique compuesto business_type_id
+        // + code, ver docs/decisiones-tecnicas.md "Planes independientes por
+        // vertical de negocio") — se ancla al vertical general explicitamente.
+        $proPlan = Plan::query()
+            ->where('code', 'pro')
+            ->where('business_type_id', \App\Models\BusinessType::where('code', 'general')->value('id'))
+            ->firstOrFail();
         $subscription = Subscription::query()->create([
             'company_id' => $company->id,
             'plan_id' => $proPlan->id,
@@ -94,7 +101,9 @@ class CouponsPageTest extends TestCase
             ->assertSee('Pro')
             ->assertSee('Bundle Descuento')
             ->assertSee('Coupon Scope SAS')
-            ->assertSee('15,000.00');
+            // Money::format() usa separador de miles con punto y sin
+            // decimales (estilo COP), no el formato US con coma y centavos.
+            ->assertSee('15.000');
 
         $createdCoupon = Coupon::query()->where('code', 'SAVE20')->firstOrFail();
 
@@ -151,6 +160,7 @@ class CouponsPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Coupon Restriction SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [

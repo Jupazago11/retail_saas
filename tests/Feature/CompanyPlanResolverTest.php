@@ -18,11 +18,12 @@ use App\Models\User;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Plans\PlanCatalogBootstrapper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class CompanyPlanResolverTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_company_creation_provisions_basic_trial_subscription_and_catalog(): void
     {
@@ -31,6 +32,7 @@ class CompanyPlanResolverTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Plan Resolver SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
 
         $resolver = app(CompanyPlanResolver::class);
         $snapshot = $resolver->snapshot($company);

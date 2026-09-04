@@ -6,66 +6,124 @@
     <div class="space-y-6">
 
         {{-- Header --}}
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
-            <h1 class="mt-1 text-2xl font-black text-gray-900">Planes</h1>
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Plataforma</p>
+                <h1 class="mt-1 text-2xl font-black text-gray-900">Planes</h1>
+            </div>
+
+            <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-1 text-sm">
+                <button type="button" wire:click="setFilter('all')"
+                    class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === 'all' ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                    Todos
+                </button>
+                @foreach ($businessTypes as $businessType)
+                    <button type="button" wire:click="setFilter('{{ $businessType->code }}')"
+                        class="rounded-md px-3 py-1.5 font-semibold transition {{ $filter === $businessType->code ? 'bg-gradient-to-br from-blue-600 to-purple-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-700' }}">
+                        {{ $businessType->name }}
+                    </button>
+                @endforeach
+            </div>
         </div>
 
-        {{-- Grid de planes --}}
-        <div class="grid gap-5 lg:grid-cols-3">
-            @foreach ($plans as $plan)
-                <div class="flex flex-col rounded-xl bg-white p-6 ring-1 ring-gray-200">
-                    {{-- Cabecera del plan --}}
-                    <div class="flex items-start justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">{{ $plan->billing_period }}</p>
-                            <h2 class="mt-0.5 text-xl font-black text-gray-900">{{ $plan->name }}</h2>
-                            <p class="mt-1 text-2xl font-black text-gray-900">
-                                {{ number_format($plan->base_price, 0, ',', '.') }}
-                                <span class="text-sm font-normal text-gray-400">COP</span>
-                            </p>
-                        </div>
-                        @if ($plan->status === 'active')
-                            <x-status-badge color="emerald">activo</x-status-badge>
-                        @else
-                            <x-status-badge color="stone">inactivo</x-status-badge>
-                        @endif
+        {{-- Un carrusel horizontal por vertical de negocio, en vez de una
+             sola grilla con todos los planes mezclados — asi cada tipo de
+             negocio queda claramente agrupado y no se ven tarjetas regadas
+             por toda la pantalla. --}}
+        <div class="space-y-8">
+            @forelse ($plansByBusinessType as $group)
+                <div>
+                    <div class="flex items-center gap-2">
+                        <x-business-type-icon :icon="$group['businessType']->icon" class="h-4 w-4 text-gray-400" />
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">{{ $group['businessType']->name }}</p>
                     </div>
 
-                    {{-- Módulos --}}
-                    <div class="mt-5">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Módulos incluidos</p>
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                            @foreach ($plan->modules->where('pivot.enabled', true) as $module)
-                                <span class="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">{{ $module->name }}</span>
-                            @endforeach
-                        </div>
-                    </div>
+                    <div class="mt-3 -mx-1 flex snap-x snap-mandatory items-start gap-4 overflow-x-auto px-1 pb-2 pt-1">
+                        @foreach ($group['plans'] as $plan)
+                            @php
+                                $isFeatured = $group['plans']->count() === 3 && $loop->index === 1;
+                                $accent = match (true) {
+                                    $isFeatured => 'blue',
+                                    $loop->last => 'purple',
+                                    default => 'gray',
+                                };
+                            @endphp
+                            <div @class([
+                                'flex w-72 shrink-0 snap-start flex-col rounded-xl border-t-[3px] bg-white p-4 shadow-sm ring-1 transition hover:shadow-md',
+                                'border-blue-500 ring-blue-500/30 shadow-md' => $accent === 'blue',
+                                'border-purple-500 ring-gray-200' => $accent === 'purple',
+                                'border-gray-300 ring-gray-200' => $accent === 'gray',
+                            ])>
+                                @if ($isFeatured)
+                                    <span class="mb-2 inline-flex w-fit items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700 ring-1 ring-blue-600/20">
+                                        <x-heroicon-o-star class="h-2.5 w-2.5" />
+                                        Recomendado
+                                    </span>
+                                @endif
 
-                    {{-- Límites --}}
-                    @if ($plan->limits->isNotEmpty())
-                        <div class="mt-4">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Límites</p>
-                            <ul class="mt-2 space-y-1">
-                                @foreach ($plan->limits->take(5) as $limit)
-                                    <li class="flex justify-between text-xs text-gray-600">
-                                        <span class="text-gray-400">{{ str_replace('_', ' ', $limit->limit_key) }}</span>
-                                        <span class="font-semibold">{{ number_format($limit->limit_value) }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
+                                {{-- Cabecera del plan --}}
+                                <div class="flex items-start justify-between gap-2">
+                                    <div>
+                                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">{{ $plan->billing_period }}</p>
+                                        <h2 class="mt-0.5 text-base font-black text-gray-900">{{ $plan->name }}</h2>
+                                        @if ((float) $plan->base_price > 0)
+                                            <p class="mt-0.5 text-xl font-black text-gray-900">
+                                                {{ number_format($plan->base_price, 0, ',', '.') }}
+                                                <span class="text-xs font-normal text-gray-400">COP/mes</span>
+                                            </p>
+                                        @else
+                                            <p class="mt-0.5 text-xs font-semibold text-gray-400">Precio por definir</p>
+                                        @endif
+                                    </div>
+                                    <x-status-toggle :active="$plan->status === 'active'" action="toggleStatus({{ $plan->id }})" />
+                                </div>
 
-                    {{-- Acción --}}
-                    <div class="mt-auto pt-5">
-                        <button wire:click="startEdit({{ $plan->id }})"
-                            class="w-full rounded-full border border-gray-300 py-2 text-sm font-semibold text-gray-700 transition hover:border-blue-400 hover:text-blue-700">
-                            Editar plan
-                        </button>
+                                {{-- Módulos --}}
+                                <div class="mt-3 border-t border-gray-100 pt-3">
+                                    <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Módulos incluidos</p>
+                                    <div class="mt-1.5 flex flex-wrap gap-1">
+                                        @forelse ($plan->modules->where('pivot.enabled', true) as $module)
+                                            <span class="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/15">
+                                                <x-heroicon-o-check class="h-2.5 w-2.5 shrink-0" />
+                                                {{ $module->name }}
+                                            </span>
+                                        @empty
+                                            <p class="text-xs text-gray-400">Sin módulos configurados.</p>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                {{-- Límites --}}
+                                @if ($plan->limits->isNotEmpty())
+                                    <div class="mt-3 border-t border-gray-100 pt-3">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Límites</p>
+                                        <div class="mt-1.5 grid grid-cols-2 gap-1">
+                                            @foreach ($plan->limits->take(6) as $limit)
+                                                <div class="rounded-md bg-gray-50 px-2 py-1">
+                                                    <p class="truncate text-[9px] font-semibold uppercase tracking-wide text-gray-400" title="{{ $limitDefinitions[$limit->limit_key] ?? $limit->limit_key }}">
+                                                        {{ $limitDefinitions[$limit->limit_key] ?? str_replace('_', ' ', $limit->limit_key) }}
+                                                    </p>
+                                                    <p class="text-xs font-bold text-gray-900">{{ number_format($limit->limit_value) }}</p>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                {{-- Acción --}}
+                                <div class="mt-auto pt-4">
+                                    <button wire:click="startEdit({{ $plan->id }})"
+                                        class="w-full rounded-full bg-gray-900 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-gray-700">
+                                        Editar plan
+                                    </button>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
-            @endforeach
+            @empty
+                <p class="text-sm text-gray-400">No hay planes para mostrar.</p>
+            @endforelse
         </div>
 
     </div>
@@ -100,9 +158,10 @@
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
+                        <div x-data="digitGroupInput({ path: 'editPrice', live: false })">
                             <label class="block text-xs font-semibold uppercase tracking-wide text-gray-500">Precio base (COP) <span class="text-rose-600">*</span></label>
-                            <input wire:model="editPrice" type="number" min="0" step="1000"
+                            <input type="text" inputmode="numeric" @input="onInput($event)"
+                                value="{{ $editPrice !== '' ? number_format((int) $editPrice, 0, ',', '.') : '' }}"
                                 class="mt-1 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-blue-600 focus:ring-blue-600">
                         </div>
 

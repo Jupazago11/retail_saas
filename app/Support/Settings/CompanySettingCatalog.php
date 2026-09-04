@@ -33,12 +33,23 @@ class CompanySettingCatalog
             // interna que marca si la empresa ya contesto la pregunta inicial
             // de "quieres usar inventario" del asistente de carga.
             'inventory.setup_wizard_answered' => ['group' => 'inventory', 'key' => 'setup_wizard_answered', 'type' => 'boolean', 'default' => false],
+            // Solo aplica al vertical restaurante: si los platos se venden
+            // como producto simple (sin descuento de insumos) o via receta
+            // (el plato descuenta cada insumo de su receta al vender).
+            'inventory.tracking_mode' => ['group' => 'inventory', 'key' => 'tracking_mode', 'type' => 'string', 'default' => 'simple'],
 
             'cash.module_enabled' => ['group' => 'cash', 'key' => 'module_enabled', 'type' => 'boolean', 'default' => true],
             'cash.opening_required' => ['group' => 'cash', 'key' => 'opening_required', 'type' => 'boolean', 'default' => true],
             'cash.default_opening_amount' => ['group' => 'cash', 'key' => 'default_opening_amount', 'type' => 'decimal', 'default' => '0.0000'],
 
             'printing.show_logo' => ['group' => 'printing', 'key' => 'show_logo', 'type' => 'boolean', 'default' => true],
+
+            // Color de los obstaculos (columnas, escaleras, paredes) en el
+            // editor del plano del salon — un solo color por empresa, no
+            // por obstaculo individual. No se muestra en Configuracion: se
+            // edita directo desde el editor del plano (input color junto
+            // al titulo "Obstaculos").
+            'dining.obstacle_color' => ['group' => 'dining', 'key' => 'obstacle_color', 'type' => 'string', 'default' => '#404040'],
 
             'credit.credit_enabled' => ['group' => 'credit', 'key' => 'credit_enabled', 'type' => 'boolean', 'default' => false],
             'credit.default_term_days' => ['group' => 'credit', 'key' => 'default_term_days', 'type' => 'integer', 'default' => 30],

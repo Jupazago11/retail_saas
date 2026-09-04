@@ -102,9 +102,11 @@
                                     </td>
                                     <td class="py-4 text-gray-600">{{ $attribute->values->count() }}</td>
                                     <td class="py-4">
-                                        <x-status-badge :color="$attribute->status === 'active' ? 'emerald' : ($attribute->status === 'inactive' ? 'stone' : 'amber')">
-                                            {{ $attribute->status }}
-                                        </x-status-badge>
+                                        @if ($attribute->status === 'archived')
+                                            <x-status-badge color="amber">archivado</x-status-badge>
+                                        @else
+                                            <x-status-toggle :active="$attribute->status === 'active'" action="toggleAttributeStatus({{ $attribute->id }})" />
+                                        @endif
                                     </td>
                                     <td class="py-4 text-right">
                                         <div class="flex justify-end gap-2">
@@ -119,9 +121,6 @@
                                                     Restaurar
                                                 </button>
                                             @else
-                                                <button wire:click="toggleAttributeStatus({{ $attribute->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                    {{ $attribute->status === 'active' ? 'Desactivar' : 'Activar' }}
-                                                </button>
                                                 <button wire:click="archiveAttribute({{ $attribute->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                     Archivar
                                                 </button>
@@ -164,9 +163,11 @@
                                     <tr wire:key="attribute-value-{{ $attributeValue->id }}" class="even:bg-gray-50">
                                         <td class="py-4 font-medium text-gray-900">{{ $attributeValue->value }}</td>
                                         <td class="py-4">
-                                            <x-status-badge :color="$attributeValue->status === 'active' ? 'emerald' : ($attributeValue->status === 'inactive' ? 'stone' : 'amber')">
-                                                {{ $attributeValue->status }}
-                                            </x-status-badge>
+                                            @if ($attributeValue->status === 'archived')
+                                                <x-status-badge color="amber">archivado</x-status-badge>
+                                            @else
+                                                <x-status-toggle :active="$attributeValue->status === 'active'" action="toggleValueStatus({{ $attributeValue->id }})" />
+                                            @endif
                                         </td>
                                         <td class="py-4 text-right">
                                             <div class="flex justify-end gap-2">
@@ -178,9 +179,6 @@
                                                         Restaurar
                                                     </button>
                                                 @else
-                                                    <button wire:click="toggleValueStatus({{ $attributeValue->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                        {{ $attributeValue->status === 'active' ? 'Desactivar' : 'Activar' }}
-                                                    </button>
                                                     <button wire:click="archiveValue({{ $attributeValue->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                         Archivar
                                                     </button>

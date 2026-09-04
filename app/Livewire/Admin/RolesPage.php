@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Admin;
 
-use App\Actions\Companies\AttachUserToCompany;
 use App\Actions\Companies\CreateInternalUserForCompany;
 use App\Enums\RecordStatus;
 use App\Livewire\Concerns\InteractsWithToast;
@@ -25,15 +24,11 @@ class RolesPage extends Component
 {
     use InteractsWithToast;
 
+    public ?string $activeModal = null;
     public ?int $editingRoleId = null;
-    public string $roleCode = '';
     public string $displayName = '';
-    public string $roleStatus = RecordStatus::Active->value;
     public array $selectedPermissionCodes = [];
     public array $memberships = [];
-    public string $newUserIdentifier = '';
-    public string $newUserCompanyRoleId = '';
-    public string $newUserMode = 'existing';
     public string $newInternalName = '';
     public string $newInternalUsername = '';
     public string $newInternalPassword = '';
@@ -45,29 +40,52 @@ class RolesPage extends Component
         $this->loadMemberships();
     }
 
+    public function openModal(string $type): void
+    {
+        $this->resetValidation();
+
+        match ($type) {
+            'user' => $this->resetUserForm(),
+            default => $this->resetRoleForm(),
+        };
+
+        $this->activeModal = $type;
+    }
+
+    public function closeModal(): void
+    {
+        $this->activeModal = null;
+        $this->resetValidation();
+    }
+
     public function editRole(int $roleId): void
     {
         $role = $this->companyRoles()->with('permissions')->findOrFail($roleId);
 
         $this->editingRoleId = $role->id;
-        $this->roleCode = $role->code;
         $this->displayName = $role->display_name;
-        $this->roleStatus = $role->status;
         $this->selectedPermissionCodes = $role->permissions
             ->pluck('code')
             ->values()
             ->all();
         $this->resetValidation();
+        $this->activeModal = 'role';
     }
 
     public function resetRoleForm(): void
     {
         $this->editingRoleId = null;
-        $this->roleCode = '';
         $this->displayName = '';
-        $this->roleStatus = RecordStatus::Active->value;
         $this->selectedPermissionCodes = [];
         $this->resetValidation();
+    }
+
+    protected function resetUserForm(): void
+    {
+        $this->newInternalName = '';
+        $this->newInternalUsername = '';
+        $this->newInternalPassword = '';
+        $this->newInternalCompanyRoleId = '';
     }
 
     public function saveRole(): void
@@ -77,19 +95,7 @@ class RolesPage extends Component
         $company = $this->currentCompany();
 
         $validated = $this->validate([
-            'roleCode' => [
-                'required',
-                'string',
-                'max:80',
-                Rule::unique('company_roles', 'code')
-                    ->where(fn ($query) => $query->where('company_id', $company->id))
-                    ->ignore($this->editingRoleId),
-            ],
             'displayName' => ['required', 'string', 'max:255'],
-            'roleStatus' => ['required', Rule::in([
-                RecordStatus::Active->value,
-                RecordStatus::Inactive->value,
-            ])],
             'selectedPermissionCodes' => ['required', 'array', 'min:1'],
             'selectedPermissionCodes.*' => [
                 'string',
@@ -98,6 +104,10 @@ class RolesPage extends Component
         ]);
 
         DB::transaction(function () use ($company, $validated) {
+            $existingRole = $this->editingRoleId
+                ? $this->companyRoles()->find($this->editingRoleId)
+                : null;
+
             $role = CompanyRole::query()->updateOrCreate(
                 [
                     'id' => $this->editingRoleId,
@@ -105,9 +115,9 @@ class RolesPage extends Component
                 ],
                 [
                     'company_id' => $company->id,
-                    'code' => Str::slug($validated['roleCode'], '_'),
+                    'code' => $existingRole?->code ?? $this->uniqueRoleCode($company->id, $validated['displayName']),
                     'display_name' => trim($validated['displayName']),
-                    'status' => $validated['roleStatus'],
+                    'status' => $existingRole?->status ?? RecordStatus::Active->value,
                 ]
             );
 
@@ -119,9 +129,46 @@ class RolesPage extends Component
             $role->permissions()->sync($permissionIds);
         });
 
+        $this->activeModal = null;
         $this->resetRoleForm();
         $this->loadMemberships();
         $this->dispatch('toast', message: 'Rol guardado correctamente.', type: 'success');
+    }
+
+    public function toggleRoleStatus(int $roleId): void
+    {
+        $this->ensurePermission('roles.manage');
+
+        $role = $this->companyRoles()->findOrFail($roleId);
+
+        $role->update([
+            'status' => $role->status === RecordStatus::Active->value
+                ? RecordStatus::Inactive->value
+                : RecordStatus::Active->value,
+        ]);
+
+        $this->dispatch('toast', message: $role->status === RecordStatus::Active->value
+            ? 'Rol activado correctamente.'
+            : 'Rol desactivado correctamente.', type: 'success');
+    }
+
+    protected function uniqueRoleCode(int $companyId, string $displayName): string
+    {
+        $base = Str::upper(Str::slug($displayName, '_'));
+
+        if ($base === '') {
+            $base = Str::upper(Str::random(6));
+        }
+
+        $base = Str::substr($base, 0, 70);
+        $code = $base;
+        $n = 2;
+
+        while (CompanyRole::query()->where('company_id', $companyId)->where('code', $code)->exists()) {
+            $code = Str::substr($base, 0, 67).'_'.$n++;
+        }
+
+        return $code;
     }
 
     public function saveMembership(int $userId): void
@@ -215,46 +262,6 @@ class RolesPage extends Component
         return app(CompanyPlanResolver::class)->limit($this->currentCompany(), 'max_users');
     }
 
-    public function addUserToCompany(AttachUserToCompany $attachUserToCompany): void
-    {
-        $this->ensurePermission('roles.manage');
-
-        $validated = $this->validate([
-            'newUserIdentifier' => ['required', 'string', 'max:255'],
-            'newUserCompanyRoleId' => ['required', 'integer'],
-        ]);
-
-        $companyRoleId = $this->normalizeNullableInt($validated['newUserCompanyRoleId']);
-
-        $identifier = trim($validated['newUserIdentifier']);
-        $user = User::query()
-            ->where('email', $identifier)
-            ->orWhere('username', $identifier)
-            ->first();
-
-        if (! $user) {
-            $this->addError('newUserIdentifier', 'No existe un usuario con ese correo o username.');
-
-            return;
-        }
-
-        try {
-            $attachUserToCompany->handle($this->currentCompany(), $user, [
-                'company_role_id' => $companyRoleId,
-            ]);
-        } catch (InvalidArgumentException $exception) {
-            $this->addError('newUserIdentifier', $exception->getMessage());
-
-            return;
-        }
-
-        $this->newUserIdentifier = '';
-        $this->newUserCompanyRoleId = '';
-        $this->resetValidation(['newUserIdentifier', 'newUserCompanyRoleId']);
-        $this->loadMemberships();
-        $this->dispatch('toast', message: 'Usuario vinculado correctamente a la empresa.', type: 'success');
-    }
-
     public function remainingUserSlots(): ?int
     {
         $maxUsers = $this->maxUsers();
@@ -264,11 +271,6 @@ class RolesPage extends Component
         }
 
         return max(0, $maxUsers - $this->activeUsersCount());
-    }
-
-    public function setNewUserMode(string $mode): void
-    {
-        $this->newUserMode = in_array($mode, ['existing', 'new'], true) ? $mode : 'existing';
     }
 
     public function createInternalUser(CreateInternalUserForCompany $createInternalUserForCompany): void
@@ -297,6 +299,7 @@ class RolesPage extends Component
             return;
         }
 
+        $this->activeModal = null;
         $this->newInternalName = '';
         $this->newInternalUsername = '';
         $this->newInternalPassword = '';
@@ -375,25 +378,6 @@ class RolesPage extends Component
             })
             ->map(fn (Collection $permissions) => $permissions->values())
             ->all();
-    }
-
-    public function currentAssignmentLabel(User $user): string
-    {
-        $pivot = $user->pivot;
-
-        if (($pivot->company_role ?? null) === 'owner') {
-            return 'Propietario';
-        }
-
-        if ($pivot->company_role_id) {
-            $role = $this->companyRoles()->get()->firstWhere('id', (int) $pivot->company_role_id);
-
-            if ($role) {
-                return 'Rol: ' . $role->display_name;
-            }
-        }
-
-        return 'Sin asignacion';
     }
 
     public function render(): View

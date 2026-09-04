@@ -8,6 +8,8 @@ Los nombres `Basic`, `Pro` y `Premium` son solo empaques comerciales. La aplicac
 
 Las tablas de este documento son el **seed inicial** (`app/Support/Plans/PlanCatalog.php`), usado solo para poblar filas que todavia no existen. Una vez que una empresa o el superadmin interactua con el catalogo, la base de datos manda: los valores reales y vigentes de modulos, features y limites por plan se administran desde `Plataforma > Planes`, y `PlanCatalogBootstrapper::ensureDefaults()` ya no los sobreescribe.
 
+Desde que `plans`/`modules` tienen `business_type_id` (ver `docs/decisiones-tecnicas.md`, "Planes independientes por vertical de negocio"), este documento describe el vertical **`general`** (retail). El vertical `restaurant` tiene su propio catalogo — ver "Vertical restaurante" mas abajo.
+
 `reports.profitability` ya esta conectada a un consumidor real: gobierna si `Reportes` muestra la tarjeta "Margen bruto" (ademas del permiso `reports.view_costs` que ya existia). Los modulos `credit`, `loyalty` y `promotions` tambien gobiernan que tarjetas y tablas de `Reportes` ve cada empresa.
 
 ## Modulos propuestos
@@ -92,6 +94,27 @@ Las tablas de este documento son el **seed inicial** (`app/Support/Plans/PlanCat
 - Cada empresa del bundle puede tener un plan distinto.
 - El bundle puede aportar descuento, modulos extra y limites custom.
 - Los overrides por empresa se aplican despues del bundle.
+
+## Vertical restaurante
+
+Mismo mecanismo de `plans`/`modules`/`plan_limits`, filas separadas con `business_type_id = restaurant`. Reutiliza los modulos compartidos (`products`, `purchases`, `cash`, `credit`, `loyalty`, `promotions`, `reports`, `imports`, `electronic_billing`) y agrega dos modulos exclusivos: `dining` (mesas y comandas, reemplaza a `pos`) y `kitchen` (cocina/KDS). Los limites iniciales son identicos a los del vertical `general` (mismo numero por tier) — ver `PlanCatalog::plans()` para el detalle exacto y ajustarlos desde `Plataforma > Planes` cuando haya informacion real de mercado.
+
+| Modulo | Basic | Pro | Premium |
+| --- | --- | --- | --- |
+| products | Si | Si | Si |
+| inventory | No | Si | Si |
+| purchases | No | Si | Si |
+| dining | Si | Si | Si |
+| kitchen | No | Si | Si |
+| cash | Si | Si | Si |
+| credit | No | Si | Si |
+| loyalty | No | Si | Si |
+| promotions | No | Si | Si |
+| reports | Si | Si | Si |
+| imports | No | Si | Si |
+| electronic_billing | No | No | Si |
+
+`dining` (mesas y comandas) y `kitchen` (cocina/KDS) ya tienen implementacion operativa — ver `docs/decisiones-tecnicas.md`, seccion "Mesas y Comandas, Cocina, e inventario por receta (vertical restaurante)".
 
 ## Formula de acceso efectivo
 

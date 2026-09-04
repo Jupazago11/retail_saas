@@ -19,11 +19,12 @@ use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class SuppliersAndPayablesPagesTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_suppliers_page_can_create_update_toggle_and_scope_suppliers(): void
     {
@@ -450,6 +451,7 @@ class SuppliersAndPayablesPagesTest extends TestCase
         $company = app(CreateCompany::class)->handle($user, [
             'legal_name' => 'Compras Retail SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
 
         session([CurrentCompany::SESSION_KEY => $company->id]);
 

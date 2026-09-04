@@ -130,8 +130,11 @@ class BundlesPage extends Component
 
     public function availablePlans(): Collection
     {
+        $businessTypeId = $this->currentCompany()->business_type_id;
+
         return Plan::query()
             ->where('status', RecordStatus::Active->value)
+            ->when($businessTypeId, fn ($query) => $query->where('business_type_id', $businessTypeId))
             ->orderBy('id')
             ->get();
     }

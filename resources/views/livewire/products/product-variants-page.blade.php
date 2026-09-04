@@ -131,9 +131,11 @@
                                     <p>Codigo: {{ $variant->barcode ?: 'Sin codigo' }}</p>
                                 </td>
                                 <td class="py-4 align-top">
-                                    <x-status-badge :color="$variant->status === 'active' ? 'emerald' : ($variant->status === 'inactive' ? 'stone' : 'amber')">
-                                        {{ $variant->status }}
-                                    </x-status-badge>
+                                    @if ($variant->status === 'archived')
+                                        <x-status-badge color="amber">archivado</x-status-badge>
+                                    @else
+                                        <x-status-toggle :active="$variant->status === 'active'" action="toggleVariantStatus({{ $variant->id }})" />
+                                    @endif
                                 </td>
                                 <td class="py-4 align-top text-right">
                                     <div class="flex justify-end gap-2">
@@ -145,9 +147,6 @@
                                                 Restaurar
                                             </button>
                                         @else
-                                            <button wire:click="toggleVariantStatus({{ $variant->id }})" class="rounded-full border border-blue-300 px-3 py-1 font-medium text-blue-700">
-                                                {{ $variant->status === 'active' ? 'Desactivar' : 'Activar' }}
-                                            </button>
                                             <button wire:click="archiveVariant({{ $variant->id }})" class="rounded-full border border-rose-300 px-3 py-1 font-medium text-rose-700">
                                                 Archivar
                                             </button>

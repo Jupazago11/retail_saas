@@ -19,11 +19,12 @@ use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class SalesPageTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_sales_page_lists_sales_and_exposes_ticket_link(): void
     {
@@ -32,11 +33,13 @@ class SalesPageTest extends TestCase
         $this->actingAs($owner);
         session([CurrentCompany::SESSION_KEY => $company->id]);
 
+        // La fila de la lista no muestra el nombre del producto (columna
+        // "Detalle" trae fecha/sucursal/vendedor, no el detalle de lineas)
+        // — eso vive en el ticket, no aqui.
         Livewire::test(SalesPage::class)
             ->assertSee('Ventas registradas')
             ->assertSee($sale->document_number)
-            ->assertSee('Abrir ticket')
-            ->assertSee('Arroz visual');
+            ->assertSee('Ver ticket');
     }
 
     public function test_sales_page_can_search_by_internal_document_number(): void
@@ -48,8 +51,7 @@ class SalesPageTest extends TestCase
 
         Livewire::test(SalesPage::class)
             ->set('search', $sale->document_number)
-            ->assertSee($sale->document_number)
-            ->assertSee('Arroz visual');
+            ->assertSee($sale->document_number);
     }
 
     public function test_sales_page_can_filter_sales_by_payment_method(): void
@@ -312,6 +314,7 @@ class SalesPageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Ventas UI SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $branch = $company->branches()->firstOrFail();
         $warehouse = $company->warehouses()->firstOrFail();
         $product = $this->productForCompany($company);

@@ -3,15 +3,14 @@
 namespace App\Livewire\Admin;
 
 use App\Enums\EquipmentRentalStatus;
-use App\Enums\EquipmentType;
 use App\Enums\RecordStatus;
 use App\Models\Company;
 use App\Models\EquipmentRental;
+use App\Models\EquipmentType;
 use App\Models\Plan;
 use App\Models\PlatformSetting;
 use App\Services\Plans\CompanyPlanResolver;
 use App\Services\Tenancy\CurrentCompany;
-use App\Support\EquipmentRentalCatalog;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
@@ -36,8 +35,11 @@ class SubscriptionPage extends Component
      */
     public function allPlans(): Collection
     {
+        $businessTypeId = $this->currentCompany()->business_type_id;
+
         return Plan::query()
             ->where('status', RecordStatus::Active->value)
+            ->when($businessTypeId, fn ($query) => $query->where('business_type_id', $businessTypeId))
             ->with([
                 // Plan::modules() no filtra el pivot "enabled" por defecto
                 // (solo lo expone via withPivot); sin este filtro, modulos
@@ -94,7 +96,7 @@ class SubscriptionPage extends Component
     {
         return EquipmentRental::query()
             ->where('company_id', $this->currentCompany()->id)
-            ->where('equipment_type', $type->value)
+            ->where('equipment_type', $type->code)
             ->where('status', EquipmentRentalStatus::Active->value)
             ->get();
     }
@@ -103,16 +105,15 @@ class SubscriptionPage extends Component
     {
         return EquipmentRental::query()
             ->where('company_id', $this->currentCompany()->id)
-            ->where('equipment_type', $type->value)
+            ->where('equipment_type', $type->code)
             ->where('status', EquipmentRentalStatus::Requested->value)
             ->count();
     }
 
     public function equipmentMonthlyTotal(): float
     {
-        return EquipmentRentalCatalog::monthlyTotalForActiveCounts(
-            $this->activeEquipmentRentals(EquipmentType::ThermalPrinter)->count(),
-            $this->activeEquipmentRentals(EquipmentType::BarcodeScanner)->count(),
+        return EquipmentType::orderBy('name')->get()->sum(
+            fn (EquipmentType $type) => $this->activeEquipmentRentals($type)->count() * (float) $type->monthly_price
         );
     }
 
@@ -129,7 +130,7 @@ class SubscriptionPage extends Component
             'snapshot' => $this->effectiveSnapshot(),
             'plans' => $plans,
             'planModuleBreakdown' => $this->planModuleBreakdown($plans),
-            'equipmentTypes' => EquipmentType::cases(),
+            'equipmentTypes' => EquipmentType::orderBy('name')->get(),
             'equipmentMonthlyTotal' => $this->equipmentMonthlyTotal(),
         ])->layout('layouts.app', [
             'header' => view('components.page-title', [

@@ -72,6 +72,7 @@ class CompanyStructurePageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Estructura Basic SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $primaryBranch = $company->branches()->firstOrFail();
 
         $this->actingAs($owner);
@@ -114,6 +115,7 @@ class CompanyStructurePageTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Estructura Restringida SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
         $viewer = User::factory()->create();
 
         $company->users()->attach($viewer->id, [

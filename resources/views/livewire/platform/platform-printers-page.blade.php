@@ -44,21 +44,13 @@
                                 @endif
                             </td>
                             <td class="py-3 align-middle w-px whitespace-nowrap">
-                                @if ($guide->status->value === 'active')
-                                    <x-status-badge color="emerald">activo</x-status-badge>
-                                @else
-                                    <x-status-badge color="stone">inactivo</x-status-badge>
-                                @endif
+                                <x-status-toggle :active="$guide->status->value === 'active'" action="toggleStatus({{ $guide->id }})" />
                             </td>
                             <td class="py-3 align-middle w-px whitespace-nowrap">
                                 <div class="flex justify-end gap-2">
                                     <button wire:click="startEdit({{ $guide->id }})"
                                         class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
                                         Editar
-                                    </button>
-                                    <button wire:click="toggleStatus({{ $guide->id }})"
-                                        class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-stone-400">
-                                        {{ $guide->status->value === 'active' ? 'Inactivar' : 'Activar' }}
                                     </button>
                                 </div>
                             </td>

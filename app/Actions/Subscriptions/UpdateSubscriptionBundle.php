@@ -62,10 +62,18 @@ class UpdateSubscriptionBundle
 
         $plan = Plan::query()
             ->where('status', RecordStatus::Active->value)
+            ->when(
+                $company->business_type_id,
+                fn ($query) => $query->where('business_type_id', $company->business_type_id)
+            )
             ->find($planId);
 
         if (! $plan) {
-            throw new InvalidArgumentException('Debes seleccionar un plan activo para el bundle.');
+            throw new InvalidArgumentException('Debes seleccionar un plan activo del vertical de la empresa para el bundle.');
+        }
+
+        if (! $company->business_type_id) {
+            $company->update(['business_type_id' => $plan->business_type_id]);
         }
 
         return DB::transaction(function () use ($actor, $bundle, $company, $discountType, $discountValue, $maxCompanies, $membership, $name, $plan, $status, $subscription) {

@@ -113,12 +113,17 @@ class FrozenSalesPageTest extends TestCase
         $this->assertSame(FrozenSaleStatus::Cancelled->value, $frozenSale->fresh()->status);
     }
 
-    public function test_frozen_sales_page_route_is_forbidden_without_freeze_or_create_permission(): void
+    // FrozenSalesPage ya no tiene ruta HTTP propia (Ventas + POS se
+    // unificaron en un workspace, ver App\Livewire\Sales\SalesWorkspacePage);
+    // el gating de permiso se prueba montando el componente directamente,
+    // via ensureFrozenAccess() dentro de FrozenSalesPage::mount().
+    public function test_frozen_sales_page_component_is_forbidden_without_freeze_or_create_permission(): void
     {
         $owner = User::factory()->create();
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Frozen Route SAS',
         ]);
+        $this->assignCompanyPlan($company, 'pro');
         $viewer = User::factory()->create();
         $companyRole = CompanyRole::query()->create([
             'company_id' => $company->id,
@@ -138,9 +143,10 @@ class FrozenSalesPageTest extends TestCase
             'joined_at' => now(),
         ]);
 
-        $this->actingAs($viewer)
-            ->withSession([CurrentCompany::SESSION_KEY => $company->id])
-            ->get(route('sales.frozen'))
+        $this->actingAs($viewer);
+        session([CurrentCompany::SESSION_KEY => $company->id]);
+
+        Livewire::test(FrozenSalesPage::class)
             ->assertForbidden();
     }
 

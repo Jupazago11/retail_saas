@@ -96,7 +96,13 @@ class CreateFrozenSale
     {
         // Ventas congeladas es una feature de plan, no una preferencia que la
         // empresa pueda prender/apagar: si el plan la trae, esta disponible.
-        if (! $this->companyPlanResolver->hasFeature($company, 'pos.frozen_sales')) {
+        // El modulo "dining" (Mesas y Comandas, vertical restaurante) reusa
+        // FrozenSale como motor de "comanda abierta" y no depende de esta
+        // feature de retail, asi que tambien habilita el gate.
+        if (
+            ! $this->companyPlanResolver->hasFeature($company, 'pos.frozen_sales')
+            && ! $this->companyPlanResolver->hasModule($company, 'dining')
+        ) {
             throw new InvalidArgumentException('El plan actual no tiene habilitada la feature de ventas congeladas.');
         }
     }

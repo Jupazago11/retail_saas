@@ -11,7 +11,15 @@ trait InteractsWithCompanyPlans
 {
     protected function assignCompanyPlan(Company $company, string $planCode): Subscription
     {
-        $plan = Plan::query()->where('code', $planCode)->first();
+        // Desde que plans.code dejo de ser unico global (unique compuesto
+        // business_type_id+code, ver docs/decisiones-tecnicas.md "Planes
+        // independientes por vertical de negocio"), hay que anclar el
+        // vertical de la empresa o esta consulta queda ambigua entre, por
+        // ejemplo, el "basic" de general y el "basic" de restaurant.
+        $plan = Plan::query()
+            ->where('code', $planCode)
+            ->when($company->business_type_id, fn ($query) => $query->where('business_type_id', $company->business_type_id))
+            ->first();
 
         if (! $plan) {
             throw new InvalidArgumentException('El plan solicitado no existe para pruebas.');

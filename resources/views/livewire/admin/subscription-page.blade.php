@@ -109,7 +109,7 @@
         <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-200">
             <p class="text-sm font-semibold uppercase tracking-[0.22em] text-blue-700">Hardware</p>
             <h3 class="mt-2 text-2xl font-black text-gray-900">Equipos en alquiler</h3>
-            <p class="mt-1 text-sm text-gray-500">Impresora termica y lector de codigo de barras alquilados a esta empresa. La entrega y el alquiler los gestiona el equipo de {{ \App\Models\PlatformSetting::appName() }}, no se activan desde aqui.</p>
+            <p class="mt-1 text-sm text-gray-500">Hardware alquilado a esta empresa. La entrega y el alquiler los gestiona el equipo de {{ \App\Models\PlatformSetting::appName() }}, no se activan desde aqui.</p>
 
             <div class="mt-5 space-y-4">
                 @foreach ($equipmentTypes as $type)
@@ -120,8 +120,8 @@
                     <div class="rounded-lg border border-gray-200 p-4">
                         <div class="flex items-center justify-between gap-4">
                             <div>
-                                <p class="font-semibold text-gray-900">{{ $type->label() }}</p>
-                                <p class="text-xs text-gray-500">${{ $this->formatMoney(\App\Support\EquipmentRentalCatalog::monthlyPrice($type)) }}/mes por unidad</p>
+                                <p class="font-semibold text-gray-900">{{ $type->name }}</p>
+                                <p class="text-xs text-gray-500">${{ $this->formatMoney($type->monthly_price) }}/mes por unidad</p>
                             </div>
 
                             @if ($rentals->count() > 0)

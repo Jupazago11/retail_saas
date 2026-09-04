@@ -156,4 +156,42 @@ class PlansPageTest extends TestCase
 
         $this->assertFalse((bool) app(CompanySettings::class)->get($company, 'credit', 'credit_enabled'));
     }
+
+    public function test_platform_admin_cannot_set_max_users_below_four_for_a_restaurant_plan(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+        $this->actingAs($platformAdmin);
+
+        $restaurantBasic = Plan::query()
+            ->where('code', 'basic')
+            ->whereHas('businessType', fn ($q) => $q->where('code', 'restaurant'))
+            ->firstOrFail();
+
+        Livewire::test(PlansPage::class)
+            ->call('startEdit', $restaurantBasic->id)
+            ->set('editLimits.max_users', '2')
+            ->call('saveEdit')
+            ->assertHasErrors(['editLimits.max_users']);
+
+        $this->assertNotSame(2, $restaurantBasic->limits()->where('limit_key', 'max_users')->value('limit_value'));
+    }
+
+    public function test_platform_admin_can_set_max_users_to_exactly_four_for_a_restaurant_plan(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_admin' => true]);
+        $this->actingAs($platformAdmin);
+
+        $restaurantBasic = Plan::query()
+            ->where('code', 'basic')
+            ->whereHas('businessType', fn ($q) => $q->where('code', 'restaurant'))
+            ->firstOrFail();
+
+        Livewire::test(PlansPage::class)
+            ->call('startEdit', $restaurantBasic->id)
+            ->set('editLimits.max_users', '4')
+            ->call('saveEdit')
+            ->assertHasNoErrors();
+
+        $this->assertSame(4, $restaurantBasic->limits()->where('limit_key', 'max_users')->value('limit_value'));
+    }
 }

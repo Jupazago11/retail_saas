@@ -43,6 +43,7 @@
                             <th class="pb-2">Empresa</th>
                             <th class="pb-2">Propietario</th>
                             <th class="pb-2">Plan</th>
+                            <th class="pb-2 w-px whitespace-nowrap">Tipo</th>
                             <th class="pb-2 w-px whitespace-nowrap">Estado</th>
                             <th class="pb-2 w-px whitespace-nowrap">Registrada</th>
                             <th class="pb-2 w-px whitespace-nowrap text-right">Acciones</th>
@@ -67,6 +68,22 @@
                                     {{ $sub?->plan?->name ?? '—' }}
                                 </td>
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
+                                    @if ($company->businessType)
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">
+                                                <x-business-type-icon :icon="$company->businessType->icon" class="h-3.5 w-3.5" />
+                                                {{ $company->businessType->name }}
+                                            </span>
+                                            <button wire:click="openTypeEditModal({{ $company->id }})"
+                                                class="text-xs font-semibold text-blue-600 hover:text-blue-700">
+                                                Cambiar
+                                            </button>
+                                        </div>
+                                    @else
+                                        <x-status-badge color="stone">sin definir</x-status-badge>
+                                    @endif
+                                </td>
+                                <td class="py-3 align-middle w-px whitespace-nowrap">
                                     @if ($status === 'pending')
                                         <x-status-badge color="amber" class="w-24">pendiente</x-status-badge>
                                     @elseif ($status === 'active')
@@ -83,15 +100,14 @@
                                 <td class="py-3 align-middle w-px whitespace-nowrap">
                                     <div class="flex justify-end gap-2">
                                         @if ($status === 'pending')
-                                            <button wire:click="activate({{ $company->id }})"
-                                                wire:confirm="¿Activar la empresa {{ $company->display_name }}?"
-                                                class="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white hover:bg-emerald-700 transition">
+                                            <button wire:click="openActivationModal({{ $company->id }})"
+                                                class="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700">
                                                 Activar
                                             </button>
                                         @elseif ($status === 'active')
-                                            <button wire:click="suspend({{ $company->id }})"
+                                            <button wire:click="suspendCompany({{ $company->id }})"
                                                 wire:confirm="¿Suspender la empresa {{ $company->display_name }}?"
-                                                class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 hover:border-rose-300 hover:text-rose-600 transition">
+                                                class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-rose-300 hover:text-rose-600">
                                                 Suspender
                                             </button>
                                         @endif
@@ -100,7 +116,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="py-10 text-center text-gray-400">
+                                <td colspan="7" class="py-10 text-center text-gray-400">
                                     No hay empresas que coincidan con el filtro.
                                 </td>
                             </tr>
@@ -117,4 +133,45 @@
         </div>
 
     </div>
+
+    @if ($showTypeModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl ring-1 ring-gray-200">
+                <h3 class="text-lg font-black text-gray-900">
+                    {{ $typeModalMode === 'activate' ? 'Activar empresa' : 'Cambiar tipo de negocio' }}
+                </h3>
+                <p class="mt-1 text-sm text-gray-500">
+                    @if ($typeModalMode === 'activate')
+                        Elige el tipo de negocio antes de activar la suscripcion. Esta eleccion la hace unicamente la plataforma.
+                    @else
+                        Puedes corregir el tipo de negocio en cualquier momento.
+                    @endif
+                </p>
+
+                <div class="mt-5 grid grid-cols-2 gap-3">
+                    @foreach ($businessTypes as $type)
+                        <button type="button" wire:click="$set('selectedBusinessTypeId', {{ $type->id }})"
+                            class="flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition {{ (int) $selectedBusinessTypeId === $type->id ? 'border-blue-600 bg-blue-50' : 'border-gray-200 hover:border-gray-300' }}">
+                            <x-business-type-icon :icon="$type->icon" class="h-8 w-8 {{ (int) $selectedBusinessTypeId === $type->id ? 'text-blue-600' : 'text-gray-400' }}" />
+                            <span class="text-sm font-semibold text-gray-800">{{ $type->name }}</span>
+                        </button>
+                    @endforeach
+                </div>
+                @error('selectedBusinessTypeId')
+                    <p class="mt-2 text-xs font-medium text-rose-600">{{ $message }}</p>
+                @enderror
+
+                <div class="mt-6 flex justify-end gap-3">
+                    <button wire:click="closeTypeModal"
+                        class="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button wire:click="confirmTypeModal"
+                        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700">
+                        {{ $typeModalMode === 'activate' ? 'Activar empresa' : 'Guardar' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </div>

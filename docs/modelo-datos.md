@@ -27,9 +27,17 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 #### `companies`
 
 - Proposito: tenant principal.
-- Campos clave: `id`, `owner_user_id`, `legal_name`, `display_name`, `tax_id`, `status`, `subscription_status`, `auto_renew`, `created_at`, `updated_at`.
+- Campos clave: `id`, `owner_user_id`, `business_type_id`, `legal_name`, `display_name`, `tax_id`, `status`, `subscription_status`, `auto_renew`, `created_at`, `updated_at`.
 - Soft delete: si.
 - Nota de implementacion actual: `auto_renew` gobierna si el comando diario `subscriptions:process-due` renueva automaticamente la suscripcion directa de la empresa al vencer, o si solo la cierra dejando la reactivacion en manos de un `platform_super_admin`.
+- Nota de implementacion actual: `business_type_id` es nullable. Una empresa nueva (autorregistro del dueño via `CreateCompany`) queda sin tipo hasta que el `platform_super_admin` la activa desde Plataforma > Empresas y elige el tipo (una sola vez al activar, pero editable despues por el superadmin desde la misma pantalla). Las empresas creadas antes de introducir este campo quedaron con `business_type_id` apuntando a `general` via backfill de migracion.
+
+#### `business_types`
+
+- Proposito: catalogo de verticales de negocio soportados (general, restaurante, y los que se agreguen a futuro).
+- Campos clave: `id`, `code`, `name`, `icon`, `status`.
+- Unique: `code`.
+- Nota de implementacion actual: se siembra directamente en la migracion (`general` y `restaurant`); a diferencia de `plans`/`modules` no tiene todavia bootstrapper ni UI de administracion — agregar un vertical nuevo hoy requiere una migracion.
 
 #### `company_user`
 
@@ -51,19 +59,23 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 #### `cash_registers`
 
 - Proposito: punto de caja por sucursal.
-- Campos clave: `id`, `company_id`, `branch_id`, `name`, `code`, `is_primary`, `status`.
+- Campos clave: `id`, `company_id`, `branch_id`, `name`, `code`, `is_primary`, `status`, `printer_type`, `pos_x`, `pos_y`.
+- `pos_x`/`pos_y` (decimal, porcentaje 0-100, nullable) y `size` (decimal, porcentaje 0-100, default `6`): posicion, y tamaño opcionales en el plano visual del salon (vertical restaurante, ver `dining_tables`/`dining_floor_plans`). `pos_x`/`pos_y` nulos = la caja no se muestra en el plano; mostrarla ahi es una decision explicita del dueño (checkbox "En el plano" en `App\Livewire\Dining\DiningFloorPlanPage`, panel "Cajas"), no automatica — arrastrable y redimensionable en cualquier momento una vez activada, sin un "modo" propio en la barra superior (a diferencia de mesas/contorno, que si necesitan aislar su interaccion por modo). La caja en si no se crea desde ese editor — solo se activa/mueve/redimensiona una que ya existe.
 
 ### Planes y monetizacion
 
 #### `plans`
 
 - Proposito: catalogo de planes.
-- Campos clave: `id`, `code`, `name`, `status`, `billing_period`, `base_price`.
+- Campos clave: `id`, `business_type_id`, `code`, `name`, `status`, `billing_period`, `base_price`.
+- Unique: `[business_type_id, code]` (no `code` global — cada vertical tiene su propio `basic`/`pro`/`premium`).
+- Nota de implementacion actual: `business_type_id` es nullable a nivel de esquema (igual que `companies.business_type_id`, para no depender de `ALTER COLUMN` crudo que solo corre en Postgres) pero `PlanCatalogBootstrapper` siempre lo siembra con un vertical real; en la practica todo plan sembrado lo trae.
 
 #### `modules`
 
 - Proposito: modulos habilitables por plan.
-- Campos clave: `id`, `code`, `name`, `status`.
+- Campos clave: `id`, `business_type_id` nullable, `code`, `name`, `status`.
+- Nota de implementacion actual: `business_type_id` nulo significa modulo compartido entre verticales (`products`, `purchases`, `cash`, `credit`, `loyalty`, `promotions`, `reports`, `imports`, `electronic_billing`); con valor, el modulo es exclusivo de ese vertical (ej. `dining`, `kitchen` solo para `restaurant`). `code` sigue siendo unico globalmente.
 
 #### `features`
 
@@ -177,9 +189,21 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 #### `products`
 
 - Proposito: producto base.
-- Campos clave: `id`, `company_id`, `category_id`, `brand_id`, `base_unit_id`, `tax_id`, `name`, `sku`, `barcode`, `description`, `cost`, `price_1`, `price_2`, `price_3`, `flexible_price`, `margin_1`, `margin_2`, `margin_3`, `tracks_inventory`, `minimum_stock`, `status`, `deleted_at`.
+- Campos clave: `id`, `company_id`, `category_id`, `brand_id`, `base_unit_id`, `tax_id`, `name`, `sku`, `barcode`, `description`, `cost`, `price_1`, `price_2`, `price_3`, `flexible_price`, `margin_1`, `margin_2`, `margin_3`, `tracks_inventory`, `is_recipe`, `minimum_stock`, `status`, `deleted_at`.
 - Nota de implementacion inicial: `tax_id` queda como referencia nullable sin FK mientras no exista catalogo fiscal propio.
 - `flexible_price` (boolean, default false): perecederos/granel con precio que cambia a diario (papa, yuca, frijol...). Cuando esta activo, `saveProduct()` (`ProductsPage`) fuerza `price_1/2/3` a 0/null y `tracks_inventory` a false en el servidor (no solo en la vista) — el precio se define en cada venta desde el POS (ver `flujo-pos.md`), y no tiene sentido llevar stock en kilos que nunca se pesan exactamente.
+- `is_recipe` (boolean, default false): el producto es un plato costeado/descontado via receta (`recipes`/`recipe_items`) en vez de tener stock propio — ver "Recetas y costeo por insumo" mas abajo.
+
+#### `recipes`
+
+- Proposito: receta de un plato (`products.is_recipe = true`) — que insumos consume y cuantas porciones rinde.
+- Campos clave: `id`, `company_id`, `product_id` (unique, el plato), `yield_quantity`, `status`.
+
+#### `recipe_items`
+
+- Proposito: insumo de una receta con su cantidad.
+- Campos clave: `id`, `recipe_id`, `ingredient_product_id` (otro `product`, debe tener `tracks_inventory = true`), `ingredient_presentation_id` nullable (conversion a unidad base via `ProductPresentationConverter`, mismo patron que `SaleItem`), `quantity`.
+- Nota de implementacion actual: `App\Services\Inventory\RecipeCostCalculator::recalculate()` escribe el costo calculado en `products.cost` del plato. `PostSaleToInventory`/`ReturnSaleToInventory` expanden un `SaleItem` de un plato con receta en un `InventoryMovement` por insumo (no genera movimiento sobre el plato mismo).
 
 #### `product_presentations`
 
@@ -290,8 +314,37 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 #### `frozen_sales`
 
 - Proposito: carrito guardado sin impacto en inventario.
-- Campos clave: `id`, `company_id`, `branch_id`, `warehouse_id`, `cash_register_id`, `customer_id`, `created_by`, `converted_sale_id`, `label`, `status`, `expires_at`, `payload_snapshot`.
+- Campos clave: `id`, `company_id`, `branch_id`, `warehouse_id`, `cash_register_id`, `dining_table_id` nullable, `customer_id`, `created_by`, `converted_sale_id`, `label`, `status`, `expires_at`, `payload_snapshot`.
 - Nota de implementacion actual: el backend ya soporta creacion, cancelacion y conversion de `frozen_sales`; `payload_snapshot` congela lineas y totales, y `converted_sale_id` enlaza la venta real resultante.
+- `dining_table_id` (vertical restaurante): cuando no es null, esta `FrozenSale` es la comanda abierta de esa mesa. `App\Actions\Sales\UpdateFrozenSaleItems` agrega lineas nuevas a una comanda abierta sin crear una fila nueva (a diferencia de `CreateFrozenSale`, que siempre inserta) — necesario porque el mesero agrega platos de a uno a lo largo de la sesion en mesa.
+
+#### `dining_tables`
+
+- Proposito: mesas del salon (vertical restaurante).
+- Campos clave: `id`, `company_id`, `branch_id`, `name`, `capacity`, `status`, `occupancy_status`, `pos_x`, `pos_y`, `shape`, `size`, `deleted_at`.
+- Nota de implementacion actual: `status` es el archivado logico habitual (activa/inactiva); `occupancy_status` (`free`/`occupied`/`reserved`) es el estado operativo en vivo, columna separada a proposito. `App\Actions\Dining\AddDishToDiningOrder` marca `occupied` al primer plato agregado; `App\Actions\Dining\CloseDiningTable` la vuelve a `free` al cobrar.
+- `pos_x`/`pos_y` (decimal, porcentaje 0-100 nullable), `shape` (`round`/`square`, default `square`) y `size` (decimal, porcentaje 0-100, default `8`): posicion, forma y tamaño de la mesa en el plano visual del salon (ver `dining_floor_plans` abajo). `pos_x`/`pos_y` nulos hasta que el dueño la ubique en `App\Livewire\Dining\DiningFloorPlanPage`; mientras tanto la mesa opera normal y `App\Livewire\Dining\DiningTablesPage` sigue mostrando la lista en vez del mapa.
+- `name` de una mesa nunca lo escribe la empresa a mano y **nunca deja huecos**: las mesas activas de una sucursal son siempre exactamente `1..N` consecutivos. `App\Models\DiningTable::nextNumberFor()` es simplemente el conteo de mesas activas + 1; `App\Models\DiningTable::renumberActiveTables()` corre cada vez que una mesa se archiva (desde `DiningFloorPlanPage::save()` o `DiningTablesPage::toggleStatus()`) y corre las siguientes un numero hacia abajo para cerrar el hueco. El indice unico plano de `(company_id, branch_id, name)` se elimino (migracion `2026_09_03_150100`) porque bloqueaba reusar el numero de una mesa archivada para siempre; la unicidad ahora se garantiza solo entre mesas **activas**, a nivel de aplicacion.
+- Capacidad es puramente informativa (no afecta `size` ni ninguna regla de negocio); se edita en linea desde la lista "Mesas" del editor de plano. Si visualmente se usa (sillas alrededor de la mesa en el plano), pero no cambia `size` ni ninguna regla.
+- Sillas alrededor de una mesa en el plano son 100% visuales (no hay tabla ni campo para ellas): se calculan en el momento repartiendo `capacity` (o 4 por defecto si no hay capacidad) en circulo alrededor de la mesa, tanto en `DiningFloorPlanPage` (JS, `chairPositions()`) como en el mapa de solo lectura de `DiningTablesPage` (PHP, mismo calculo con `cos()`/`sin()`).
+
+`cash_registers` tambien tiene `pos_x`/`pos_y` (mismo esquema porcentual, nullable) para ubicarse opcionalmente en este mismo plano — ver seccion `cash_registers` mas abajo.
+
+#### `dining_floor_plans`
+
+- Proposito: contorno del salon de una sucursal, dibujado a mano libre por el dueño de la empresa.
+- Campos clave: `id`, `company_id`, `branch_id` (unico compuesto), `outline_points` (JSON, array de `{x, y}` en porcentaje 0-100 del mismo viewBox cuadrado que `dining_tables.pos_x/pos_y`).
+- Nota de implementacion actual: sin fila para una sucursal, esa sucursal no tiene plano y `DiningTablesPage` cae a la vista de lista (no hay contorno "vacio" por defecto, la fila simplemente no existe). Solo el dueño de la empresa (`companies.owner_user_id`) puede crear o editar el contorno y las posiciones — chequeo explicito en `App\Livewire\Dining\DiningFloorPlanPage`, mas estricto que el permiso `dining.manage` que gobierna el uso operativo diario.
+
+#### `dining_order_items`
+
+- Proposito: ticket de cocina por plato agregado a una comanda, con estado individual.
+- Campos clave: `id`, `frozen_sale_id`, `product_id`, `product_variant_id` nullable, `quantity`, `kitchen_status` (`pending` -> `preparing` -> (`on_hold` <-> `preparing`) -> `ready` -> `served`; o `cancelled`, terminal), `created_by`, `modified_by` nullable, `is_modified` boolean.
+- Nota de implementacion actual: normalizado aparte del JSON `payload_snapshot` de `frozen_sales` porque la pantalla de Cocina (`App\Livewire\Dining\KitchenDisplayPage`, `wire:poll`) necesita filtrar/agrupar por estado en SQL. `App\Actions\Dining\AdvanceDiningOrderItemStatus` valida la transicion contra un mapa explicito de estados permitidos (no un simple "siguiente paso"), soportando la pausa `on_hold`. Editar la cantidad (`UpdateDiningOrderItemQuantity`) o quitar un plato (`RemoveDiningOrderItem`, borra si estaba `pending`, marca `cancelled` si cocina ya lo habia tocado) marca `is_modified=true` — Cocina lo resalta como "Novedad".
+
+#### `sales` (columnas de division de cuenta)
+
+- `frozen_sale_id` nullable (FK a `frozen_sales`, `nullOnDelete`), `payer_label` nullable (string 60). Una `FrozenSale` de mesa normalmente se convierte en una sola `Sale` (`converted_sale_id`, relacion 1:1), pero al dividir la cuenta por items (`App\Actions\Dining\SplitDiningTableBill`) una misma `FrozenSale` produce VARIAS `Sale`, cada una con su subconjunto de items, su propio pago, y `payer_label` con el nombre del pagador (null si no hubo division). En ese caso `frozen_sales.converted_sale_id` queda null (no hay un unico "el" converted_sale_id).
 
 #### `payments`
 
@@ -388,8 +441,12 @@ Version conceptual con ajuste incremental segun las migraciones ya creadas. Cuan
 
 ## Relaciones criticas
 
+- `business_types` 1:N `companies`, `plans`, `modules` (estas dos ultimas nullable — ver notas en "Planes y monetizacion").
 - `companies` 1:N `branches`, `warehouses`, `cash_registers`, `company_roles`, `products`, `sales`, `promotions`.
 - `companies` 1:N `purchases`, `suppliers` y `payable_movements`.
+- `companies` 1:N `dining_tables`; `dining_tables` 1:N `frozen_sales`; `frozen_sales` 1:N `dining_order_items`.
+- `branches` 1:1 `dining_floor_plans` (una fila por sucursal, si el dueño ya dibujo el contorno).
+- `products` 1:1 `recipes` (solo cuando `is_recipe = true`); `recipes` 1:N `recipe_items`; `recipe_items` N:1 `products` (el insumo, via `ingredient_product_id`).
 - `users` N:M `companies` via `company_user`.
 - `plans` N:M `modules` y `features`.
 - `products` 1:N `product_presentations` y `product_variants`.

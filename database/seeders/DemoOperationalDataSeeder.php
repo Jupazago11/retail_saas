@@ -69,7 +69,6 @@ class DemoOperationalDataSeeder extends Seeder
 
         $service->set($company, 'general', 'phone', $settings['phone']);
         $service->set($company, 'general', 'address', $settings['address']);
-        $service->set($company, 'pos', 'sale_document_prefix', $settings['sale_prefix']);
         $service->set($company, 'cash', 'default_opening_amount', $settings['opening_amount']);
         $service->set($company, 'pos', 'allow_manual_discounts', $planCode === 'premium');
         $service->set($company, 'credit', 'credit_enabled', in_array($planCode, ['pro', 'premium'], true));
@@ -1327,7 +1326,11 @@ class DemoOperationalDataSeeder extends Seeder
             return;
         }
 
-        $payment = app(RegisterCreditPayment::class)->handle($company, $existing, [
+        // Los abonos ya no se enlazan a una venta puntual: RegisterCreditPayment
+        // recibe la cuenta de credito directamente, no la Sale.
+        $account = $customers[$definition['customer']]->creditAccount()->firstOrFail();
+
+        $payment = app(RegisterCreditPayment::class)->handle($company, $account, [
             'cash_session_id' => $cashSession->id,
             'received_by' => $owner->id,
             'payment_method_code' => 'cash',

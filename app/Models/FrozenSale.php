@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FrozenSale extends Model
 {
@@ -12,6 +13,7 @@ class FrozenSale extends Model
         'branch_id',
         'warehouse_id',
         'cash_register_id',
+        'dining_table_id',
         'customer_id',
         'created_by',
         'converted_sale_id',
@@ -47,6 +49,16 @@ class FrozenSale extends Model
     public function cashRegister(): BelongsTo
     {
         return $this->belongsTo(CashRegister::class);
+    }
+
+    public function diningTable(): BelongsTo
+    {
+        return $this->belongsTo(DiningTable::class);
+    }
+
+    public function diningOrderItems(): HasMany
+    {
+        return $this->hasMany(DiningOrderItem::class);
     }
 
     public function customer(): BelongsTo

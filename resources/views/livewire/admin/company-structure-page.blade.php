@@ -45,20 +45,14 @@
                                     @endif
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
-                                    @if ($branch->status === 'active')
+                                    @if ($branch->is_primary)
                                         <x-status-badge color="emerald">Activa</x-status-badge>
                                     @else
-                                        <x-status-badge color="stone">Inactiva</x-status-badge>
+                                        <x-status-toggle :active="$branch->status === 'active'" activeLabel="Activa" inactiveLabel="Inactiva" action="toggleStatus('branch', {{ $branch->id }})" />
                                     @endif
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
                                     <div class="flex justify-end gap-2">
-                                        @if (! $branch->is_primary)
-                                            <button wire:click="toggleStatus('branch', {{ $branch->id }})"
-                                                class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
-                                                {{ $branch->status === 'active' ? 'Inactivar' : 'Activar' }}
-                                            </button>
-                                        @endif
                                         @if (in_array($branch->id, $deletableBranchIds))
                                             <button wire:click="deleteRecord('branch', {{ $branch->id }})"
                                                 wire:confirm="¿Eliminar la sucursal {{ $branch->name }}? Esta acción no se puede deshacer."
@@ -122,20 +116,14 @@
                                     @endif
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
-                                    @if ($warehouse->status === 'active')
+                                    @if ($warehouse->is_primary)
                                         <x-status-badge color="emerald">Activa</x-status-badge>
                                     @else
-                                        <x-status-badge color="stone">Inactiva</x-status-badge>
+                                        <x-status-toggle :active="$warehouse->status === 'active'" activeLabel="Activa" inactiveLabel="Inactiva" action="toggleStatus('warehouse', {{ $warehouse->id }})" />
                                     @endif
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
                                     <div class="flex justify-end gap-2">
-                                        @if (! $warehouse->is_primary)
-                                            <button wire:click="toggleStatus('warehouse', {{ $warehouse->id }})"
-                                                class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
-                                                {{ $warehouse->status === 'active' ? 'Inactivar' : 'Activar' }}
-                                            </button>
-                                        @endif
                                         @if (in_array($warehouse->id, $deletableWarehouseIds))
                                             <button wire:click="deleteRecord('warehouse', {{ $warehouse->id }})"
                                                 wire:confirm="¿Eliminar la bodega {{ $warehouse->name }}? Esta acción no se puede deshacer."
@@ -212,20 +200,14 @@
                                     </select>
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
-                                    @if ($cashRegister->status === 'active')
+                                    @if ($cashRegister->is_primary)
                                         <x-status-badge color="emerald">Activa</x-status-badge>
                                     @else
-                                        <x-status-badge color="stone">Inactiva</x-status-badge>
+                                        <x-status-toggle :active="$cashRegister->status === 'active'" activeLabel="Activa" inactiveLabel="Inactiva" action="toggleStatus('cash', {{ $cashRegister->id }})" />
                                     @endif
                                 </td>
                                 <td class="py-3 w-px whitespace-nowrap">
                                     <div class="flex justify-end gap-2">
-                                        @if (! $cashRegister->is_primary)
-                                            <button wire:click="toggleStatus('cash', {{ $cashRegister->id }})"
-                                                class="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-600 transition hover:border-blue-400 hover:text-blue-700">
-                                                {{ $cashRegister->status === 'active' ? 'Inactivar' : 'Activar' }}
-                                            </button>
-                                        @endif
                                         @if (in_array($cashRegister->id, $deletableCashIds))
                                             <button wire:click="deleteRecord('cash', {{ $cashRegister->id }})"
                                                 wire:confirm="¿Eliminar la caja {{ $cashRegister->name }}? Esta acción no se puede deshacer."

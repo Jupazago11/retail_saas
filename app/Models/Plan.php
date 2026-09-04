@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Plan extends Model
 {
     protected $fillable = [
+        'business_type_id',
         'code',
         'name',
         'status',
@@ -21,6 +23,11 @@ class Plan extends Model
         return [
             'base_price' => 'decimal:2',
         ];
+    }
+
+    public function businessType(): BelongsTo
+    {
+        return $this->belongsTo(BusinessType::class);
     }
 
     public function modules(): BelongsToMany

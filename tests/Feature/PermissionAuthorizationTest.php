@@ -13,11 +13,12 @@ use App\Models\User;
 use App\Services\Tenancy\CurrentCompany;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Tests\Concerns\InteractsWithCompanyPlans;
 use Tests\TestCase;
 
 class PermissionAuthorizationTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithCompanyPlans, RefreshDatabase;
 
     public function test_seller_can_access_products_but_not_masters(): void
     {
@@ -25,6 +26,7 @@ class PermissionAuthorizationTest extends TestCase
         $company = app(CreateCompany::class)->handle($owner, [
             'legal_name' => 'Retail Permisos SAS',
         ]);
+        $this->assignCompanyPlan($company, 'basic');
 
         $seller = User::factory()->create();
 

@@ -3,12 +3,11 @@
 namespace App\Actions\Equipment;
 
 use App\Enums\EquipmentRentalStatus;
-use App\Enums\EquipmentType;
 use App\Models\Company;
 use App\Models\EquipmentRental;
+use App\Models\EquipmentType;
 use App\Models\User;
 use App\Services\Audit\AuditLogger;
-use App\Support\EquipmentRentalCatalog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,11 +34,11 @@ class ManageEquipmentRental
         $rental = DB::transaction(function () use ($company, $type, $notes) {
             return EquipmentRental::create([
                 'company_id' => $company->id,
-                'equipment_type' => $type->value,
-                'company_sequence' => $this->nextCompanySequence($company, $type),
+                'equipment_type' => $type->code,
+                'company_sequence' => $this->nextCompanySequence($company, $type->code),
                 'status' => EquipmentRentalStatus::Requested->value,
-                'unit_cost' => EquipmentRentalCatalog::unitCost($type),
-                'monthly_price' => EquipmentRentalCatalog::monthlyPrice($type),
+                'unit_cost' => $type->unit_cost,
+                'monthly_price' => $type->monthly_price,
                 'requested_at' => now(),
                 'notes' => $notes,
             ]);
@@ -60,11 +59,11 @@ class ManageEquipmentRental
         $rental = DB::transaction(function () use ($company, $type, $notes) {
             return EquipmentRental::create([
                 'company_id' => $company->id,
-                'equipment_type' => $type->value,
-                'company_sequence' => $this->nextCompanySequence($company, $type),
+                'equipment_type' => $type->code,
+                'company_sequence' => $this->nextCompanySequence($company, $type->code),
                 'status' => EquipmentRentalStatus::Active->value,
-                'unit_cost' => EquipmentRentalCatalog::unitCost($type),
-                'monthly_price' => EquipmentRentalCatalog::monthlyPrice($type),
+                'unit_cost' => $type->unit_cost,
+                'monthly_price' => $type->monthly_price,
                 'requested_at' => now(),
                 'started_at' => now(),
                 'notes' => $notes,
@@ -147,13 +146,15 @@ class ManageEquipmentRental
         $this->auditLogger->logUpdated($company, 'equipment.replaced', $before, $rental->fresh(), $actor);
 
         $replacement = DB::transaction(function () use ($company, $rental, $notes) {
+            $unitCost = EquipmentType::where('code', $rental->equipment_type)->value('unit_cost') ?? $rental->unit_cost;
+
             return EquipmentRental::create([
                 'company_id' => $company->id,
-                'equipment_type' => $rental->equipment_type->value,
+                'equipment_type' => $rental->equipment_type,
                 'company_sequence' => $this->nextCompanySequence($company, $rental->equipment_type),
                 'status' => EquipmentRentalStatus::Active->value,
                 'replaces_rental_id' => $rental->id,
-                'unit_cost' => EquipmentRentalCatalog::unitCost($rental->equipment_type),
+                'unit_cost' => $unitCost,
                 'monthly_price' => $rental->monthly_price,
                 'requested_at' => now(),
                 'started_at' => now(),
@@ -172,11 +173,11 @@ class ManageEquipmentRental
      * dice nada por si solo). Mismo patron que ya usa OpenCashSession para
      * el consecutivo de cajas.
      */
-    protected function nextCompanySequence(Company $company, EquipmentType $type): int
+    protected function nextCompanySequence(Company $company, string $typeCode): int
     {
         $lastSequence = (int) EquipmentRental::query()
             ->where('company_id', $company->id)
-            ->where('equipment_type', $type->value)
+            ->where('equipment_type', $typeCode)
             ->orderByDesc('company_sequence')
             ->lockForUpdate()
             ->value('company_sequence');
